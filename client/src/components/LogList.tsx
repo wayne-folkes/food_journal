@@ -30,7 +30,7 @@ export function LogList({ entries, isLoading, onEdit, onDelete }: Props) {
   if (entries.length === 0) {
     return (
       <div className="log-list--empty">
-        <p>No entries yet today. Start logging above!</p>
+        <p>Nothing logged yet today.</p>
       </div>
     )
   }

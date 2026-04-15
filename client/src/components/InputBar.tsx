@@ -20,7 +20,7 @@ export function InputBar({ onAdd }: Props) {
       <input
         type="text"
         className="input-bar__field"
-        placeholder="What did you eat or drink?"
+        placeholder="e.g. oat milk latte at 9am..."
         value={value}
         onChange={(e) => setValue(e.target.value)}
         autoFocus

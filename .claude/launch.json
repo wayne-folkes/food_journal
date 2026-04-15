@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "food-journal",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "/Users/wayne/dev/vibe_coding/food_journal/client",
+      "port": 5173
+    }
+  ]
+}

@@ -1,38 +1,57 @@
+/* ── Google Fonts ─────────────────────────────────────────────────────────
+   Lora  — warm serif for headings, wordmark, and timestamps
+   Nunito — rounded sans for body text, inputs, entries
+   ───────────────────────────────────────────────────────────────────────── */
+
 /* ── Design tokens ───────────────────────────────────────────────────────── */
 :root {
-  --color-bg: #f5f6fa;
-  --color-surface: #ffffff;
-  --color-border: #e2e5ed;
-  --color-text: #1a1d23;
-  --color-text-muted: #6b7280;
-  --color-primary: #1d4ed8;
-  --color-primary-hover: #1e40af;
-  --color-danger: #dc2626;
-  --color-danger-hover: #b91c1c;
-  --color-chip-bg: #f0f4ff;
-  --color-chip-text: #1d4ed8;
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.08);
+  /* Palette — warm parchment diary */
+  --cream:          #FAF6F0;
+  --cream-mid:      #F2EBE0;
+  --cream-dark:     #E8DDD0;
+  --paper:          #FFFFFF;
+  --ink:            #2A2118;
+  --ink-mid:        #5C4F42;
+  --ink-muted:      #9A8878;
+  --terra:          #C25A2A;   /* terracotta — primary CTA */
+  --terra-hover:    #A84623;
+  --terra-light:    #F7EBE4;   /* chip hover, outline hover */
+  --terra-border:   #E8B49A;   /* subtle terracotta borders */
+  --sage:           #4A6741;   /* secondary / success */
+  --danger:         #B83232;
+  --border:         #E2D9CC;
 
-  /* Input bar height used for bottom padding calculation on mobile */
-  --input-bar-height: 68px;
+  /* Shadows */
+  --shadow-sm:   0 1px 3px rgba(42, 33, 24, 0.08);
+  --shadow-card: 0 2px 8px rgba(42, 33, 24, 0.08), 0 0 0 1px rgba(42, 33, 24, 0.04);
+  --shadow-md:   0 4px 16px rgba(42, 33, 24, 0.12);
+  --shadow-up:   0 -2px 12px rgba(42, 33, 24, 0.08);
 
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
-  /* Mobile-first base: slightly smaller to fit more on small screens */
+  /* Radii */
+  --radius-sm:  5px;
+  --radius-md:  10px;
+  --radius-lg:  16px;
+  --radius-xl:  24px;
+
+  /* Input bar height — used for mobile bottom-padding calc */
+  --input-bar-height: 72px;
+
+  /* Typography */
+  --font-serif: 'Lora', Georgia, 'Times New Roman', serif;
+  --font-sans:  'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Base */
+  font-family: var(--font-sans);
   font-size: 15px;
-  line-height: 1.5;
-  color: var(--color-text);
-  background: var(--color-bg);
+  line-height: 1.55;
+  color: var(--ink);
+  background-color: var(--cream);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scale up to standard 16px on wider screens */
 @media (min-width: 640px) {
-  :root {
-    font-size: 16px;
-  }
+  :root { font-size: 16px; }
 }
 
 *, *::before, *::after {
@@ -43,6 +62,7 @@
 
 body {
   min-height: 100svh;
+  background-color: var(--cream);
 }
 
 #root {
