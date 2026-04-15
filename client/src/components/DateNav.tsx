@@ -1,0 +1,55 @@
+import { todayString } from '../lib/store'
+
+interface Props {
+  date: string          // YYYY-MM-DD
+  onPrev: () => void
+  onNext: () => void
+}
+
+function formatDate(dateStr: string): string {
+  const today = todayString()
+  const yesterday = offsetDate(today, -1)
+
+  if (dateStr === today) return 'Today'
+  if (dateStr === yesterday) return 'Yesterday'
+
+  // e.g. "Wed, Apr 14"
+  const d = new Date(`${dateStr}T12:00:00`) // noon local avoids DST edge cases
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+/** Returns a YYYY-MM-DD string offset by `days` from the given date string. */
+export function offsetDate(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T12:00:00`)
+  d.setDate(d.getDate() + days)
+  return d.toLocaleDateString('sv') // 'sv' locale → YYYY-MM-DD
+}
+
+export function DateNav({ date, onPrev, onNext }: Props) {
+  const isToday = date === todayString()
+
+  return (
+    <div className="date-nav">
+      <button
+        className="date-nav__arrow"
+        onClick={onPrev}
+        aria-label="Previous day"
+      >
+        ←
+      </button>
+
+      <span className="date-nav__label">
+        {formatDate(date)}
+      </span>
+
+      <button
+        className="date-nav__arrow"
+        onClick={onNext}
+        disabled={isToday}
+        aria-label="Next day"
+      >
+        →
+      </button>
+    </div>
+  )
+}

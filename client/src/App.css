@@ -246,6 +246,59 @@
 .chip:hover { background: var(--terra-light); border-color: var(--terra); color: var(--terra); }
 .chip:active { background: var(--terra-light); border-color: var(--terra-hover); }
 
+/* ── Date navigator ──────────────────────────────────────────────────────── */
+.date-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--paper);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 4px 4px;
+}
+
+.date-nav__label {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: center;
+  flex: 1;
+}
+
+@media (min-width: 640px) {
+  .date-nav__label { font-size: 1rem; }
+}
+
+.date-nav__arrow {
+  background: none;
+  border: none;
+  cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  font-size: 1.1rem;
+  color: var(--ink-mid);
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.date-nav__arrow:hover:not(:disabled) {
+  background: var(--cream-mid);
+  color: var(--terra);
+}
+.date-nav__arrow:active:not(:disabled) {
+  background: var(--cream-dark);
+}
+.date-nav__arrow:disabled {
+  color: var(--cream-dark);
+  cursor: default;
+}
+
 /* ── Log list card ───────────────────────────────────────────────────────── */
 .log-list {
   background: var(--paper);

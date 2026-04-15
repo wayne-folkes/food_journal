@@ -8,6 +8,7 @@ import { RecentChips } from './components/RecentChips'
 import { LogList } from './components/LogList'
 import { EditModal } from './components/EditModal'
 import { AuthButton } from './components/AuthButton'
+import { DateNav, offsetDate } from './components/DateNav'
 import { ToastProvider, useToast } from './components/Toast'
 import type { Entry } from './types/database'
 import './App.css'
@@ -17,6 +18,7 @@ function AppInner() {
     useEntriesStore()
   const [user, setUser] = useState<User | null>(null)
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null)
+  const [selectedDate, setSelectedDate] = useState(todayString)
   const toast = useToast()
 
   // Auth listener — onAuthStateChange covers all cases including INITIAL_SESSION on page load.
@@ -27,14 +29,11 @@ function AppInner() {
       setUser(session?.user ?? null)
 
       if (event === 'SIGNED_IN') {
-        // Sync anonymous entries to Supabase first, then mark as authed.
-        // The loadToday effect will fire after setAuthed(true) — by then entries are in Supabase.
         await syncLocalToRemote()
         setAuthed(true)
       } else if (event === 'SIGNED_OUT') {
         setAuthed(false)
       } else {
-        // INITIAL_SESSION, TOKEN_REFRESHED, etc. — no sync needed.
         setAuthed(!!session)
       }
     })
@@ -42,9 +41,19 @@ function AppInner() {
     return () => subscription.unsubscribe()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Reload entries whenever the selected date or auth state changes
   useEffect(() => {
-    loadToday(todayString())
-  }, [isAuthed, loadToday])
+    loadToday(selectedDate)
+  }, [isAuthed, selectedDate, loadToday])
+
+  // For anonymous users the store holds ALL entries (no server-side filter).
+  // Filter them down to the selected date in local time.
+  const displayedEntries = isAuthed
+    ? entries
+    : entries.filter((e) => {
+        const localDate = new Date(e.consumed_at).toLocaleDateString('sv')
+        return localDate === selectedDate
+      })
 
   async function handleAdd(raw: string) {
     const { description, consumed_at } = parseEntry(raw)
@@ -92,6 +101,7 @@ function AppInner() {
     }
   }
 
+  const isViewingToday = selectedDate === todayString()
   const recent = recentDistinct(entries)
 
   return (
@@ -102,10 +112,24 @@ function AppInner() {
       </header>
 
       <main className="app-main">
-        <h1 className="app-main__question">What did you eat or drink?</h1>
-        <InputBar onAdd={handleAdd} />
-        <RecentChips items={recent} onSelect={handleRelogChip} />
-        <LogList entries={entries} isLoading={isLoading} onEdit={setEditingEntry} onDelete={handleDelete} />
+        {isViewingToday && (
+          <h1 className="app-main__question">What did you eat or drink?</h1>
+        )}
+        {isViewingToday && <InputBar onAdd={handleAdd} />}
+        {isViewingToday && recent.length > 0 && (
+          <RecentChips items={recent} onSelect={handleRelogChip} />
+        )}
+        <DateNav
+          date={selectedDate}
+          onPrev={() => setSelectedDate((d) => offsetDate(d, -1))}
+          onNext={() => setSelectedDate((d) => offsetDate(d, 1))}
+        />
+        <LogList
+          entries={displayedEntries}
+          isLoading={isLoading}
+          onEdit={setEditingEntry}
+          onDelete={handleDelete}
+        />
       </main>
 
       {editingEntry && (
