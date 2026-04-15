@@ -1,0 +1,52 @@
+/* ── Design tokens ───────────────────────────────────────────────────────── */
+:root {
+  --color-bg: #f5f6fa;
+  --color-surface: #ffffff;
+  --color-border: #e2e5ed;
+  --color-text: #1a1d23;
+  --color-text-muted: #6b7280;
+  --color-primary: #1d4ed8;
+  --color-primary-hover: #1e40af;
+  --color-danger: #dc2626;
+  --color-danger-hover: #b91c1c;
+  --color-chip-bg: #f0f4ff;
+  --color-chip-text: #1d4ed8;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.08);
+
+  /* Input bar height used for bottom padding calculation on mobile */
+  --input-bar-height: 68px;
+
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  /* Mobile-first base: slightly smaller to fit more on small screens */
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scale up to standard 16px on wider screens */
+@media (min-width: 640px) {
+  :root {
+    font-size: 16px;
+  }
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100svh;
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
