@@ -20,7 +20,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  background: rgba(250, 246, 240, 0.92);
+  background: var(--header-bg);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
@@ -577,7 +577,7 @@
 }
 .meal-card__menu-item:hover { background: var(--cream-mid); }
 .meal-card__menu-item--danger { color: var(--danger); }
-.meal-card__menu-item--danger:hover { background: #fdf0f0; }
+.meal-card__menu-item--danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
 
 /* Items list */
 .meal-card__items {
@@ -634,7 +634,7 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(42, 33, 24, 0.4);
+  background: var(--overlay-bg);
   display: flex;
   align-items: flex-end;
   justify-content: stretch;

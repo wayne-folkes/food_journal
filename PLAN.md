@@ -83,24 +83,24 @@
 
 ### 8.3 — Safety Features (depend on 8.2 toast action button)
 
-- [ ] **Undo delete**
+- [x] **Undo delete**
   - File: `App.tsx` — `handleDelete`: optimistically remove meal (store in `pendingDelete` ref), show toast *"Meal deleted"* with **Undo** action. After 5s auto-dismiss, call `deleteMeal(id)`. On Undo, restore meal and cancel delete.
   - File: `store.ts` — add `removeMealLocally(id)` and `restoreMeal(meal)` actions (local state only, no Supabase)
   - Test: E2E — delete → click Undo within 5s → meal reappears
 
-- [ ] **Confirm on edit discard**
+- [x] **Confirm on edit discard**
   - File: `EditMealModal.tsx` — track `isDirty` (compare chips/type/time against original). On cancel, if dirty, `window.confirm("Discard unsaved changes?")` before closing.
 
 ### 8.4 — Polish (independent, parallelize)
 
-- [ ] **Dark mode**
+- [x] **Dark mode**
   - File: `index.css` — `@media (prefers-color-scheme: dark)` overriding all CSS variables with dark equivalents (`--cream: #1A1714`, `--paper: #242018`, `--ink: #EDE8E0`, etc.)
   - File: `App.css` — adjust hardcoded `rgba()` values (header backdrop, overlay) for dark
   - Test: visual check in browser devtools
 
-- [ ] **PWA manifest + icons**
+- [x] **PWA manifest + icons**
   - New file: `client/public/manifest.json` — name, short_name, start_url, display: standalone, icons
-  - New files: `client/public/icon-192.png`, `client/public/icon-512.png`
+  - New files: `client/public/icon.svg`, `client/public/icon-maskable.svg`
   - File: `client/index.html` — `<link rel="manifest">`, `<meta name="theme-color">`, Apple touch icon
 
 ---

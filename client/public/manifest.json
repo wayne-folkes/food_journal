@@ -1,0 +1,24 @@
+{
+  "name": "Food Journal",
+  "short_name": "Food Journal",
+  "description": "Log meals instantly, no friction.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF6F0",
+  "theme_color": "#C25A2A",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

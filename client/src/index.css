@@ -21,6 +21,10 @@
   --danger:         #B83232;
   --border:         #E2D9CC;
 
+  /* Adaptive backdrop tokens — overridden in dark mode */
+  --header-bg:  rgba(250, 246, 240, 0.92);
+  --overlay-bg: rgba(42, 33, 24, 0.4);
+
   /* Shadows */
   --shadow-sm:   0 1px 3px rgba(42, 33, 24, 0.08);
   --shadow-card: 0 2px 8px rgba(42, 33, 24, 0.08), 0 0 0 1px rgba(42, 33, 24, 0.04);
@@ -77,4 +81,45 @@ body {
   min-height: 100svh;
   display: flex;
   flex-direction: column;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Palette — warm dark */
+    --cream:        #1C1814;
+    --cream-mid:    #231F1A;
+    --cream-dark:   #2C2620;
+    --paper:        #262018;
+    --ink:          #EDE8E0;
+    --ink-mid:      #B8AFA6;
+    --ink-muted:    #7A706A;
+    --terra:        #D4724A;
+    --terra-hover:  #C25A2A;
+    --terra-light:  #2A1A10;
+    --terra-border: #5A3020;
+    --sage:         #5A8C50;
+    --danger:       #CC4444;
+    --border:       #352E28;
+
+    /* Shadows */
+    --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --shadow-md:   0 4px 16px rgba(0, 0, 0, 0.45);
+    --shadow-up:   0 -2px 12px rgba(0, 0, 0, 0.3);
+
+    /* Meal type accents — slightly adjusted for dark backgrounds */
+    --meal-breakfast: #D4A53C;
+    --meal-lunch:     #6E8F62;
+    --meal-dinner:    #D4724A;
+    --meal-snack:     #8A7868;
+    --meal-dessert:   #B86C7A;
+    --meal-drink:     #5C7C9E;
+
+    /* Adaptive tokens */
+    --header-bg:  rgba(28, 24, 20, 0.92);
+    --overlay-bg: rgba(0, 0, 0, 0.6);
+
+    background-color: var(--cream);
+    color: var(--ink);
+  }
 }
