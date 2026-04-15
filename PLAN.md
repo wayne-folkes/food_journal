@@ -35,8 +35,8 @@
 - [x] GitHub repository — https://github.com/wayne-folkes/food_journal
 - [x] Vercel project linked to GitHub — https://foodjournal-lime.vercel.app
 - [x] Environment variables set in Vercel (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
-- [ ] Add production URL to Supabase Auth + Google OAuth allowed origins
-- [ ] Production smoke test
+- [x] Add production URL to Supabase Auth + Google OAuth allowed origins
+- [x] Production smoke test
 
 ## Post-MVP (Deferred)
 - [ ] Compare Days view
