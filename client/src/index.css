@@ -40,6 +40,14 @@
   --font-serif: 'Lora', Georgia, 'Times New Roman', serif;
   --font-sans:  'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
 
+  /* Meal type accent colors */
+  --meal-breakfast: #E8B84A;   /* warm yellow */
+  --meal-lunch:     #7A9B6E;   /* sage green */
+  --meal-dinner:    #C25A2A;   /* terra (same as primary) */
+  --meal-snack:     #9A8878;   /* muted ink */
+  --meal-dessert:   #C77A8A;   /* dusty rose */
+  --meal-drink:     #6B8CAE;   /* slate blue */
+
   /* Base */
   font-family: var(--font-sans);
   font-size: 15px;

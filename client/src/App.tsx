@@ -1,33 +1,30 @@
 import { useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
-import { parseEntry } from './lib/parser'
 import { useEntriesStore, recentDistinct, todayString } from './lib/store'
-import { InputBar } from './components/InputBar'
+import { MealComposer } from './components/MealComposer'
+import { suggestMealType } from './lib/mealType'
+import { MealLog } from './components/MealLog'
 import { RecentChips } from './components/RecentChips'
-import { LogList } from './components/LogList'
-import { EditModal } from './components/EditModal'
+import { EditMealModal } from './components/EditMealModal'
 import { AuthButton } from './components/AuthButton'
 import { DateNav, offsetDate } from './components/DateNav'
 import { ToastProvider, useToast } from './components/Toast'
-import type { Entry } from './types/database'
+import type { MealWithItems, MealType } from './types/database'
 import './App.css'
 
 function AppInner() {
-  const { entries, isAuthed, isLoading, setAuthed, loadToday, addEntry, editEntry, deleteEntry, syncLocalToRemote } =
+  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, syncLocalToRemote } =
     useEntriesStore()
   const [user, setUser] = useState<User | null>(null)
-  const [editingEntry, setEditingEntry] = useState<Entry | null>(null)
+  const [editingMeal, setEditingMeal] = useState<MealWithItems | null>(null)
   const [selectedDate, setSelectedDate] = useState(todayString)
   const toast = useToast()
 
-  // Auth listener — onAuthStateChange covers all cases including INITIAL_SESSION on page load.
-  // For SIGNED_IN we must sync local→remote BEFORE calling setAuthed(true), otherwise the
-  // loadToday effect fires first and overwrites the store with an empty Supabase fetch.
+  // Auth listener
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setUser(session?.user ?? null)
-
       if (event === 'SIGNED_IN') {
         await syncLocalToRemote()
         setAuthed(true)
@@ -37,55 +34,62 @@ function AppInner() {
         setAuthed(!!session)
       }
     })
-
     return () => subscription.unsubscribe()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reload entries whenever the selected date or auth state changes
+  // Reload meals whenever the selected date or auth state changes
   useEffect(() => {
-    loadToday(selectedDate)
-  }, [isAuthed, selectedDate, loadToday])
+    loadDay(selectedDate)
+  }, [isAuthed, selectedDate, loadDay])
 
-  // For anonymous users the store holds ALL entries (no server-side filter).
-  // Filter them down to the selected date in local time.
-  const displayedEntries = isAuthed
-    ? entries
-    : entries.filter((e) => {
-        const localDate = new Date(e.consumed_at).toLocaleDateString('sv')
+  // For anonymous users, filter meals to the selected date
+  const displayedMeals = isAuthed
+    ? meals
+    : meals.filter((m) => {
+        const localDate = new Date(m.consumed_at).toLocaleDateString('sv')
         return localDate === selectedDate
       })
 
-  async function handleAdd(raw: string) {
-    const { description, consumed_at } = parseEntry(raw)
+  async function handleAddMeal(payload: {
+    mealType: MealType
+    items: string[]
+    consumed_at: string
+    rawInput: string
+  }) {
     try {
-      await addEntry({
-        description,
-        consumed_at: consumed_at.toISOString(),
-        raw_input: raw,
+      await addMeal({
+        meal_type: payload.mealType,
+        consumed_at: payload.consumed_at,
+        raw_input: payload.rawInput,
+        items: payload.items,
       })
     } catch (err) {
-      toast.error('Failed to add entry. Please try again.')
-      console.error('handleAdd error', err)
+      toast.error('Failed to add meal. Please try again.')
+      console.error('handleAddMeal error', err)
     }
   }
 
-  async function handleRelogChip(description: string) {
+  async function handleRelogItem(description: string) {
     try {
-      await addEntry({
-        description,
+      await addMeal({
+        meal_type: suggestMealType(),
         consumed_at: new Date().toISOString(),
         raw_input: description,
+        items: [description],
       })
     } catch (err) {
       toast.error('Failed to add entry. Please try again.')
-      console.error('handleRelogChip error', err)
+      console.error('handleRelogItem error', err)
     }
   }
 
-  async function handleSaveEdit(id: string, updates: { description: string; consumed_at: string }) {
+  async function handleSaveEdit(
+    id: string,
+    updates: { meal_type: MealType; consumed_at: string; items: string[] }
+  ) {
     try {
-      await editEntry(id, updates)
-      setEditingEntry(null)
+      await editMeal(id, updates)
+      setEditingMeal(null)
     } catch (err) {
       toast.error('Failed to save changes. Please try again.')
       console.error('handleSaveEdit error', err)
@@ -94,15 +98,15 @@ function AppInner() {
 
   async function handleDelete(id: string) {
     try {
-      await deleteEntry(id)
+      await deleteMeal(id)
     } catch (err) {
-      toast.error('Failed to delete entry. Please try again.')
+      toast.error('Failed to delete meal. Please try again.')
       console.error('handleDelete error', err)
     }
   }
 
   const isViewingToday = selectedDate === todayString()
-  const recent = recentDistinct(entries)
+  const recent = recentDistinct(meals)
 
   return (
     <div className="app">
@@ -112,31 +116,30 @@ function AppInner() {
       </header>
 
       <main className="app-main">
-        {isViewingToday && (
-          <h1 className="app-main__question">What did you eat or drink?</h1>
-        )}
-        {isViewingToday && <InputBar onAdd={handleAdd} />}
+        {isViewingToday && <MealComposer onAdd={handleAddMeal} />}
         {isViewingToday && recent.length > 0 && (
-          <RecentChips items={recent} onSelect={handleRelogChip} />
+          <RecentChips items={recent} onSelect={handleRelogItem} />
         )}
         <DateNav
           date={selectedDate}
           onPrev={() => setSelectedDate((d) => offsetDate(d, -1))}
           onNext={() => setSelectedDate((d) => offsetDate(d, 1))}
+          onToday={() => setSelectedDate(todayString())}
         />
-        <LogList
-          entries={displayedEntries}
+        <MealLog
+          meals={displayedMeals}
           isLoading={isLoading}
-          onEdit={setEditingEntry}
+          selectedDate={selectedDate}
+          onEdit={setEditingMeal}
           onDelete={handleDelete}
         />
       </main>
 
-      {editingEntry && (
-        <EditModal
-          entry={editingEntry}
+      {editingMeal && (
+        <EditMealModal
+          meal={editingMeal}
           onSave={handleSaveEdit}
-          onCancel={() => setEditingEntry(null)}
+          onCancel={() => setEditingMeal(null)}
         />
       )}
     </div>

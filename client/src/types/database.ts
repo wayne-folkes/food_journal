@@ -1,18 +1,20 @@
 /**
- * Hand-written Supabase schema types.
+ * Hand-written Supabase schema types for the meals redesign.
  * Regenerate with:
  *   npx supabase gen types typescript --project-id kbdtcoyrspyjqjsgkwjl > src/types/database.ts
- * after running the migration.
  */
+
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'dessert' | 'drink'
+
 export type Database = {
   public: {
     Tables: {
-      entries: {
+      meals: {
         Row: {
           id: string
           user_id: string | null
-          description: string
           consumed_at: string
+          meal_type: MealType
           raw_input: string
           created_at: string
           updated_at: string
@@ -20,28 +22,64 @@ export type Database = {
         Insert: {
           id?: string
           user_id?: string | null
-          description: string
-          consumed_at: string
-          raw_input: string
+          consumed_at?: string
+          meal_type?: MealType
+          raw_input?: string
           created_at?: string
           updated_at?: string
         }
         Update: {
-          description?: string
           consumed_at?: string
+          meal_type?: MealType
           raw_input?: string
           updated_at?: string
         }
         Relationships: []
       }
+      meal_items: {
+        Row: {
+          id: string
+          meal_id: string
+          description: string
+          position: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          meal_id: string
+          description: string
+          position?: number
+          created_at?: string
+        }
+        Update: {
+          description?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'meal_items_meal_id_fkey'
+            columns: ['meal_id']
+            referencedRelation: 'meals'
+            referencedColumns: ['id']
+          }
+        ]
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
-    Enums: Record<string, never>
+    Enums: {
+      meal_type: MealType
+    }
     CompositeTypes: Record<string, never>
   }
 }
 
-export type Entry = Database['public']['Tables']['entries']['Row']
-export type EntryInsert = Database['public']['Tables']['entries']['Insert']
-export type EntryUpdate = Database['public']['Tables']['entries']['Update']
+export type Meal = Database['public']['Tables']['meals']['Row']
+export type MealInsert = Database['public']['Tables']['meals']['Insert']
+export type MealUpdate = Database['public']['Tables']['meals']['Update']
+
+export type MealItem = Database['public']['Tables']['meal_items']['Row']
+export type MealItemInsert = Database['public']['Tables']['meal_items']['Insert']
+
+/** A meal with its items eagerly loaded — the primary working type. */
+export type MealWithItems = Meal & { items: MealItem[] }

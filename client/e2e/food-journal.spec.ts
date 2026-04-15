@@ -1,185 +1,163 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+test.beforeEach(async ({ page }) => {
+  // Clear local storage before each test to start fresh
+  await page.goto('/')
+  await page.evaluate(() => localStorage.clear())
+  await page.reload()
+})
 
-/** Clear the Zustand persisted store so each test starts fresh. */
-async function clearStore(page: Page) {
-  await page.evaluate(() => localStorage.removeItem('food_journal_entries'))
-}
+test('golden path — log a multi-item meal and see it in the log', async ({ page }) => {
+  await page.goto('/')
 
-/** Type text into the main input and submit via the keyboard or button. */
-async function fillInput(page: Page, text: string) {
-  await page.getByPlaceholder('What did you eat or drink?').fill(text)
-}
+  // The chip input should be visible
+  const chipInput = page.locator('.chip-input__field')
+  await expect(chipInput).toBeVisible()
 
-async function submitWithEnter(page: Page) {
-  await page.getByPlaceholder('What did you eat or drink?').press('Enter')
-}
+  // Type an item and press Enter to chip it
+  await chipInput.fill('scrambled eggs')
+  await chipInput.press('Enter')
 
-async function submitWithButton(page: Page) {
-  await page.getByRole('button', { name: 'Add' }).click()
-}
+  // Chip should appear
+  await expect(page.locator('.chip-input__chip').first()).toContainText('scrambled eggs')
 
-/** Add an entry via Enter key and wait for it to appear in the log. */
-async function addEntry(page: Page, text: string, expectedDesc?: string) {
-  await fillInput(page, text)
-  await submitWithEnter(page)
-  const desc = expectedDesc ?? text
-  await expect(page.locator('.entry-row__desc', { hasText: desc }).first()).toBeVisible()
-}
+  // Add another item via comma
+  await chipInput.fill('toast,')
+  await expect(page.locator('.chip-input__chip').nth(1)).toContainText('toast')
 
-// ---------------------------------------------------------------------------
-// Test suite
-// ---------------------------------------------------------------------------
+  // Add a third item
+  await chipInput.fill('orange juice')
+  await chipInput.press('Enter')
 
-test.describe('Food Journal – anonymous golden path', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/')
-    await clearStore(page)
-    // Reload so the app picks up the cleared store before each test
-    await page.reload()
-    await page.waitForLoadState('networkidle')
-  })
+  // Save the meal
+  await page.locator('button[type="submit"]').click()
 
-  // -------------------------------------------------------------------------
-  // 1. Golden path – submit with Enter
-  // -------------------------------------------------------------------------
-  test.describe('Golden path', () => {
-    test("type entry and press Enter → appears in Today's Log", async ({ page }) => {
-      await fillInput(page, 'scrambled eggs')
-      await submitWithEnter(page)
+  // Meal card should be visible
+  await expect(page.locator('.meal-card')).toBeVisible()
+  await expect(page.locator('.meal-card__item').first()).toContainText('scrambled eggs')
+  await expect(page.locator('.meal-card__item').nth(1)).toContainText('toast')
+  await expect(page.locator('.meal-card__item').nth(2)).toContainText('orange juice')
+})
 
-      // Section heading
-      await expect(page.getByRole('heading', { name: "Today's Log" })).toBeVisible()
+test('meal type selection — switching type updates the active pill', async ({ page }) => {
+  await page.goto('/')
 
-      // Entry description
-      await expect(page.locator('.entry-row__desc', { hasText: 'scrambled eggs' })).toBeVisible()
-    })
-  })
+  // Click "Lunch" pill
+  await page.locator('.meal-type-pill', { hasText: 'Lunch' }).click()
+  await expect(page.locator('.meal-type-pill--lunch')).toHaveClass(/meal-type-pill--active/)
+  await expect(page.locator('.meal-type-pill--breakfast')).not.toHaveClass(/meal-type-pill--active/)
+})
 
-  // -------------------------------------------------------------------------
-  // 2. Add with button
-  // -------------------------------------------------------------------------
-  test.describe('Add with button', () => {
-    test('type entry and click Add button → appears in log', async ({ page }) => {
-      await fillInput(page, 'black coffee')
-      await submitWithButton(page)
+test('save button is disabled when no chips are present', async ({ page }) => {
+  await page.goto('/')
+  const saveBtn = page.locator('button[type="submit"]')
+  await expect(saveBtn).toBeDisabled()
 
-      await expect(page.getByRole('heading', { name: "Today's Log" })).toBeVisible()
-      await expect(page.locator('.entry-row__desc', { hasText: 'black coffee' })).toBeVisible()
-    })
-  })
+  // Add a chip
+  await page.locator('.chip-input__field').fill('apple')
+  await page.locator('.chip-input__field').press('Enter')
+  await expect(saveBtn).not.toBeDisabled()
 
-  // -------------------------------------------------------------------------
-  // 3. Time parsing – "pizza at noon" → description is "pizza" (time stripped)
-  // -------------------------------------------------------------------------
-  test.describe('Time parsing', () => {
-    test('"pizza at noon" → description does not contain "noon"', async ({ page }) => {
-      await fillInput(page, 'pizza at noon')
-      await submitWithEnter(page)
+  // Remove the chip
+  await page.locator('.chip-input__remove').click()
+  await expect(saveBtn).toBeDisabled()
+})
 
-      await expect(page.getByRole('heading', { name: "Today's Log" })).toBeVisible()
+test('log two separate meals — both show in the log', async ({ page }) => {
+  await page.goto('/')
 
-      // The parser strips the matched time expression ("at noon"), leaving "pizza"
-      const desc = page.locator('.entry-row__desc').first()
-      await expect(desc).toBeVisible()
-      await expect(desc).not.toContainText('noon')
-      // Description should contain "pizza"
-      await expect(desc).toContainText('pizza')
-    })
-  })
+  // First meal
+  await page.locator('.chip-input__field').fill('oatmeal')
+  await page.locator('.chip-input__field').press('Enter')
+  await page.locator('button[type="submit"]').click()
 
-  // -------------------------------------------------------------------------
-  // 4. Delete entry
-  // -------------------------------------------------------------------------
-  test.describe('Delete entry', () => {
-    test('add entry → click delete → entry disappears', async ({ page }) => {
-      await addEntry(page, 'green tea')
+  // Second meal
+  await page.locator('.chip-input__field').fill('chicken salad')
+  await page.locator('.chip-input__field').press('Enter')
+  await page.locator('.meal-type-pill', { hasText: 'Lunch' }).click()
+  await page.locator('button[type="submit"]').click()
 
-      // Hover the row to reveal actions, then click the delete button
-      const row = page.locator('.entry-row', { hasText: 'green tea' })
-      await row.hover()
-      await row.getByTitle('Delete').click()
+  // Both cards visible
+  const cards = page.locator('.meal-card')
+  await expect(cards).toHaveCount(2)
+})
 
-      // Entry should be gone
-      await expect(page.locator('.entry-row__desc', { hasText: 'green tea' })).not.toBeVisible()
-    })
-  })
+test('delete a meal', async ({ page }) => {
+  await page.goto('/')
 
-  // -------------------------------------------------------------------------
-  // 5. Edit entry
-  // -------------------------------------------------------------------------
-  test.describe('Edit entry', () => {
-    test('add entry → open edit modal → change description → Save Changes → updated text appears', async ({ page }) => {
-      await addEntry(page, 'toast')
+  // Add a meal
+  await page.locator('.chip-input__field').fill('banana')
+  await page.locator('.chip-input__field').press('Enter')
+  await page.locator('button[type="submit"]').click()
+  await expect(page.locator('.meal-card')).toHaveCount(1)
 
-      // Hover to reveal actions, click edit
-      const row = page.locator('.entry-row', { hasText: 'toast' })
-      await row.hover()
-      await row.getByTitle('Edit').click()
+  // Open menu and delete
+  await page.locator('.meal-card__menu-btn').click()
+  await page.locator('.meal-card__menu-item--danger').click()
 
-      // Modal should be open
-      await expect(page.getByRole('heading', { name: 'Edit Entry' })).toBeVisible()
+  await expect(page.locator('.meal-card')).toHaveCount(0)
+  await expect(page.locator('.meal-log__empty')).toBeVisible()
+})
 
-      // Clear and update description field (the first input inside the modal)
-      const descInput = page.locator('.modal .input[type="text"]')
-      await descInput.clear()
-      await descInput.fill('avocado toast')
+test('edit a meal — change item and save', async ({ page }) => {
+  await page.goto('/')
 
-      // Save
-      await page.getByRole('button', { name: 'Save Changes' }).click()
+  // Add a meal
+  await page.locator('.chip-input__field').fill('coffee')
+  await page.locator('.chip-input__field').press('Enter')
+  await page.locator('button[type="submit"]').click()
 
-      // Modal should close and updated description should be in the log
-      await expect(page.getByRole('heading', { name: 'Edit Entry' })).not.toBeVisible()
-      await expect(page.locator('.entry-row__desc', { hasText: 'avocado toast' })).toBeVisible()
+  // Open edit
+  await page.locator('.meal-card__menu-btn').click()
+  await page.locator('.meal-card__menu-item', { hasText: 'Edit' }).click()
 
-      // Old description should be gone
-      await expect(page.locator('.entry-row__desc', { hasText: 'toast' }).filter({ hasNotText: 'avocado' })).not.toBeVisible()
-    })
-  })
+  // Modal should be visible with existing chip
+  await expect(page.locator('.modal')).toBeVisible()
+  await expect(page.locator('.modal .chip-input__chip')).toContainText('coffee')
 
-  // -------------------------------------------------------------------------
-  // 6. Recent chips
-  // -------------------------------------------------------------------------
-  test.describe('Recent chips', () => {
-    test('add two entries → chips appear → click chip → second entry added', async ({ page }) => {
-      // Add first entry
-      await addEntry(page, 'oatmeal')
+  // Remove old chip, add new one
+  await page.locator('.modal .chip-input__remove').click()
+  await page.locator('.modal .chip-input__field').fill('espresso')
+  await page.locator('.modal .chip-input__field').press('Enter')
 
-      // Add second entry
-      await addEntry(page, 'black coffee')
+  // Save
+  await page.locator('.modal button[type="submit"]').click()
 
-      // Both chips should be visible (most recent first)
-      await expect(page.locator('.chip', { hasText: 'black coffee' })).toBeVisible()
-      await expect(page.locator('.chip', { hasText: 'oatmeal' })).toBeVisible()
+  // Card should show updated item
+  await expect(page.locator('.meal-card__item')).toContainText('espresso')
+  await expect(page.locator('.meal-card__item')).not.toContainText('coffee')
+})
 
-      // Count oatmeal entries before clicking chip
-      const oatmealsBefore = await page.locator('.entry-row__desc', { hasText: 'oatmeal' }).count()
+test('recent chips appear after logging and relog creates a new snack meal', async ({ page }) => {
+  await page.goto('/')
 
-      // Click the oatmeal chip to re-log it
-      await page.locator('.chip', { hasText: 'oatmeal' }).click()
+  // Log a meal
+  await page.locator('.chip-input__field').fill('almonds')
+  await page.locator('.chip-input__field').press('Enter')
+  await page.locator('button[type="submit"]').click()
 
-      // A second oatmeal entry should now appear
-      await expect(page.locator('.entry-row__desc', { hasText: 'oatmeal' })).toHaveCount(oatmealsBefore + 1)
-    })
-  })
+  // Recent chip should appear
+  await expect(page.locator('.chip', { hasText: 'almonds' })).toBeVisible()
 
-  // -------------------------------------------------------------------------
-  // 7. Persist on refresh
-  // -------------------------------------------------------------------------
-  test.describe('Persist on refresh', () => {
-    test('add entry → reload page → entry still shows', async ({ page }) => {
-      await addEntry(page, 'banana')
+  // Click the recent chip
+  await page.locator('.chip', { hasText: 'almonds' }).click()
 
-      // Reload the page
-      await page.reload()
-      await page.waitForLoadState('networkidle')
+  // A second meal card should be logged
+  await expect(page.locator('.meal-card')).toHaveCount(2)
+})
 
-      // Entry should still be visible
-      await expect(page.getByRole('heading', { name: "Today's Log" })).toBeVisible()
-      await expect(page.locator('.entry-row__desc', { hasText: 'banana' })).toBeVisible()
-    })
-  })
+test('data persists after page reload (localStorage)', async ({ page }) => {
+  await page.goto('/')
+
+  // Log a meal
+  await page.locator('.chip-input__field').fill('yogurt')
+  await page.locator('.chip-input__field').press('Enter')
+  await page.locator('button[type="submit"]').click()
+
+  // Reload
+  await page.reload()
+
+  // Should still be visible
+  await expect(page.locator('.meal-card')).toHaveCount(1)
+  await expect(page.locator('.meal-card__item')).toContainText('yogurt')
 })
