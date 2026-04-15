@@ -18,6 +18,10 @@ function displayTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
+function capitalize(s: string): string {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
+}
+
 export function MealComposer({ onAdd }: Props) {
   const now = new Date()
   const [mealType, setMealType] = useState<MealType>(() => suggestMealType(now))
@@ -34,7 +38,7 @@ export function MealComposer({ onAdd }: Props) {
     const { description, consumed_at } = parseChip(trimmed, new Date(mealTime))
     if (consumed_at) setMealTime(consumed_at.toISOString())
 
-    const label = description || trimmed
+    const label = capitalize(description || trimmed)
     const next = [...chips, label]
     setChips(next)
     return next
@@ -48,7 +52,7 @@ export function MealComposer({ onAdd }: Props) {
       const lastRaw = newChips[newChips.length - 1]
       const { description, consumed_at } = parseChip(lastRaw, new Date(mealTime))
       if (consumed_at) setMealTime(consumed_at.toISOString())
-      const label = description || lastRaw
+      const label = capitalize(description || lastRaw)
       setChips([...newChips.slice(0, -1), label])
     } else {
       setChips(newChips)
@@ -98,6 +102,9 @@ export function MealComposer({ onAdd }: Props) {
           onInputChange={setInputValue}
           placeholder="e.g. scrambled eggs, toast, coffee…"
         />
+        {chips.length === 0 && !inputValue && (
+          <p className="meal-composer__hint">Press Enter or , to add items</p>
+        )}
       </div>
 
       <div className="meal-composer__footer">

@@ -243,6 +243,17 @@
 .chip-input__field::placeholder { color: var(--ink-muted); }
 
 /* ── Composer footer ─────────────────────────────────────────────────────── */
+.meal-composer__hint {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 2px 14px 6px;
+  margin: 0;
+  opacity: 0.75;
+}
+
 .meal-composer__footer {
   display: flex;
   align-items: center;
@@ -411,6 +422,11 @@
 }
 
 /* ── Meal Card ───────────────────────────────────────────────────────────── */
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .meal-card {
   display: flex;
   background: var(--paper);
@@ -418,6 +434,7 @@
   box-shadow: var(--shadow-card);
   overflow: hidden;
   transition: box-shadow 0.15s;
+  animation: card-in 0.22s ease-out both;
 }
 .meal-card:hover {
   box-shadow: 0 3px 12px rgba(42, 33, 24, 0.1), 0 0 0 1px rgba(42, 33, 24, 0.05);
