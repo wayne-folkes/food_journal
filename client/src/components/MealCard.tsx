@@ -6,13 +6,14 @@ interface Props {
   meal: MealWithItems
   onEdit: (meal: MealWithItems) => void
   onDelete: (id: string) => void
+  onDuplicate: (meal: MealWithItems) => void
 }
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
-export function MealCard({ meal, onEdit, onDelete }: Props) {
+export function MealCard({ meal, onEdit, onDelete, onDuplicate }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
@@ -45,6 +46,12 @@ export function MealCard({ meal, onEdit, onDelete }: Props) {
                     onClick={() => { setMenuOpen(false); onEdit(meal) }}
                   >
                     Edit
+                  </button>
+                  <button
+                    className="meal-card__menu-item"
+                    onClick={() => { setMenuOpen(false); onDuplicate(meal) }}
+                  >
+                    Log again
                   </button>
                   <button
                     className="meal-card__menu-item meal-card__menu-item--danger"

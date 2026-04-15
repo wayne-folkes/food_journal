@@ -9,6 +9,7 @@ import { RecentChips } from './components/RecentChips'
 import { EditMealModal } from './components/EditMealModal'
 import { AuthButton } from './components/AuthButton'
 import { DateNav, offsetDate } from './components/DateNav'
+import { DaySummary } from './components/DaySummary'
 import { ToastProvider, useToast } from './components/Toast'
 import type { MealWithItems, MealType } from './types/database'
 import './App.css'
@@ -105,6 +106,20 @@ function AppInner() {
     }
   }
 
+  async function handleDuplicate(meal: MealWithItems) {
+    try {
+      await addMeal({
+        meal_type: meal.meal_type,
+        consumed_at: new Date().toISOString(),
+        raw_input: meal.raw_input ?? '',
+        items: meal.items.map((i) => i.description),
+      })
+    } catch (err) {
+      toast.error('Failed to log meal again. Please try again.')
+      console.error('handleDuplicate error', err)
+    }
+  }
+
   const isViewingToday = selectedDate === todayString()
   const recent = recentDistinct(meals)
 
@@ -126,12 +141,14 @@ function AppInner() {
           onNext={() => setSelectedDate((d) => offsetDate(d, 1))}
           onToday={() => setSelectedDate(todayString())}
         />
+        <DaySummary meals={displayedMeals} />
         <MealLog
           meals={displayedMeals}
           isLoading={isLoading}
           selectedDate={selectedDate}
           onEdit={setEditingMeal}
           onDelete={handleDelete}
+          onDuplicate={handleDuplicate}
         />
       </main>
 

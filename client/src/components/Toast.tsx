@@ -2,15 +2,21 @@ import { createContext, useCallback, useContext, useRef, useState } from 'react'
 
 type ToastKind = 'error' | 'success'
 
+export interface ToastAction {
+  label: string
+  onClick: () => void
+}
+
 interface ToastItem {
   id: number
   message: string
   kind: ToastKind
+  action?: ToastAction
 }
 
 interface ToastContextValue {
-  error: (message: string) => void
-  success: (message: string) => void
+  error: (message: string, action?: ToastAction) => void
+  success: (message: string, action?: ToastAction) => void
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null)
@@ -22,11 +28,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const nextId = useRef(0)
 
-  const add = useCallback((message: string, kind: ToastKind) => {
+  const add = useCallback((message: string, kind: ToastKind, action?: ToastAction) => {
     const id = nextId.current++
     setToasts((prev) => {
-      const next = [...prev, { id, message, kind }]
-      // Keep only the last MAX_TOASTS items
+      const next = [...prev, { id, message, kind, action }]
       return next.length > MAX_TOASTS ? next.slice(next.length - MAX_TOASTS) : next
     })
     setTimeout(() => {
@@ -34,15 +39,19 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     }, DISMISS_MS)
   }, [])
 
+  const dismiss = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+  }, [])
+
   const value: ToastContextValue = {
-    error: useCallback((msg) => add(msg, 'error'), [add]),
-    success: useCallback((msg) => add(msg, 'success'), [add]),
+    error: useCallback((msg, action) => add(msg, 'error', action), [add]),
+    success: useCallback((msg, action) => add(msg, 'success', action), [add]),
   }
 
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <ToastContainer toasts={toasts} />
+      <ToastContainer toasts={toasts} onDismiss={dismiss} />
     </ToastContext.Provider>
   )
 }
@@ -53,13 +62,21 @@ export function useToast(): ToastContextValue {
   return ctx
 }
 
-function ToastContainer({ toasts }: { toasts: ToastItem[] }) {
+function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
   if (toasts.length === 0) return null
   return (
     <div className="toast-container" role="region" aria-label="Notifications" aria-live="polite">
       {toasts.map((t) => (
         <div key={t.id} className={`toast toast--${t.kind}`}>
-          {t.message}
+          <span className="toast__message">{t.message}</span>
+          {t.action && (
+            <button
+              className="toast__action"
+              onClick={() => { t.action!.onClick(); onDismiss(t.id) }}
+            >
+              {t.action.label}
+            </button>
+          )}
         </div>
       ))}
     </div>

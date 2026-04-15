@@ -7,6 +7,7 @@ interface Props {
   selectedDate: string
   onEdit: (meal: MealWithItems) => void
   onDelete: (id: string) => void
+  onDuplicate: (meal: MealWithItems) => void
 }
 
 function LoadingSkeleton() {
@@ -29,7 +30,7 @@ function formatDateHeading(dateStr: string): string {
   return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
-export function MealLog({ meals, isLoading, selectedDate, onEdit, onDelete }: Props) {
+export function MealLog({ meals, isLoading, selectedDate, onEdit, onDelete, onDuplicate }: Props) {
   if (isLoading) return <LoadingSkeleton />
 
   const sorted = [...meals].sort(
@@ -44,7 +45,7 @@ export function MealLog({ meals, isLoading, selectedDate, onEdit, onDelete }: Pr
         <p className="meal-log__empty">Nothing logged yet.</p>
       ) : (
         sorted.map((meal) => (
-          <MealCard key={meal.id} meal={meal} onEdit={onEdit} onDelete={onDelete} />
+          <MealCard key={meal.id} meal={meal} onEdit={onEdit} onDelete={onDelete} onDuplicate={onDuplicate} />
         ))
       )}
     </section>
