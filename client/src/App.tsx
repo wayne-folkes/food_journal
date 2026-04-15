@@ -8,14 +8,16 @@ import { RecentChips } from './components/RecentChips'
 import { LogList } from './components/LogList'
 import { EditModal } from './components/EditModal'
 import { AuthButton } from './components/AuthButton'
+import { ToastProvider, useToast } from './components/Toast'
 import type { Entry } from './types/database'
 import './App.css'
 
-export default function App() {
-  const { entries, isAuthed, setAuthed, loadToday, addEntry, editEntry, deleteEntry, syncLocalToRemote } =
+function AppInner() {
+  const { entries, isAuthed, isLoading, setAuthed, loadToday, addEntry, editEntry, deleteEntry, syncLocalToRemote } =
     useEntriesStore()
   const [user, setUser] = useState<User | null>(null)
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null)
+  const toast = useToast()
 
   // Auth listener — onAuthStateChange covers all cases including INITIAL_SESSION on page load.
   // For SIGNED_IN we must sync local→remote BEFORE calling setAuthed(true), otherwise the
@@ -44,26 +46,50 @@ export default function App() {
     loadToday(todayString())
   }, [isAuthed, loadToday])
 
-  function handleAdd(raw: string) {
+  async function handleAdd(raw: string) {
     const { description, consumed_at } = parseEntry(raw)
-    addEntry({
-      description,
-      consumed_at: consumed_at.toISOString(),
-      raw_input: raw,
-    })
+    try {
+      await addEntry({
+        description,
+        consumed_at: consumed_at.toISOString(),
+        raw_input: raw,
+      })
+    } catch (err) {
+      toast.error('Failed to add entry. Please try again.')
+      console.error('handleAdd error', err)
+    }
   }
 
-  function handleRelogChip(description: string) {
-    addEntry({
-      description,
-      consumed_at: new Date().toISOString(),
-      raw_input: description,
-    })
+  async function handleRelogChip(description: string) {
+    try {
+      await addEntry({
+        description,
+        consumed_at: new Date().toISOString(),
+        raw_input: description,
+      })
+    } catch (err) {
+      toast.error('Failed to add entry. Please try again.')
+      console.error('handleRelogChip error', err)
+    }
   }
 
-  function handleSaveEdit(id: string, updates: { description: string; consumed_at: string }) {
-    editEntry(id, updates)
-    setEditingEntry(null)
+  async function handleSaveEdit(id: string, updates: { description: string; consumed_at: string }) {
+    try {
+      await editEntry(id, updates)
+      setEditingEntry(null)
+    } catch (err) {
+      toast.error('Failed to save changes. Please try again.')
+      console.error('handleSaveEdit error', err)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      await deleteEntry(id)
+    } catch (err) {
+      toast.error('Failed to delete entry. Please try again.')
+      console.error('handleDelete error', err)
+    }
   }
 
   const recent = recentDistinct(entries)
@@ -79,7 +105,7 @@ export default function App() {
         <h1 className="app-main__question">What did you eat or drink?</h1>
         <InputBar onAdd={handleAdd} />
         <RecentChips items={recent} onSelect={handleRelogChip} />
-        <LogList entries={entries} onEdit={setEditingEntry} onDelete={deleteEntry} />
+        <LogList entries={entries} isLoading={isLoading} onEdit={setEditingEntry} onDelete={handleDelete} />
       </main>
 
       {editingEntry && (
@@ -90,5 +116,13 @@ export default function App() {
         />
       )}
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <AppInner />
+    </ToastProvider>
   )
 }

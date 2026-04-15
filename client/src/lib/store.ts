@@ -46,6 +46,7 @@ export const useEntriesStore = create<EntriesState>()(
     (set, get) => ({
       entries: [],
       isAuthed: false,
+      isLoading: false,
 
       setAuthed: (authed) => set({ isAuthed: authed, ...(!authed && { entries: [] }) }),
 
@@ -57,23 +58,29 @@ export const useEntriesStore = create<EntriesState>()(
           return
         }
 
+        set({ isLoading: true })
+
         // Use local midnight boundaries so entries aren't missed due to UTC offset
         const start = new Date(`${date}T00:00:00`).toISOString()
         const end = new Date(`${date}T23:59:59.999`).toISOString()
 
-        const { data, error } = await supabase
-          .from('entries')
-          .select('*')
-          .gte('consumed_at', start)
-          .lte('consumed_at', end)
-          .order('consumed_at', { ascending: true })
+        try {
+          const { data, error } = await supabase
+            .from('entries')
+            .select('*')
+            .gte('consumed_at', start)
+            .lte('consumed_at', end)
+            .order('consumed_at', { ascending: true })
 
-        if (error) {
-          console.error('loadToday error', error)
-          return
+          if (error) {
+            console.error('loadToday error', error)
+            return
+          }
+
+          set({ entries: data ?? [] })
+        } finally {
+          set({ isLoading: false })
         }
-
-        set({ entries: data ?? [] })
       },
 
       addEntry: async (insert) => {

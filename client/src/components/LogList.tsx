@@ -3,11 +3,30 @@ import { EntryRow } from './EntryRow'
 
 interface Props {
   entries: Entry[]
+  isLoading: boolean
   onEdit: (entry: Entry) => void
   onDelete: (id: string) => void
 }
 
-export function LogList({ entries, onEdit, onDelete }: Props) {
+function LoadingSkeleton() {
+  return (
+    <section className="log-list skeleton">
+      <h2 className="log-list__heading">Today's Log</h2>
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="skeleton-row">
+          <div className="skeleton-pulse skeleton-pulse--time" />
+          <div className="skeleton-pulse skeleton-pulse--desc" />
+        </div>
+      ))}
+    </section>
+  )
+}
+
+export function LogList({ entries, isLoading, onEdit, onDelete }: Props) {
+  if (isLoading) {
+    return <LoadingSkeleton />
+  }
+
   if (entries.length === 0) {
     return (
       <div className="log-list--empty">
