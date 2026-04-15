@@ -46,12 +46,27 @@ export function EditMealModal({ meal, onSave, onCancel }: Props) {
     })
   }
 
+  const originalChips = meal.items.map((i) => i.description)
+  const originalTime = formatTimeInput(meal.consumed_at)
+
+  const isDirty =
+    mealType !== meal.meal_type ||
+    consumedAt !== originalTime ||
+    chips.length !== originalChips.length ||
+    chips.some((c, i) => c !== originalChips[i]) ||
+    inputValue.trim().length > 0
+
+  function handleCancel() {
+    if (isDirty && !window.confirm('Discard unsaved changes?')) return
+    onCancel()
+  }
+
   return (
-    <div className="modal-overlay" onClick={onCancel}>
+    <div className="modal-overlay" onClick={handleCancel}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
           <h2>Edit Meal</h2>
-          <button className="btn-icon" onClick={onCancel} type="button">✕</button>
+          <button className="btn-icon" onClick={handleCancel} type="button">✕</button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -85,7 +100,7 @@ export function EditMealModal({ meal, onSave, onCancel }: Props) {
             <button type="submit" className="btn btn--primary" disabled={chips.length === 0 && !inputValue.trim()}>
               Save Changes
             </button>
-            <button type="button" className="btn btn--ghost" onClick={onCancel}>
+            <button type="button" className="btn btn--ghost" onClick={handleCancel}>
               Cancel
             </button>
           </div>

@@ -22,7 +22,7 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | null>(null)
 
 const MAX_TOASTS = 3
-const DISMISS_MS = 3000
+const DISMISS_MS = 5500
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])

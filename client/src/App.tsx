@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { useEntriesStore, recentDistinct, todayString } from './lib/store'
@@ -15,7 +15,7 @@ import type { MealWithItems, MealType } from './types/database'
 import './App.css'
 
 function AppInner() {
-  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, syncLocalToRemote } =
+  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, removeMealLocally, restoreMeal, syncLocalToRemote } =
     useEntriesStore()
   const [user, setUser] = useState<User | null>(null)
   const [editingMeal, setEditingMeal] = useState<MealWithItems | null>(null)
@@ -97,13 +97,49 @@ function AppInner() {
     }
   }
 
+  const pendingDeletes = useRef<Map<string, { meal: MealWithItems; timer: ReturnType<typeof setTimeout> }>>(new Map())
+
   async function handleDelete(id: string) {
-    try {
-      await deleteMeal(id)
-    } catch (err) {
-      toast.error('Failed to delete meal. Please try again.')
-      console.error('handleDelete error', err)
+    // Find the meal before removing it
+    const meal = displayedMeals.find((m) => m.id === id)
+    if (!meal) return
+
+    // Optimistically remove from UI
+    removeMealLocally(id)
+
+    // Cancel any existing pending delete for this id
+    const existing = pendingDeletes.current.get(id)
+    if (existing) {
+      clearTimeout(existing.timer)
     }
+
+    // Schedule the real delete after 5 seconds
+    const timer = setTimeout(async () => {
+      pendingDeletes.current.delete(id)
+      try {
+        await deleteMeal(id)
+      } catch (err) {
+        // If the real delete fails, restore the meal
+        restoreMeal(meal)
+        toast.error('Failed to delete meal. Please try again.')
+        console.error('handleDelete error', err)
+      }
+    }, 5000)
+
+    pendingDeletes.current.set(id, { meal, timer })
+
+    // Show toast with Undo action
+    toast.success('Meal deleted', {
+      label: 'Undo',
+      onClick: () => {
+        const pending = pendingDeletes.current.get(id)
+        if (pending) {
+          clearTimeout(pending.timer)
+          pendingDeletes.current.delete(id)
+          restoreMeal(pending.meal)
+        }
+      },
+    })
   }
 
   async function handleDuplicate(meal: MealWithItems) {

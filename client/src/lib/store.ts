@@ -17,6 +17,8 @@ interface MealsState {
     updates: { meal_type: MealType; consumed_at: string; items: string[] }
   ) => Promise<void>
   deleteMeal: (id: string) => Promise<void>
+  removeMealLocally: (id: string) => void
+  restoreMeal: (meal: MealWithItems) => void
   syncLocalToRemote: () => Promise<void>
   setAuthed: (authed: boolean) => void
 }
@@ -234,6 +236,18 @@ export const useEntriesStore = create<MealsState>()(
         const { error } = await supabase.from('meals').delete().eq('id', id)
         if (error) { console.error('deleteMeal error', error); throw error }
         set((s) => ({ meals: s.meals.filter((m) => m.id !== id) }))
+      },
+
+      removeMealLocally: (id) => {
+        set((s) => ({ meals: s.meals.filter((m) => m.id !== id) }))
+      },
+
+      restoreMeal: (meal) => {
+        set((s) => ({
+          meals: [...s.meals, meal].sort(
+            (a, b) => new Date(a.consumed_at).getTime() - new Date(b.consumed_at).getTime()
+          ),
+        }))
       },
 
       syncLocalToRemote: async () => {
