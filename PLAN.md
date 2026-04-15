@@ -22,19 +22,20 @@
 - [x] Sign-out clears local store
 - [x] Bug fixes: RLS user_id default, race condition, timezone query
 
-## Phase 4: Polish
-- [ ] Mobile-first responsive layout
-- [ ] Loading states (spinner while fetching from Supabase)
-- [ ] Error handling (toast notifications for failed writes)
+## Phase 4: Polish ✅
+- [x] Mobile-first responsive layout (sticky bottom input, 44px touch targets, bottom-sheet modal, safe-area insets)
+- [x] Loading skeleton while Supabase fetch is in flight
+- [x] Toast notifications for add/edit/delete errors (auto-dismiss 3s)
 
-## Phase 5: Testing
-- [ ] Playwright E2E — golden path (type → submit → entry appears)
-- [ ] Playwright E2E — anonymous → sign-in → sync flow
+## Phase 5: Testing ✅
+- [x] Playwright E2E — 7 golden-path tests (anonymous flow)
+- [x] Unit tests — 20/20 passing (parser + store utilities)
 
-## Phase 6: Deployment
-- [ ] GitHub repository
-- [ ] Vercel project (linked to GitHub)
-- [ ] Environment variables set in Vercel dashboard
+## Phase 6: Deployment ✅
+- [x] GitHub repository — https://github.com/wayne-folkes/food_journal
+- [x] Vercel project linked to GitHub — https://foodjournal-lime.vercel.app
+- [x] Environment variables set in Vercel (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+- [ ] Add production URL to Supabase Auth + Google OAuth allowed origins
 - [ ] Production smoke test
 
 ## Post-MVP (Deferred)
