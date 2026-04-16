@@ -39,14 +39,29 @@ async function fetchFromUsda(description: string): Promise<{ calories: number | 
     })
   })
 
-  const data = await response.json() as { foods?: Array<{ fdcId: number; foodNutrients?: Array<{ number: string; amount: number }> }> }
+  const data = await response.json() as {
+    foods?: Array<{
+      fdcId: number
+      foodNutrients?: Array<{
+        nutrientNumber?: string  // search endpoint field name
+        number?: string          // fallback
+        nutrientName?: string
+        name?: string
+        value?: number           // search endpoint field name
+        amount?: number          // fallback
+        unitName?: string
+      }>
+    }>
+  }
   const food = data.foods?.[0]
 
-  // Find energy nutrient (number 208 = Energy, kcal)
-  const energyNutrient = food?.foodNutrients?.find(
-    (n: { number: string }) => String(n.number) === '208'
+  // Find energy nutrient — search endpoint uses nutrientNumber/value; details endpoint uses number/amount
+  const energyNutrient = food?.foodNutrients?.find(n =>
+    String(n.nutrientNumber ?? n.number) === '208' ||
+    ((n.nutrientName ?? n.name) === 'Energy' && (n.unitName ?? '').toUpperCase() === 'KCAL')
   )
-  const calories = energyNutrient ? Math.round(energyNutrient.amount) : null
+  const rawAmount = energyNutrient?.value ?? energyNutrient?.amount
+  const calories = rawAmount != null ? Math.round(rawAmount) : null
 
   return { calories, fdcId: food?.fdcId ?? null }
 }
