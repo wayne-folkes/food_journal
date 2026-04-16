@@ -437,12 +437,11 @@ export const useEntriesStore = create<MealsState>()(
         // Optimistic update
         const prevMeals = get().meals
         set((s) => ({
-          meals: s.meals.map((m) => ({
-            ...m,
-            items: m.items.map((item) =>
-              item.id === itemId ? { ...item, calories } : item
-            ),
-          })),
+          meals: s.meals.map((m) =>
+            m.items.some((i) => i.id === itemId)
+              ? { ...m, items: m.items.map((i) => i.id === itemId ? { ...i, calories } : i) }
+              : m
+          ),
         }))
 
         const { isAuthed } = get()
