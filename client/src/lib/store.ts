@@ -24,7 +24,7 @@ interface SearchMealRpcRow {
   raw_input: string
   created_at: string
   updated_at: string
-  items: Json
+  items: MealItem[]
 }
 
 export interface ChipItem {
@@ -217,6 +217,7 @@ function isSearchMealRpcRow(value: unknown): value is SearchMealRpcRow {
     && typeof value.created_at === 'string'
     && typeof value.updated_at === 'string'
     && Array.isArray(value.items)
+    && value.items.every(isMealItem)
 }
 
 function fromSearchMealsRpc(data: unknown, source: string): MealWithItems[] {
