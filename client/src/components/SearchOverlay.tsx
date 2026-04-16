@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from 'react'
 import type { MealWithItems } from '../types/database'
 import { useEntriesStore } from '../lib/store'
 import { MEAL_TYPE_LABELS } from '../lib/mealType'
@@ -148,7 +148,7 @@ export function SearchOverlay({ onClose, onNavigateToDate }: SearchOverlayProps)
     }
   }, [])
 
-  const grouped = groupByDate(results)
+  const grouped = useMemo(() => groupByDate(results), [results])
   const showResults = query.length >= 2 && !isSearching
   const showEmpty = showResults && results.length === 0
   const showHint = inputValue.length < 2 && !isSearching
