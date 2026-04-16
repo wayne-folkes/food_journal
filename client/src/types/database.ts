@@ -122,6 +122,21 @@ export type Database = {
         }
         Returns: Json
       }
+      search_meals: {
+        Args: {
+          p_query: string
+        }
+        Returns: {
+          id: string
+          user_id: string | null
+          consumed_at: string
+          meal_type: MealType
+          raw_input: string
+          created_at: string
+          updated_at: string
+          items: Json
+        }[]
+      }
       update_meal_with_items: {
         Args: {
           p_meal_id: string

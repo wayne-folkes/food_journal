@@ -16,6 +16,17 @@ interface FailedSyncedLocalMeal {
   error: string
 }
 
+interface SearchMealRpcRow {
+  id: string
+  user_id: string | null
+  consumed_at: string
+  meal_type: MealType
+  raw_input: string
+  created_at: string
+  updated_at: string
+  items: Json
+}
+
 export interface ChipItem {
   description: string
   calories: number | null
@@ -87,10 +98,6 @@ function normalizeMealWithItems(meal: MealWithItems): MealWithItems {
 
 function buildRawInput(items: Array<{ description: string }>): string {
   return items.map((item) => item.description).join(', ')
-}
-
-function escapeLikePattern(value: string): string {
-  return value.replace(/[\\%_]/g, '\\$&')
 }
 
 function serializeRpcItems(items: RpcMealItem[]): Json {
@@ -198,6 +205,47 @@ function fromBatchSyncRpc(data: unknown, source: string): {
   }
 
   return { synced, failed }
+}
+
+function isSearchMealRpcRow(value: unknown): value is SearchMealRpcRow {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && (value.user_id === null || typeof value.user_id === 'string')
+    && typeof value.consumed_at === 'string'
+    && isMealType(value.meal_type)
+    && typeof value.raw_input === 'string'
+    && typeof value.created_at === 'string'
+    && typeof value.updated_at === 'string'
+    && Array.isArray(value.items)
+}
+
+function fromSearchMealsRpc(data: unknown, source: string): MealWithItems[] {
+  if (!Array.isArray(data)) {
+    throw new Error(`Invalid meals payload returned from ${source}`)
+  }
+
+  return data.map((entry) => {
+    if (!isSearchMealRpcRow(entry)) {
+      throw new Error(`Invalid meals payload returned from ${source}`)
+    }
+
+    const meal: MealWithItems = {
+      id: entry.id,
+      user_id: entry.user_id,
+      consumed_at: entry.consumed_at,
+      meal_type: entry.meal_type,
+      raw_input: entry.raw_input,
+      created_at: entry.created_at,
+      updated_at: entry.updated_at,
+      items: entry.items,
+    }
+
+    if (!isMealWithItems(meal)) {
+      throw new Error(`Invalid meals payload returned from ${source}`)
+    }
+
+    return normalizeMealWithItems(meal)
+  })
 }
 
 /** Build a full local MealWithItems from an insert payload. */
@@ -423,31 +471,17 @@ export const useEntriesStore = create<MealsState>()(
           return get().meals.filter((m) => m.items.some((i) => i.description.toLowerCase().includes(q)))
         }
 
-        // Get matching meal_item meal_ids
-        const { data: itemMatches } = await supabase
-          .from('meal_items')
-          .select('meal_id')
-          .ilike('description', `%${escapeLikePattern(normalizedQuery)}%`)
-
-        const mealIds = [...new Set(itemMatches?.map((r) => r.meal_id) ?? [])]
-        if (mealIds.length === 0) return []
-
         const { data, error } = await supabase
-          .from('meals')
-          .select('*, meal_items(*)')
-          .in('id', mealIds)
-          .order('consumed_at', { ascending: false })
-          .limit(50)
+          .rpc('search_meals', { p_query: normalizedQuery })
 
         if (error) { console.error('searchMeals error', error); return [] }
 
-        type SupabaseMealRow = Omit<MealWithItems, 'items'> & {
-          meal_items: MealWithItems['items']
+        try {
+          return fromSearchMealsRpc(data, 'search_meals')
+        } catch (err) {
+          console.error('searchMeals parse error', err)
+          return []
         }
-        return (data as SupabaseMealRow[] ?? []).map((m) => ({
-          ...m,
-          items: [...(m.meal_items ?? [])].sort((a, b) => a.position - b.position),
-        }))
       },
 
       syncLocalToRemote: async () => {

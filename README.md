@@ -26,7 +26,27 @@ supabase/migrations/0004_food_lookup.sql           -- USDA cache table
 supabase/migrations/0005_sync_meals_schema.sql     -- raw_input + updated_at on meals
 supabase/migrations/0006_transactional_meal_writes.sql -- transactional meal RPCs
 supabase/migrations/0007_batch_sync_local_meals.sql -- batched local-to-remote sync RPC
+supabase/migrations/0008_search_meals_rpc.sql      -- search RPC + trigram index
 ```
+
+After running `0007` and `0008`, verify the new SQL objects exist:
+
+```sql
+select proname
+from pg_proc
+where proname in ('create_meals_with_items_batch', 'search_meals')
+order by proname;
+
+select indexname
+from pg_indexes
+where schemaname = 'public'
+   and tablename = 'meal_items'
+   and indexname = 'meal_items_description_trgm';
+```
+
+Expected result:
+- both RPC names are returned from `pg_proc`
+- the `meal_items_description_trgm` index is returned from `pg_indexes`
 
 ### 2. Supabase — enable Google OAuth
 

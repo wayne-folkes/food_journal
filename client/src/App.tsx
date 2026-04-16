@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { useEntriesStore, recentDistinct, todayString } from './lib/store'
@@ -205,7 +205,7 @@ function AppInner() {
   }
 
   const isViewingToday = selectedDate === todayString()
-  const recent = recentDistinct(meals)
+  const recent = useMemo(() => recentDistinct(meals), [meals])
 
   return (
     <div className="app">

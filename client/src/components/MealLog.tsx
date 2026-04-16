@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import type { MealWithItems } from '../types/database'
 import { MealCard } from './MealCard'
 
@@ -33,11 +34,14 @@ function formatDateHeading(dateStr: string): string {
 }
 
 export function MealLog({ meals, isLoading, selectedDate, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories }: Props) {
-  if (isLoading) return <LoadingSkeleton />
-
-  const sorted = [...meals].sort(
-    (a, b) => new Date(a.consumed_at).getTime() - new Date(b.consumed_at).getTime()
+  const sorted = useMemo(
+    () => [...meals].sort(
+      (a, b) => new Date(a.consumed_at).getTime() - new Date(b.consumed_at).getTime()
+    ),
+    [meals]
   )
+
+  if (isLoading) return <LoadingSkeleton />
 
   return (
     <section className="meal-log">

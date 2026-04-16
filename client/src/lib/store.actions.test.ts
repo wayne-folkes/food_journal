@@ -430,23 +430,86 @@ describe('useEntriesStore.addMeal', () => {
     })
   })
 
-  it('escapes wildcard characters before issuing remote search patterns', async () => {
+  it('passes wildcard characters through to the search RPC as literal user input', async () => {
     useEntriesStore.setState({ meals: [], isAuthed: true, isLoading: false })
 
-    const ilike = vi.fn().mockResolvedValue({ data: [], error: null })
-    const select = vi.fn().mockReturnValue({ ilike })
-
-    mockSupabase.from.mockImplementation((table: string) => {
-      if (table === 'meal_items') {
-        return { select }
-      }
-
-      throw new Error(`Unexpected table: ${table}`)
-    })
+    mockSupabase.rpc.mockResolvedValue({ data: [], error: null })
 
     await expect(useEntriesStore.getState().searchMeals(' 50%_milk ')).resolves.toEqual([])
 
-    expect(mockSupabase.from).toHaveBeenCalledWith('meal_items')
-    expect(ilike).toHaveBeenCalledWith('description', '%50\\%\\_milk%')
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('search_meals', { p_query: '50%_milk' })
+  })
+
+  it('searches authenticated meals through the search_meals RPC', async () => {
+    useEntriesStore.setState({ meals: [], isAuthed: true, isLoading: false })
+    mockSupabase.rpc.mockResolvedValue({
+      data: [
+        {
+          id: 'meal-1',
+          user_id: 'user-1',
+          consumed_at: '2026-04-15T09:00:00.000Z',
+          meal_type: 'breakfast',
+          raw_input: 'coffee, toast',
+          created_at: '2026-04-15T09:00:00.000Z',
+          updated_at: '2026-04-15T09:00:00.000Z',
+          items: [
+            {
+              id: 'item-1',
+              meal_id: 'meal-1',
+              description: 'coffee',
+              position: 0,
+              consumed_at: '2026-04-15T09:00:00.000Z',
+              created_at: '2026-04-15T09:00:00.000Z',
+              calories: null,
+            },
+            {
+              id: 'item-2',
+              meal_id: 'meal-1',
+              description: 'toast',
+              position: 1,
+              consumed_at: '2026-04-15T09:00:00.000Z',
+              created_at: '2026-04-15T09:00:00.000Z',
+              calories: 120,
+            },
+          ],
+        },
+      ],
+      error: null,
+    })
+
+    const results = await useEntriesStore.getState().searchMeals('coffee')
+
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('search_meals', { p_query: 'coffee' })
+    expect(results).toEqual([
+      {
+        id: 'meal-1',
+        user_id: 'user-1',
+        consumed_at: '2026-04-15T09:00:00.000Z',
+        meal_type: 'breakfast',
+        raw_input: 'coffee, toast',
+        created_at: '2026-04-15T09:00:00.000Z',
+        updated_at: '2026-04-15T09:00:00.000Z',
+        items: [
+          {
+            id: 'item-1',
+            meal_id: 'meal-1',
+            description: 'coffee',
+            position: 0,
+            consumed_at: '2026-04-15T09:00:00.000Z',
+            created_at: '2026-04-15T09:00:00.000Z',
+            calories: null,
+          },
+          {
+            id: 'item-2',
+            meal_id: 'meal-1',
+            description: 'toast',
+            position: 1,
+            consumed_at: '2026-04-15T09:00:00.000Z',
+            created_at: '2026-04-15T09:00:00.000Z',
+            calories: 120,
+          },
+        ],
+      },
+    ])
   })
 })
