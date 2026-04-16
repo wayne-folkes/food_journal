@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
-import { buildLookupCacheRows, type LookupItem, type LookupResult } from './usda-cache'
+import type { LookupItem, LookupResult } from '../shared/usda-lookup'
+import { buildLookupCacheRows } from './usda-cache'
 
 const USDA_API_KEY = process.env.USDA_API_KEY!
 const SUPABASE_URL = process.env.SUPABASE_URL!
@@ -187,11 +188,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 7. Return { results: LookupResult[] } preserving original order
+    const hitResultMap = new Map(hits.map((result) => [result.id, result]))
     const missResultMap = new Map(missResults.map(({ result }) => [result.id, result]))
-    const results: LookupResult[] = items.map(item => {
-      const hit = hits.find(h => h.id === item.id)
-      return hit ?? missResultMap.get(item.id)!
-    })
+    const results: LookupResult[] = []
+
+    for (const item of items) {
+      const result = hitResultMap.get(item.id) ?? missResultMap.get(item.id)
+
+      if (!result) {
+        console.error('usda-lookup missing assembled result for item', item.id)
+        return res.status(500).json({ error: 'Failed to assemble lookup results' })
+      }
+
+      results.push(result)
+    }
 
     return res.status(200).json({ results })
   } catch (err) {

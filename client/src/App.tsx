@@ -46,7 +46,7 @@ function AppInner() {
       }
     })
     return () => subscription.unsubscribe()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [setAuthed, syncLocalToRemote])
 
   // Reload meals whenever the selected date or auth state changes
   useEffect(() => {

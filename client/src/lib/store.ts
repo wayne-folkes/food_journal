@@ -4,6 +4,7 @@ import type { Json, MealWithItems, MealInsert, MealType, MealItem } from '../typ
 import { supabase } from './supabase'
 
 const LOCAL_KEY = 'food_journal_meals'
+const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'drink']
 
 export interface ChipItem {
   description: string
@@ -78,6 +79,10 @@ function buildRawInput(items: Array<{ description: string }>): string {
   return items.map((item) => item.description).join(', ')
 }
 
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&')
+}
+
 function serializeRpcItems(items: RpcMealItem[]): Json {
   return items.map((item, position) => ({
     description: item.description,
@@ -87,8 +92,44 @@ function serializeRpcItems(items: RpcMealItem[]): Json {
   }))
 }
 
-function fromRpcMeal(data: unknown): MealWithItems {
-  return normalizeMealWithItems(data as MealWithItems)
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isMealType(value: unknown): value is MealType {
+  return typeof value === 'string' && MEAL_TYPES.includes(value as MealType)
+}
+
+function isMealItem(value: unknown): value is MealItem {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && typeof value.meal_id === 'string'
+    && typeof value.description === 'string'
+    && typeof value.position === 'number'
+    && typeof value.consumed_at === 'string'
+    && typeof value.created_at === 'string'
+    && (value.calories === null || typeof value.calories === 'number')
+}
+
+function isMealWithItems(value: unknown): value is MealWithItems {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && (value.user_id === null || typeof value.user_id === 'string')
+    && typeof value.consumed_at === 'string'
+    && isMealType(value.meal_type)
+    && typeof value.raw_input === 'string'
+    && typeof value.created_at === 'string'
+    && typeof value.updated_at === 'string'
+    && Array.isArray(value.items)
+    && value.items.every(isMealItem)
+}
+
+function fromRpcMeal(data: unknown, source: string): MealWithItems {
+  if (!isMealWithItems(data)) {
+    throw new Error(`Invalid meal payload returned from ${source}`)
+  }
+
+  return normalizeMealWithItems(data)
 }
 
 /** Build a full local MealWithItems from an insert payload. */
@@ -188,7 +229,7 @@ export const useEntriesStore = create<MealsState>()(
           throw error
         }
 
-        const mealWithItems = fromRpcMeal(data)
+        const mealWithItems = fromRpcMeal(data, 'create_meal_with_items')
 
         set((s) => ({ meals: [...s.meals, mealWithItems] }))
         return mealWithItems
@@ -243,7 +284,7 @@ export const useEntriesStore = create<MealsState>()(
           throw error
         }
 
-        const updatedMeal = fromRpcMeal(data)
+        const updatedMeal = fromRpcMeal(data, 'update_meal_with_items')
 
         set((s) => ({
           meals: s.meals.map((meal) => (meal.id === id ? updatedMeal : meal)),
@@ -304,12 +345,13 @@ export const useEntriesStore = create<MealsState>()(
       },
 
       searchMeals: async (query) => {
-        if (!query || query.length < 2) return []
+        const normalizedQuery = query.trim()
+        if (!normalizedQuery || normalizedQuery.length < 2) return []
 
         const { isAuthed } = get()
 
         if (!isAuthed) {
-          const q = query.toLowerCase()
+          const q = normalizedQuery.toLowerCase()
           return get().meals.filter((m) => m.items.some((i) => i.description.toLowerCase().includes(q)))
         }
 
@@ -317,7 +359,7 @@ export const useEntriesStore = create<MealsState>()(
         const { data: itemMatches } = await supabase
           .from('meal_items')
           .select('meal_id')
-          .ilike('description', `%${query}%`)
+          .ilike('description', `%${escapeLikePattern(normalizedQuery)}%`)
 
         const mealIds = [...new Set(itemMatches?.map((r) => r.meal_id) ?? [])]
         if (mealIds.length === 0) return []
@@ -371,7 +413,7 @@ export const useEntriesStore = create<MealsState>()(
               continue
             }
 
-            synced.push(fromRpcMeal(data))
+            synced.push(fromRpcMeal(data, 'create_meal_with_items'))
             syncedLocalIds.add(m.id)
           } catch (err) {
             console.error('syncLocalToRemote item error', err)

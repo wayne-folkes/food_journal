@@ -5,11 +5,10 @@
     "moduleResolution": "node",
     "lib": ["ES2020", "DOM"],
     "strict": true,
-    "ignoreDeprecations": "6.0",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "types": ["node"],
     "outDir": ".vercel/output/functions"
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "../shared/**/*.ts"]
 }

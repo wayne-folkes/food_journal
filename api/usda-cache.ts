@@ -1,14 +1,4 @@
-export interface LookupItem {
-  id: string
-  description: string
-}
-
-export interface LookupResult {
-  id: string
-  description: string
-  calories: number | null
-  source: 'cache' | 'usda' | 'not_found'
-}
+import type { LookupItem, LookupResult } from '../shared/usda-lookup'
 
 export interface LookupCacheRow {
   description_key: string

@@ -1,16 +1,5 @@
 import { supabase } from './supabase'
-
-interface LookupItem {
-  id: string
-  description: string
-}
-
-interface LookupResult {
-  id: string
-  description: string
-  calories: number | null
-  source: 'cache' | 'usda' | 'not_found'
-}
+import type { LookupItem, LookupResult } from '../../../shared/usda-lookup'
 
 export async function lookupCalories(items: LookupItem[]): Promise<LookupResult[]> {
   const { data: { session } } = await supabase.auth.getSession()

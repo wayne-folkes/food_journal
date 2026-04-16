@@ -99,6 +99,23 @@ describe('useEntriesStore.addMeal', () => {
     })
   })
 
+  it('throws when the RPC meal payload is malformed', async () => {
+    useEntriesStore.setState({ meals: [], isAuthed: true, isLoading: false })
+    mockSupabase.rpc.mockResolvedValue({
+      data: { id: 'meal-1', meal_type: 'drink' },
+      error: null,
+    })
+
+    await expect(useEntriesStore.getState().addMeal({
+      meal_type: 'drink',
+      consumed_at: '2026-04-15T10:00:00.000Z',
+      raw_input: 'coffee',
+      items: ['coffee'],
+    })).rejects.toThrow('Invalid meal payload returned from create_meal_with_items')
+
+    expect(useEntriesStore.getState().meals).toEqual([])
+  })
+
   it('updates an authenticated meal via RPC so the meal and items change atomically', async () => {
     const existingMeal = {
       id: 'meal-1',
@@ -236,5 +253,25 @@ describe('useEntriesStore.addMeal', () => {
     await useEntriesStore.getState().syncLocalToRemote()
 
     expect(useEntriesStore.getState().meals).toEqual([secondLocalMeal, syncedRemoteMeal])
+  })
+
+  it('escapes wildcard characters before issuing remote search patterns', async () => {
+    useEntriesStore.setState({ meals: [], isAuthed: true, isLoading: false })
+
+    const ilike = vi.fn().mockResolvedValue({ data: [], error: null })
+    const select = vi.fn().mockReturnValue({ ilike })
+
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === 'meal_items') {
+        return { select }
+      }
+
+      throw new Error(`Unexpected table: ${table}`)
+    })
+
+    await expect(useEntriesStore.getState().searchMeals(' 50%_milk ')).resolves.toEqual([])
+
+    expect(mockSupabase.from).toHaveBeenCalledWith('meal_items')
+    expect(ilike).toHaveBeenCalledWith('description', '%50\\%\\_milk%')
   })
 })
