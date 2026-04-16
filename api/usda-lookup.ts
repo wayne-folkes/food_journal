@@ -26,6 +26,11 @@ interface LookupResult {
   source: 'cache' | 'usda' | 'not_found'
 }
 
+interface CachedLookupRow {
+  description_key: string
+  calories_per_100g: number | null
+}
+
 async function fetchFromUsda(description: string): Promise<{ calories: number | null; fdcId: number | null }> {
   const response = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${USDA_API_KEY}`, {
     method: 'POST',
@@ -128,7 +133,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .select('description_key, calories_per_100g')
       .in('description_key', keys)
 
-    const cacheMap = new Map(cached?.map(r => [r.description_key, r.calories_per_100g]) ?? [])
+    const cacheMap = new Map(
+      ((cached ?? []) as CachedLookupRow[]).map((row) => [row.description_key, row.calories_per_100g] as const)
+    )
 
     // Separate hits from misses
     const hits: LookupResult[] = []

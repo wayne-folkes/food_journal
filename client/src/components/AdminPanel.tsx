@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { useToast } from './Toast'
+import { useToast } from '../lib/toast'
 
 export function AdminPanel() {
   const [flushing, setFlushing] = useState(false)

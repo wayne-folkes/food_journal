@@ -19,11 +19,11 @@ test('golden path — log a multi-item meal and see it in the log', async ({ pag
   await chipInput.press('Enter')
 
   // Chip should appear
-  await expect(page.locator('.chip-input__chip').first()).toContainText('scrambled eggs')
+  await expect(page.locator('.chip-input__chip').first()).toContainText('Scrambled eggs')
 
   // Add another item via comma
   await chipInput.fill('toast,')
-  await expect(page.locator('.chip-input__chip').nth(1)).toContainText('toast')
+  await expect(page.locator('.chip-input__chip').nth(1)).toContainText('Toast')
 
   // Add a third item
   await chipInput.fill('orange juice')
@@ -34,9 +34,9 @@ test('golden path — log a multi-item meal and see it in the log', async ({ pag
 
   // Meal card should be visible
   await expect(page.locator('.meal-card')).toBeVisible()
-  await expect(page.locator('.meal-card__item').first()).toContainText('scrambled eggs')
-  await expect(page.locator('.meal-card__item').nth(1)).toContainText('toast')
-  await expect(page.locator('.meal-card__item').nth(2)).toContainText('orange juice')
+  await expect(page.locator('.meal-card__item').first()).toContainText('Scrambled eggs')
+  await expect(page.locator('.meal-card__item').nth(1)).toContainText('Toast')
+  await expect(page.locator('.meal-card__item').nth(2)).toContainText('Orange juice')
 })
 
 test('meal type selection — switching type updates the active pill', async ({ page }) => {
@@ -113,7 +113,7 @@ test('edit a meal — change item and save', async ({ page }) => {
 
   // Modal should be visible with existing chip
   await expect(page.locator('.modal')).toBeVisible()
-  await expect(page.locator('.modal .chip-input__chip')).toContainText('coffee')
+  await expect(page.locator('.modal .chip-input__chip')).toContainText('Coffee')
 
   // Remove old chip, add new one
   await page.locator('.modal .chip-input__remove').click()
@@ -125,7 +125,7 @@ test('edit a meal — change item and save', async ({ page }) => {
 
   // Card should show updated item
   await expect(page.locator('.meal-card__item')).toContainText('espresso')
-  await expect(page.locator('.meal-card__item')).not.toContainText('coffee')
+  await expect(page.locator('.meal-card__item')).not.toContainText('Coffee')
 })
 
 test('recent chips appear after logging and relog creates a new snack meal', async ({ page }) => {
@@ -137,10 +137,10 @@ test('recent chips appear after logging and relog creates a new snack meal', asy
   await page.locator('button[type="submit"]').click()
 
   // Recent chip should appear
-  await expect(page.locator('.chip', { hasText: 'almonds' })).toBeVisible()
+  await expect(page.locator('.chip', { hasText: 'Almonds' })).toBeVisible()
 
   // Click the recent chip
-  await page.locator('.chip', { hasText: 'almonds' }).click()
+  await page.locator('.chip', { hasText: 'Almonds' }).click()
 
   // A second meal card should be logged
   await expect(page.locator('.meal-card')).toHaveCount(2)
@@ -159,5 +159,5 @@ test('data persists after page reload (localStorage)', async ({ page }) => {
 
   // Should still be visible
   await expect(page.locator('.meal-card')).toHaveCount(1)
-  await expect(page.locator('.meal-card__item')).toContainText('yogurt')
+  await expect(page.locator('.meal-card__item')).toContainText('Yogurt')
 })

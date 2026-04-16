@@ -1,4 +1,5 @@
 import { todayString } from '../lib/store'
+import { offsetDate } from '../lib/date'
 
 interface Props {
   date: string          // YYYY-MM-DD
@@ -17,13 +18,6 @@ function formatDate(dateStr: string): string {
   // e.g. "Wed, Apr 14"
   const d = new Date(`${dateStr}T12:00:00`) // noon local avoids DST edge cases
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
-}
-
-/** Returns a YYYY-MM-DD string offset by `days` from the given date string. */
-export function offsetDate(dateStr: string, days: number): string {
-  const d = new Date(`${dateStr}T12:00:00`)
-  d.setDate(d.getDate() + days)
-  return d.toLocaleDateString('sv') // 'sv' locale → YYYY-MM-DD
 }
 
 export function DateNav({ date, onPrev, onNext, onToday }: Props) {

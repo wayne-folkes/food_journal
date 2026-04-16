@@ -8,12 +8,14 @@ import { MealLog } from './components/MealLog'
 import { RecentChips } from './components/RecentChips'
 import { EditMealModal } from './components/EditMealModal'
 import { AuthButton } from './components/AuthButton'
-import { DateNav, offsetDate } from './components/DateNav'
+import { DateNav } from './components/DateNav'
 import { DaySummary } from './components/DaySummary'
-import { ToastProvider, useToast } from './components/Toast'
+import { ToastProvider } from './components/Toast'
 import { SearchOverlay } from './components/SearchOverlay'
 import { AdminPanel } from './components/AdminPanel'
 import { lookupCalories } from './lib/caloriesLookup'
+import { offsetDate } from './lib/date'
+import { useToast } from './lib/toast'
 
 const ADMIN_EMAIL = 'wayne.folkes@gmail.com'
 import type { MealWithItems, MealType } from './types/database'
@@ -37,8 +39,9 @@ function AppInner() {
         await syncLocalToRemote()
         setAuthed(true)
       } else if (event === 'SIGNED_OUT') {
+        useEntriesStore.setState({ meals: [] })
         setAuthed(false)
-      } else {
+      } else if (session) {
         setAuthed(!!session)
       }
     })

@@ -23,6 +23,7 @@ supabase/migrations/0001_init.sql       -- legacy entries table (unused)
 supabase/migrations/0002_meals.sql      -- meals + meal_items tables + RLS
 supabase/migrations/0003_meal_items_calories.sql  -- calories column
 supabase/migrations/0004_food_lookup.sql           -- USDA cache table
+supabase/migrations/0005_sync_meals_schema.sql     -- raw_input + updated_at on meals
 ```
 
 ### 2. Supabase — enable Google OAuth
@@ -112,6 +113,7 @@ food_journal/
 
 ```
 meals          — one record per eating occasion (meal_type, consumed_at, user_id)
+                 plus raw_input and updated_at metadata used by the app
   └── meal_items — food items within a meal (description, calories, position)
 
 food_lookup    — shared USDA calorie cache (description_key, calories_per_100g)

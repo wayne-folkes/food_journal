@@ -90,7 +90,7 @@ export const useEntriesStore = create<MealsState>()(
       isAuthed: false,
       isLoading: false,
 
-      setAuthed: (authed) => set({ isAuthed: authed, ...(!authed && { meals: [] }) }),
+      setAuthed: (authed) => set({ isAuthed: authed }),
 
       loadDay: async (date = todayString()) => {
         const { isAuthed } = get()
