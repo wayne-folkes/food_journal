@@ -85,6 +85,10 @@ From `client/`:
 | `npm test` | Run Vitest unit tests |
 | `npm run test:e2e` | Run Playwright E2E tests (requires `npx playwright install`) |
 
+## CI
+
+GitHub Actions runs **lint**, **unit tests**, and **build** on every push to `main` and on every pull request. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
 ## Project structure
 
 ```
