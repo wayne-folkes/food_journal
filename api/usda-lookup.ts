@@ -3,6 +3,19 @@ import { createClient } from '@supabase/supabase-js'
 import type { LookupItem, LookupResult } from '../shared/usda-lookup'
 import { buildLookupCacheRows } from './usda-cache'
 
+async function pLimit<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
+  const results: T[] = []
+  let i = 0
+  async function run(): Promise<void> {
+    while (i < tasks.length) {
+      const idx = i++
+      results[idx] = await tasks[idx]()
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, run))
+  return results
+}
+
 const USDA_API_KEY = process.env.USDA_API_KEY!
 const SUPABASE_URL = process.env.SUPABASE_URL!
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -148,9 +161,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // 5. USDA calls for misses (concurrent with Promise.all)
-    const missResults = await Promise.all(
-      misses.map(async (item): Promise<{ result: LookupResult; fdcId: number | null }> => {
+    // 5. USDA calls for misses (concurrency-limited to 5)
+    const missResults = await pLimit(
+      misses.map((item) => async (): Promise<{ result: LookupResult; fdcId: number | null }> => {
         try {
           const { calories, fdcId } = await fetchFromUsda(item.description)
           return {
@@ -163,7 +176,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             fdcId
           }
         } catch (err) {
-          console.error(`USDA lookup failed for "${item.description}":`, err)
+          console.error(`USDA lookup failed for "${item.description}":`, err instanceof Error ? err.message : String(err))
           return {
             result: {
               id: item.id,
@@ -174,7 +187,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             fdcId: null
           }
         }
-      })
+      }),
+      5
     )
 
     // 6. Cache write for new results (upsert all misses, including not_found)
@@ -186,7 +200,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .upsert(upsertRows, { onConflict: 'description_key' })
 
       if (upsertError) {
-        console.error('Cache upsert error:', upsertError)
+        console.error('Cache upsert error:', upsertError instanceof Error ? upsertError.message : String(upsertError))
       }
     }
 
@@ -208,7 +222,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({ results })
   } catch (err) {
-    console.error('usda-lookup unexpected error:', err)
+    console.error('usda-lookup unexpected error:', err instanceof Error ? err.message : String(err))
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
