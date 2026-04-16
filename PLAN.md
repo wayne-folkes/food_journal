@@ -342,14 +342,14 @@ A dedicated weekly view showing all meals grouped by day, with stats: most consu
 
 ### 11.1 — Week data loading (must go first)
 
-- [ ] **`loadWeek` store action**
+- [x] **`loadWeek` store action**
   - File: `store.ts` — add `loadWeek(startDate: string): Promise<MealWithItems[]>` to `MealsState`
   - For authed: query `meals` + `meal_items(*)` where `consumed_at` between Monday 00:00 and Sunday 23:59:59 of the given week
   - For anon: filter local `meals` array by the same date range
   - Returns the full week of meals (does NOT replace the `meals` state — stored separately)
   - Add `weekMeals: MealWithItems[]` and `weekLoading: boolean` to the store
 
-- [ ] **`loadPriorItems` for "new this week" detection**
+- [x] **`loadPriorItems` for "new this week" detection**
   - File: `store.ts` — add `loadPriorItems(beforeDate: string): Promise<Set<string>>` 
   - For authed: `select distinct lower(description) from meal_items join meals on ... where consumed_at < weekStart`
   - Returns a Set of normalized description strings logged before this week
@@ -357,7 +357,7 @@ A dedicated weekly view showing all meals grouped by day, with stats: most consu
 
 ### 11.2 — Week navigation (depends on 11.1)
 
-- [ ] **View toggle in DateNav**
+- [x] **View toggle in DateNav**
   - File: `DateNav.tsx` — add a "Day | Week" toggle (two small pills/tabs) in the header area
   - When "Week" is selected: arrows navigate by 7 days, label shows "Apr 7 – 13" format
   - File: `App.tsx` — add `viewMode: 'day' | 'week'` state. When `viewMode === 'week'`, call `loadWeek` instead of `loadDay`, render `WeekView` instead of `MealLog`
@@ -365,11 +365,11 @@ A dedicated weekly view showing all meals grouped by day, with stats: most consu
 
 ### 11.3 — WeekView component (depends on 11.1, parallel with 11.2)
 
-- [ ] **New file: `components/WeekView.tsx`**
+- [x] **New file: `components/WeekView.tsx`**
   - Props: `weekMeals: MealWithItems[]`, `weekStart: string`, `isLoading: boolean`
   - Layout: stats cards at top, then day-by-day meal list below
 
-- [ ] **Day-by-day meal list**
+- [x] **Day-by-day meal list**
   - Group `weekMeals` by date (local timezone)
   - Each day: date header ("Monday, Apr 7") + compact MealCards
   - Days with no meals: show a muted "No meals logged" row
@@ -377,29 +377,29 @@ A dedicated weekly view showing all meals grouped by day, with stats: most consu
 
 ### 11.4 — Stats cards (depends on 11.1, parallelize internally)
 
-- [ ] **Most consumed items**
+- [x] **Most consumed items**
   - File: `WeekView.tsx` — count occurrences of each `item.description` (case-insensitive) across the week
   - Display top 5 as: "Eggs × 5, Coffee × 4, Rice × 3"
   - Style: ranked list, count badge on the right
 
-- [ ] **Meal pattern grid**
+- [x] **Meal pattern grid**
   - File: `WeekView.tsx` — 7 rows (Mon–Sun) × 4 columns (B/L/D/S)
   - Each cell: filled dot (has a meal of that type) or empty circle (no meal)
   - Color-coded using existing meal-type colors (`--meal-breakfast`, `--meal-lunch`, etc.)
   - Shows at a glance: "I skipped breakfast 3 days this week"
 
-- [ ] **New items this week**
+- [x] **New items this week**
   - File: `WeekView.tsx` — compare this week's item descriptions against `priorItems` Set from 11.1
   - Display items that don't appear in prior history: "🆕 Quinoa, Mango lassi, Tempeh"
   - If none: "No new foods this week"
 
-- [ ] **Total items logged**
+- [x] **Total items logged**
   - File: `WeekView.tsx` — simple count of all `meal_items` across the week
   - Display: "42 items logged this week"
 
 ### 11.5 — CSS (parallel with 11.3/11.4)
 
-- [ ] **WeekView styles**
+- [x] **WeekView styles**
   - File: `App.css`
   - `.week-view` container
   - `.week-stats` — grid or flex row of stat cards, scrollable horizontally on mobile

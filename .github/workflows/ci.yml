@@ -57,3 +57,35 @@ jobs:
           cache-dependency-path: client/package-lock.json
       - run: npm ci
       - run: npm run build
+
+  schema-drift:
+    name: Schema drift check
+    runs-on: ubuntu-latest
+    # Only check on pushes to main — PRs may intentionally add migration files
+    # before applying them to prod.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Compare local migrations to production
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          LOCAL_COUNT=$(ls supabase/migrations/*.sql 2>/dev/null | wc -l | tr -d ' ')
+
+          REMOTE_COUNT=$(curl -sf \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            "https://api.supabase.com/v1/projects/kbdtcoyrspyjqjsgkwjl/database/migrations" \
+            | python3 -c "import sys, json; print(len(json.load(sys.stdin)))")
+
+          echo "Local migration files : $LOCAL_COUNT"
+          echo "Applied to production : $REMOTE_COUNT"
+
+          if [ "$LOCAL_COUNT" -ne "$REMOTE_COUNT" ]; then
+            echo ""
+            echo "❌ Schema drift — $LOCAL_COUNT local file(s), $REMOTE_COUNT applied to prod."
+            echo "Apply the missing migration(s) via the Supabase MCP apply_migration tool."
+            exit 1
+          fi
+
+          echo "✅ All $LOCAL_COUNT migrations are applied to production."
