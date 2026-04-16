@@ -41,6 +41,7 @@ interface RpcMealItem {
 
 interface MealsState {
   meals: MealWithItems[]
+  dayCache: Record<string, MealWithItems[]>
   isAuthed: boolean
   isLoading: boolean
   // Actions
@@ -280,6 +281,7 @@ export const useEntriesStore = create<MealsState>()(
   persist(
     (set, get) => ({
       meals: [],
+      dayCache: {},
       isAuthed: false,
       isLoading: false,
 
@@ -288,6 +290,13 @@ export const useEntriesStore = create<MealsState>()(
       loadDay: async (date = todayString()) => {
         const { isAuthed } = get()
         if (!isAuthed) return // anon: already in localStorage
+
+        // P3: check day-level cache before hitting Supabase
+        const cached = get().dayCache[date]
+        if (cached) {
+          set({ meals: cached })
+          return
+        }
 
         set({ isLoading: true })
         const start = new Date(`${date}T00:00:00`).toISOString()
@@ -301,7 +310,10 @@ export const useEntriesStore = create<MealsState>()(
             .lte('consumed_at', end)
             .order('consumed_at', { ascending: true })
 
-          if (error) { console.error('loadDay error', error); return }
+          if (error) { console.error('loadDay error:', error instanceof Error ? error.message : String(error)); return }
+
+          // S8: re-check auth after await — drop result if user signed out mid-flight
+          if (!get().isAuthed) return
 
           // Supabase returns the relation as `meal_items` (the table name).
           // Map it to `items` to match our MealWithItems shape.
@@ -312,7 +324,8 @@ export const useEntriesStore = create<MealsState>()(
             ...m,
             items: [...(m.meal_items ?? [])].sort((a, b) => a.position - b.position),
           }))
-          set({ meals })
+          // P3: store in cache and update meals atomically
+          set({ meals, dayCache: { ...get().dayCache, [date]: meals } })
         } finally {
           set({ isLoading: false })
         }
@@ -342,13 +355,16 @@ export const useEntriesStore = create<MealsState>()(
         })
 
         if (error || !data) {
-          console.error('addMeal error', error)
+          console.error('addMeal error:', error instanceof Error ? error.message : String(error))
           throw error
         }
 
         const mealWithItems = fromRpcMeal(data, 'create_meal_with_items')
 
-        set((s) => ({ meals: [...s.meals, mealWithItems] }))
+        // P3: invalidate cache for the affected date
+        const addedDate = new Date(consumedAt).toLocaleDateString('sv')
+        const { [addedDate]: _, ...addMealCacheRest } = get().dayCache
+        set((s) => ({ meals: [...s.meals, mealWithItems], dayCache: addMealCacheRest }))
         return mealWithItems
       },
 
@@ -397,14 +413,18 @@ export const useEntriesStore = create<MealsState>()(
         })
 
         if (error || !data) {
-          console.error('editMeal error', error)
+          console.error('editMeal error:', error instanceof Error ? error.message : String(error))
           throw error
         }
 
         const updatedMeal = fromRpcMeal(data, 'update_meal_with_items')
 
+        // P3: invalidate cache for the affected date
+        const editedDate = new Date(updates.consumed_at).toLocaleDateString('sv')
+        const { [editedDate]: _, ...editMealCacheRest } = get().dayCache
         set((s) => ({
           meals: s.meals.map((meal) => (meal.id === id ? updatedMeal : meal)),
+          dayCache: editMealCacheRest,
         }))
       },
 
@@ -416,9 +436,20 @@ export const useEntriesStore = create<MealsState>()(
           return
         }
 
+        // P3: look up the meal's date before deleting so we can invalidate cache
+        const mealToDelete = get().meals.find((m) => m.id === id)
+        const deletedDate = mealToDelete ? new Date(mealToDelete.consumed_at).toLocaleDateString('sv') : null
+
         const { error } = await supabase.from('meals').delete().eq('id', id)
-        if (error) { console.error('deleteMeal error', error); throw error }
-        set((s) => ({ meals: s.meals.filter((m) => m.id !== id) }))
+        if (error) { console.error('deleteMeal error:', error instanceof Error ? error.message : String(error)); throw error }
+
+        // P3: invalidate cache for the deleted meal's date
+        if (deletedDate) {
+          const { [deletedDate]: _, ...deleteMealCacheRest } = get().dayCache
+          set((s) => ({ meals: s.meals.filter((m) => m.id !== id), dayCache: deleteMealCacheRest }))
+        } else {
+          set((s) => ({ meals: s.meals.filter((m) => m.id !== id) }))
+        }
       },
 
       removeMealLocally: (id) => {
@@ -455,7 +486,7 @@ export const useEntriesStore = create<MealsState>()(
         if (error) {
           // Revert on error
           set({ meals: prevMeals })
-          console.error('updateItemCalories error', error)
+          console.error('updateItemCalories error:', error instanceof Error ? error.message : String(error))
           throw error
         }
       },
@@ -474,12 +505,12 @@ export const useEntriesStore = create<MealsState>()(
         const { data, error } = await supabase
           .rpc('search_meals', { p_query: normalizedQuery })
 
-        if (error) { console.error('searchMeals error', error); return [] }
+        if (error) { console.error('searchMeals error:', error instanceof Error ? error.message : String(error)); return [] }
 
         try {
           return fromSearchMealsRpc(data, 'search_meals')
         } catch (err) {
-          console.error('searchMeals parse error', err)
+          console.error('searchMeals parse error:', err instanceof Error ? err.message : String(err))
           return []
         }
       },
@@ -498,7 +529,7 @@ export const useEntriesStore = create<MealsState>()(
           })
 
           if (error || !data) {
-            console.error('syncLocalToRemote batch error', error)
+            console.error('syncLocalToRemote batch error:', error instanceof Error ? error.message : String(error))
             return
           }
 
@@ -508,7 +539,7 @@ export const useEntriesStore = create<MealsState>()(
           )
 
           for (const failure of failed) {
-            console.error('syncLocalToRemote meal error', failure.error)
+            console.error('syncLocalToRemote meal error:', failure.error)
           }
 
           if (successfulSyncs.length === 0) return
@@ -522,7 +553,7 @@ export const useEntriesStore = create<MealsState>()(
             meals: [...s.meals.filter((m) => !syncedLocalIds.has(m.id)), ...synced],
           }))
         } catch (err) {
-          console.error('syncLocalToRemote batch error', err)
+          console.error('syncLocalToRemote batch error:', err instanceof Error ? err.message : String(err))
         }
       },
     }),
