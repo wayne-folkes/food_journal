@@ -1208,3 +1208,282 @@ mark {
 .btn--danger:hover {
   background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
+
+/* ── View toggle (Day | Week) ─────────────────────────────────────── */
+
+.view-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--border);
+  border-radius: 8px;
+  padding: 2px;
+  margin: 0 auto 8px;
+}
+
+.view-toggle__btn {
+  flex: 1;
+  padding: 4px 16px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.view-toggle__btn--active {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* ── WeekView container ───────────────────────────────────────────── */
+
+.week-view {
+  padding: 0 16px 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.week-view--loading {
+  padding: 24px 16px;
+}
+
+/* ── Stats row ───────────────────────────────────────────────────── */
+
+.week-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.week-stat-card {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 120px;
+  min-width: 0;
+}
+
+.week-stat-card--wide {
+  flex: 2 1 220px;
+}
+
+.week-stat-card__value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.week-stat-card__label {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.week-empty-hint {
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+  margin: 4px 0 0;
+}
+
+/* ── Top items list ──────────────────────────────────────────────── */
+
+.week-top-items {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.week-top-items__row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.8125rem;
+}
+
+.week-top-items__name {
+  flex: 1;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.week-top-items__count {
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ── New items chips ─────────────────────────────────────────────── */
+
+.week-new-items {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.week-new-items__chip {
+  background: color-mix(in srgb, var(--sage) 15%, transparent);
+  color: var(--sage);
+  border: 1px solid color-mix(in srgb, var(--sage) 30%, transparent);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* ── Meal pattern grid ───────────────────────────────────────────── */
+
+.meal-pattern {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meal-pattern__legend {
+  display: grid;
+  grid-template-columns: 48px repeat(4, 1fr);
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.meal-pattern__legend-label {
+  text-align: center;
+  font-size: 0.6875rem;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.meal-pattern__row {
+  display: grid;
+  grid-template-columns: 48px repeat(4, 1fr);
+  gap: 4px;
+  align-items: center;
+}
+
+.meal-pattern__day {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+
+.meal-pattern__dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: transparent;
+  display: block;
+  margin: 0 auto;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.meal-pattern__dot--filled.meal-pattern__dot--breakfast { background: var(--meal-breakfast); border-color: var(--meal-breakfast); }
+.meal-pattern__dot--filled.meal-pattern__dot--lunch     { background: var(--meal-lunch);     border-color: var(--meal-lunch); }
+.meal-pattern__dot--filled.meal-pattern__dot--dinner    { background: var(--meal-dinner);    border-color: var(--meal-dinner); }
+.meal-pattern__dot--filled.meal-pattern__dot--snack     { background: var(--meal-snack);     border-color: var(--meal-snack); }
+
+/* ── Day-by-day list ─────────────────────────────────────────────── */
+
+.week-days {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.week-day-group__header {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0 0 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+
+.week-day-group__header:hover {
+  color: var(--ink);
+}
+
+.week-day-group__empty {
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+  margin: 4px 0;
+  padding-left: 4px;
+  font-style: italic;
+}
+
+.week-day-group__meals {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.week-meal-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px 6px 10px;
+  border-radius: 8px;
+  border-left: 3px solid var(--border);
+  background: var(--paper);
+  font-size: 0.8125rem;
+}
+
+.week-meal-row--breakfast { border-left-color: var(--meal-breakfast); }
+.week-meal-row--lunch     { border-left-color: var(--meal-lunch); }
+.week-meal-row--dinner    { border-left-color: var(--meal-dinner); }
+.week-meal-row--snack     { border-left-color: var(--meal-snack); }
+.week-meal-row--dessert   { border-left-color: var(--meal-dessert, #c084fc); }
+.week-meal-row--drink     { border-left-color: var(--meal-drink, #67e8f9); }
+
+.week-meal-row__type {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+  flex-shrink: 0;
+}
+
+.week-meal-row__items {
+  color: var(--ink);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
