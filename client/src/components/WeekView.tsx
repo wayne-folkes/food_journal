@@ -31,7 +31,7 @@ export function WeekView({ weekMeals, weekStart, isLoading, onNavigateToDay }: W
 
   useEffect(() => {
     loadPriorItems(weekStart).then(setPriorItems)
-  }, [weekStart])
+  }, [weekStart, loadPriorItems])
 
   const groupedByDate = useMemo(() => {
     const { start } = getWeekBounds(weekStart)

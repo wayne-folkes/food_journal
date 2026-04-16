@@ -60,7 +60,7 @@ function AppInner() {
     if (viewMode === 'week') {
       loadWeek(selectedDate)
     }
-  }, [viewMode, selectedDate])
+  }, [viewMode, selectedDate, loadWeek])
 
   // For anonymous users, filter meals to the selected date
   const displayedMeals = useMemo(

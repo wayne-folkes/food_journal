@@ -383,7 +383,8 @@ export const useEntriesStore = create<MealsState>()(
 
         // P3: invalidate cache for the affected date
         const addedDate = new Date(consumedAt).toLocaleDateString('sv')
-        const { [addedDate]: _, ...addMealCacheRest } = get().dayCache
+        const addMealCacheRest = { ...get().dayCache }
+        delete addMealCacheRest[addedDate]
         set((s) => ({ meals: [...s.meals, mealWithItems], dayCache: addMealCacheRest }))
         return mealWithItems
       },
@@ -441,7 +442,8 @@ export const useEntriesStore = create<MealsState>()(
 
         // P3: invalidate cache for the affected date
         const editedDate = new Date(updates.consumed_at).toLocaleDateString('sv')
-        const { [editedDate]: _, ...editMealCacheRest } = get().dayCache
+        const editMealCacheRest = { ...get().dayCache }
+        delete editMealCacheRest[editedDate]
         set((s) => ({
           meals: s.meals.map((meal) => (meal.id === id ? updatedMeal : meal)),
           dayCache: editMealCacheRest,
@@ -465,7 +467,8 @@ export const useEntriesStore = create<MealsState>()(
 
         // P3: invalidate cache for the deleted meal's date
         if (deletedDate) {
-          const { [deletedDate]: _, ...deleteMealCacheRest } = get().dayCache
+          const deleteMealCacheRest = { ...get().dayCache }
+          delete deleteMealCacheRest[deletedDate]
           set((s) => ({ meals: s.meals.filter((m) => m.id !== id), dayCache: deleteMealCacheRest }))
         } else {
           set((s) => ({ meals: s.meals.filter((m) => m.id !== id) }))
