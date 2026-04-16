@@ -404,6 +404,40 @@
 .date-nav__arrow:active:not(:disabled) { background: var(--cream-dark); }
 .date-nav__arrow:disabled { color: var(--cream-dark); cursor: default; }
 
+/* ── View toggle pill group ──────────────────────────────────────────────── */
+.view-toggle {
+  display: flex;
+  background: var(--cream-mid);
+  border-radius: 999px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.view-toggle__btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  padding: 3px 12px;
+  border-radius: 999px;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1.5;
+  min-height: 26px;
+}
+.view-toggle__btn:hover:not(.view-toggle__btn--active) {
+  color: var(--ink);
+}
+.view-toggle__btn--active {
+  background: var(--paper);
+  color: var(--terra);
+  box-shadow: 0 1px 3px rgba(42, 33, 24, 0.12);
+}
+
 /* ── Meal Log ────────────────────────────────────────────────────────────── */
 .meal-log {
   display: flex;

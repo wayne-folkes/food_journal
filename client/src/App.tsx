@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
-import { useEntriesStore, recentDistinct, todayString } from './lib/store'
+import { useEntriesStore, recentDistinct, todayString, getWeekBounds } from './lib/store'
 import { MealComposer } from './components/MealComposer'
 import { suggestMealType } from './lib/mealType'
 import { MealLog } from './components/MealLog'
@@ -13,6 +13,7 @@ import { DaySummary } from './components/DaySummary'
 import { ToastProvider } from './components/Toast'
 import { SearchOverlay } from './components/SearchOverlay'
 import { AdminPanel } from './components/AdminPanel'
+import { WeekView } from './components/WeekView'
 import { lookupCalories } from './lib/caloriesLookup'
 import { offsetDate } from './lib/date'
 import { useToast } from './lib/toast'
@@ -22,12 +23,13 @@ import type { ChipItem } from './lib/store'
 import './App.css'
 
 function AppInner() {
-  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, syncLocalToRemote, updateItemCalories } =
+  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, syncLocalToRemote, updateItemCalories, loadWeek, weekMeals, weekLoading } =
     useEntriesStore()
   const [user, setUser] = useState<User | null>(null)
   const [editingMeal, setEditingMeal] = useState<MealWithItems | null>(null)
   const [selectedDate, setSelectedDate] = useState(todayString)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<'day' | 'week'>('day')
   const toast = useToast()
 
   // Auth listener
@@ -52,6 +54,13 @@ function AppInner() {
   useEffect(() => {
     loadDay(selectedDate)
   }, [isAuthed, selectedDate, loadDay])
+
+  // Load week data when switching to week view or when date changes in week view
+  useEffect(() => {
+    if (viewMode === 'week') {
+      loadWeek(selectedDate)
+    }
+  }, [viewMode, selectedDate])
 
   // For anonymous users, filter meals to the selected date
   const displayedMeals = useMemo(
@@ -195,6 +204,7 @@ function AppInner() {
 
   const isViewingToday = selectedDate === todayString()
   const recent = useMemo(() => recentDistinct(meals), [meals])
+  const step = viewMode === 'week' ? 7 : 1
 
   return (
     <div className="app">
@@ -222,27 +232,40 @@ function AppInner() {
         )}
         <DateNav
           date={selectedDate}
-          onPrev={() => setSelectedDate((d) => offsetDate(d, -1))}
-          onNext={() => setSelectedDate((d) => offsetDate(d, 1))}
+          onPrev={() => setSelectedDate((d) => offsetDate(d, -step))}
+          onNext={() => setSelectedDate((d) => offsetDate(d, step))}
           onToday={() => setSelectedDate(todayString())}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
         />
-        <DaySummary meals={displayedMeals} />
-        <MealLog
-          meals={displayedMeals}
-          isLoading={isLoading}
-          selectedDate={selectedDate}
-          onEdit={setEditingMeal}
-          onDelete={handleDelete}
-          onDuplicate={handleDuplicate}
-          onUpdateCalories={async (itemId, calories) => {
-            try {
-              await updateItemCalories(itemId, calories)
-            } catch {
-              toast.error('Failed to save calories')
-            }
-          }}
-          onEstimateCalories={handleEstimateCalories}
-        />
+        {viewMode === 'week' ? (
+          <WeekView
+            weekMeals={weekMeals}
+            weekStart={getWeekBounds(selectedDate).start}
+            isLoading={weekLoading}
+            onNavigateToDay={(date) => { setSelectedDate(date); setViewMode('day') }}
+          />
+        ) : (
+          <>
+            <DaySummary meals={displayedMeals} />
+            <MealLog
+              meals={displayedMeals}
+              isLoading={isLoading}
+              selectedDate={selectedDate}
+              onEdit={setEditingMeal}
+              onDelete={handleDelete}
+              onDuplicate={handleDuplicate}
+              onUpdateCalories={async (itemId, calories) => {
+                try {
+                  await updateItemCalories(itemId, calories)
+                } catch {
+                  toast.error('Failed to save calories')
+                }
+              }}
+              onEstimateCalories={handleEstimateCalories}
+            />
+          </>
+        )}
       </main>
 
       {editingMeal && (
