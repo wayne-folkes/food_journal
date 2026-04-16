@@ -54,12 +54,16 @@ function AppInner() {
   }, [isAuthed, selectedDate, loadDay])
 
   // For anonymous users, filter meals to the selected date
-  const displayedMeals = isAuthed
-    ? meals
-    : meals.filter((m) => {
-        const localDate = new Date(m.consumed_at).toLocaleDateString('sv')
-        return localDate === selectedDate
-      })
+  const displayedMeals = useMemo(
+    () =>
+      isAuthed
+        ? meals
+        : meals.filter((m) => {
+            const localDate = new Date(m.consumed_at).toLocaleDateString('sv')
+            return localDate === selectedDate
+          }),
+    [meals, isAuthed, selectedDate]
+  )
 
   async function handleAddMeal(payload: {
     mealType: MealType
