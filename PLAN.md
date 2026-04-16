@@ -129,7 +129,85 @@ Phase 8.4 is independent of everything.
 
 ---
 
+## Phase 9: Search + Calories
+
+### 9.1 — Calorie Schema (must go first)
+
+- [ ] **DB migration: add calories column**
+  - Supabase SQL: `ALTER TABLE meal_items ADD COLUMN calories smallint;`
+  - File: `types/database.ts` — add `calories: number | null` to `MealItem`, `MealItemInsert`
+  - No store changes needed — column comes back for free in existing `select('*, meal_items(*)')` join
+
+### 9.2 — Calorie Input UI (depends on 9.1)
+
+- [ ] **Inline calorie editing on MealCard**
+  - File: `MealCard.tsx` — each item row gets a tappable calorie badge: shows `— cal` when null, `150 cal` when set. Tap opens a small inline `<input type="number">` (or popover). Blur/Enter saves.
+  - File: `App.css` — `.meal-card__cal` badge style: pill-shaped, muted when empty, sage-colored when filled
+  - Keep it minimal: no calorie input in MealComposer — calories are added after the meal is logged
+
+- [ ] **Save calorie to Supabase**
+  - File: `store.ts` — new action `updateItemCalories(itemId: string, calories: number | null)` — calls `supabase.from('meal_items').update({ calories }).eq('id', itemId)`, updates local state
+  - Optimistic update: set locally first, rollback on error + toast
+
+- [ ] **Meal calorie subtotal**
+  - File: `MealCard.tsx` — below the items list, show sum: *"420 cal"* (only when ≥1 item has calories). If some items are missing calories, show *"~420 cal"* with a tooltip/title explaining it's partial
+
+### 9.3 — Day calorie total (depends on 9.2)
+
+- [ ] **Day summary with calories**
+  - File: `DaySummary.tsx` — extend to show *"3 meals · 8 items · 1,420 cal"*. Only show calorie segment when ≥1 item across the day has calories. Use `~` prefix when any items are missing calories.
+
+### 9.4 — Calorie editing in EditMealModal (depends on 9.2)
+
+- [ ] **Calorie field in edit modal**
+  - File: `EditMealModal.tsx` — each chip in the edit list gets an optional calorie input beside it
+  - On save, update `meal_items.calories` for each changed item
+  - Track calorie changes in `isDirty` check
+
+### 9.5 — Search (independent of 9.1–9.4, parallelize)
+
+- [ ] **Search icon + expandable bar**
+  - File: `App.tsx` — add search icon button in header. Clicking toggles a `SearchOverlay` component.
+  - New file: `components/SearchOverlay.tsx` — full-screen overlay with autofocused text input, debounced 300ms
+  - File: `App.css` — `.search-overlay` slide-down animation, input styling consistent with app theme
+
+- [ ] **Search query + results**
+  - File: `store.ts` — new action `searchItems(query: string): Promise<MealWithItems[]>` — calls `supabase.from('meals').select('*, meal_items!inner(*)').ilike('meal_items.description', '%query%').order('consumed_at', { ascending: false }).limit(50)`
+  - For anonymous users: filter local meals in-memory with `item.description.toLowerCase().includes(query)`
+
+- [ ] **Search results display**
+  - File: `SearchOverlay.tsx` — results grouped by date (date header + MealCards). Matching item text highlighted (bold/underline). Empty state: *"No meals found"*. Tap a result → close search, navigate to that date.
+
+- [ ] **Keyboard / mobile UX**
+  - Escape key or back button closes search
+  - Search input gets `inputmode="search"` + `enterkeyhint="search"` for mobile keyboards
+  - Results are scrollable, overlay traps focus
+
+---
+
+### Dependency Graph
+
+```
+Phase 9.1  ── Calorie column migration
+                │
+Phase 9.2  ──┬── Inline calorie editing ──────────┐
+              └── Save to Supabase + optimistic     │
+                                                    │
+Phase 9.3  ── Day summary calories ─────────────────┘
+                                                    │
+Phase 9.4  ── Edit modal calorie field ─────────────┘
+
+Phase 9.5  ──┬── Search overlay + bar       (independent)
+              ├── Search query + results
+              └── Keyboard / mobile UX
+```
+
+9.5 (search) can run fully in parallel with 9.1–9.4 (calories).
+Within calories: 9.1 → 9.2 → 9.3/9.4 (9.3 and 9.4 can parallelize).
+
+---
+
 ## Backlog
 - [ ] Compare Days view
-- [ ] LLM parsing (when budget allows)
-- [ ] Search across all entries
+- [ ] LLM parsing + calorie estimation (when budget allows)
+- [ ] Shared food_lookup cache table (pairs with LLM feature)

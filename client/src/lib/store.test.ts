@@ -27,6 +27,7 @@ function makeMeal(opts: MakeMealOptions = {}): MealWithItems {
     meal_id: id,
     description: it.description,
     position: i,
+    calories: null as number | null,
     created_at: now,
   }))
 

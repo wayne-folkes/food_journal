@@ -43,6 +43,7 @@ export type Database = {
           description: string
           position: number
           created_at: string
+          calories: number | null
         }
         Insert: {
           id?: string
@@ -50,10 +51,12 @@ export type Database = {
           description: string
           position?: number
           created_at?: string
+          calories?: number | null
         }
         Update: {
           description?: string
           position?: number
+          calories?: number | null
         }
         Relationships: [
           {

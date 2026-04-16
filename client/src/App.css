@@ -588,6 +588,9 @@
 }
 
 .meal-card__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 0.93rem;
   color: var(--ink);
   line-height: 1.4;
@@ -605,6 +608,132 @@
   border-radius: 50%;
   background: var(--ink-muted);
   opacity: 0.5;
+}
+
+.meal-card__item-desc {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Calorie badge */
+.meal-card__cal-badge {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.13s, color 0.13s, opacity 0.13s;
+}
+
+.meal-card__cal-badge--empty {
+  background: transparent;
+  color: var(--ink-muted);
+  border: 1px dashed var(--cream-dark);
+  opacity: 0.7;
+}
+.meal-card__cal-badge--empty:hover {
+  opacity: 1;
+  border-color: var(--sage);
+  color: var(--sage);
+}
+
+.meal-card__cal-badge--set {
+  background: color-mix(in srgb, var(--sage) 14%, transparent);
+  color: var(--sage);
+  border: 1px solid color-mix(in srgb, var(--sage) 30%, transparent);
+}
+.meal-card__cal-badge--set:hover {
+  background: color-mix(in srgb, var(--sage) 22%, transparent);
+}
+
+/* Inline calorie input */
+.meal-card__cal-input {
+  flex-shrink: 0;
+  width: 64px;
+  border: 1.5px solid var(--sage);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  outline: none;
+  text-align: right;
+  /* hide number input spin arrows */
+  -moz-appearance: textfield;
+}
+.meal-card__cal-input::-webkit-inner-spin-button,
+.meal-card__cal-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+
+/* Meal calorie subtotal */
+.meal-card__cal-total {
+  text-align: right;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink-muted);
+  margin-top: 6px;
+  letter-spacing: 0.02em;
+}
+
+/* ── Edit Modal — calorie rows ───────────────────────────────────────────── */
+.edit-modal__cal-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.edit-modal__cal-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.edit-modal__cal-row-desc {
+  flex: 1;
+  font-size: 0.88rem;
+  color: var(--ink);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-modal__cal-input {
+  width: 72px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 5px 8px;
+  outline: none;
+  text-align: right;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  -moz-appearance: textfield;
+}
+.edit-modal__cal-input::-webkit-inner-spin-button,
+.edit-modal__cal-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+.edit-modal__cal-input:focus {
+  border-color: var(--sage);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sage) 15%, transparent);
+}
+.edit-modal__cal-input::placeholder {
+  color: var(--ink-muted);
+  opacity: 0.6;
 }
 
 /* ── Auth ────────────────────────────────────────────────────────────────── */
@@ -833,4 +962,149 @@
     align-items: center;
   }
   .toast { width: 100%; max-width: 100%; text-align: center; }
+}
+
+/* ── Header search button ────────────────────────────────────────────────── */
+.header-search-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  color: var(--ink-mid);
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  min-width: 40px;
+  min-height: 40px;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+.header-search-btn:hover {
+  color: var(--ink);
+  background: var(--cream-dark);
+}
+
+/* ── Search overlay ──────────────────────────────────────────────────────── */
+.search-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--cream);
+  display: flex;
+  flex-direction: column;
+  animation: fade-in 0.15s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.search-overlay__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--header-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  flex-shrink: 0;
+}
+
+.search-overlay__back {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-mid);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 6px;
+  padding: 0.5rem;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.search-overlay__back:hover {
+  color: var(--ink);
+  background: var(--cream-dark);
+}
+
+.search-overlay__input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: max(1rem, 16px);
+  font-family: var(--font-sans);
+  color: var(--ink);
+  outline: none;
+  min-width: 0;
+}
+.search-overlay__input::placeholder { color: var(--ink-muted); }
+
+/* Hide browser's native search cancel button */
+.search-overlay__input::-webkit-search-cancel-button { display: none; }
+
+.search-overlay__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--terra);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.search-overlay__results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.search-overlay__date-group {
+  margin-bottom: 1.5rem;
+}
+
+.search-overlay__date-header {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.search-overlay__empty {
+  text-align: center;
+  color: var(--ink-muted);
+  margin-top: 3rem;
+  font-size: 0.9rem;
+}
+
+/* Search result cards are clickable */
+.search-meal-card {
+  cursor: pointer;
+  margin-bottom: 0.5rem;
+}
+.search-meal-card:focus {
+  outline: 2px solid var(--terra);
+  outline-offset: 2px;
+}
+.search-meal-card:hover {
+  box-shadow: 0 4px 16px rgba(42, 33, 24, 0.12), 0 0 0 1px rgba(42, 33, 24, 0.06);
+}
+
+/* Highlight matching text */
+mark {
+  background: var(--terra-light);
+  color: var(--terra);
+  border-radius: 2px;
+  padding: 0 1px;
 }

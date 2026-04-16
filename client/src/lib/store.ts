@@ -5,6 +5,12 @@ import { supabase } from './supabase'
 
 const LOCAL_KEY = 'food_journal_meals'
 
+export interface ChipItem {
+  description: string
+  calories: number | null
+  id?: string
+}
+
 interface MealsState {
   meals: MealWithItems[]
   isAuthed: boolean
@@ -14,13 +20,15 @@ interface MealsState {
   addMeal: (insert: MealInsert & { items: string[] }) => Promise<void>
   editMeal: (
     id: string,
-    updates: { meal_type: MealType; consumed_at: string; items: string[] }
+    updates: { meal_type: MealType; consumed_at: string; items: ChipItem[] }
   ) => Promise<void>
   deleteMeal: (id: string) => Promise<void>
   removeMealLocally: (id: string) => void
   restoreMeal: (meal: MealWithItems) => void
   syncLocalToRemote: () => Promise<void>
   setAuthed: (authed: boolean) => void
+  updateItemCalories: (itemId: string, calories: number | null) => Promise<void>
+  searchMeals: (query: string) => Promise<MealWithItems[]>
 }
 
 /** Returns today's date string in YYYY-MM-DD (local time). */
@@ -60,6 +68,7 @@ function localMeal(
     meal_id: mealId,
     description: desc,
     position: i,
+    calories: null,
     created_at: now,
   }))
   return {
@@ -170,14 +179,15 @@ export const useEntriesStore = create<MealsState>()(
           set((s) => ({
             meals: s.meals.map((m) => {
               if (m.id !== id) return m
-              const items: MealItem[] = updates.items.map((desc, i) => ({
+              const items: MealItem[] = updates.items.map((chip, i) => ({
                 id: m.items[i]?.id ?? crypto.randomUUID(),
                 meal_id: id,
-                description: desc,
+                description: chip.description,
                 position: i,
+                calories: chip.calories ?? null,
                 created_at: m.items[i]?.created_at ?? now,
               }))
-              return { ...m, ...updates, items, updated_at: now }
+              return { ...m, meal_type: updates.meal_type, consumed_at: updates.consumed_at, items, updated_at: now }
             }),
           }))
           return
@@ -198,10 +208,11 @@ export const useEntriesStore = create<MealsState>()(
         // Replace all items: delete old, insert new
         await supabase.from('meal_items').delete().eq('meal_id', id)
 
-        const itemInserts = updates.items.map((desc, i) => ({
+        const itemInserts = updates.items.map((chip, i) => ({
           meal_id: id,
-          description: desc,
+          description: chip.description,
           position: i,
+          calories: chip.calories ?? null,
         }))
 
         const { data: newItems, error: itemsErr } = await supabase
@@ -247,6 +258,71 @@ export const useEntriesStore = create<MealsState>()(
           meals: [...s.meals, meal].sort(
             (a, b) => new Date(a.consumed_at).getTime() - new Date(b.consumed_at).getTime()
           ),
+        }))
+      },
+
+      updateItemCalories: async (itemId, calories) => {
+        // Optimistic update
+        const prevMeals = get().meals
+        set((s) => ({
+          meals: s.meals.map((m) => ({
+            ...m,
+            items: m.items.map((item) =>
+              item.id === itemId ? { ...item, calories } : item
+            ),
+          })),
+        }))
+
+        const { isAuthed } = get()
+        if (!isAuthed) return // local-only: optimistic update is enough
+
+        const { error } = await supabase
+          .from('meal_items')
+          .update({ calories })
+          .eq('id', itemId)
+
+        if (error) {
+          // Revert on error
+          set({ meals: prevMeals })
+          console.error('updateItemCalories error', error)
+          throw error
+        }
+      },
+
+      searchMeals: async (query) => {
+        if (!query || query.length < 2) return []
+
+        const { isAuthed } = get()
+
+        if (!isAuthed) {
+          const q = query.toLowerCase()
+          return get().meals.filter((m) => m.items.some((i) => i.description.toLowerCase().includes(q)))
+        }
+
+        // Get matching meal_item meal_ids
+        const { data: itemMatches } = await supabase
+          .from('meal_items')
+          .select('meal_id')
+          .ilike('description', `%${query}%`)
+
+        const mealIds = [...new Set(itemMatches?.map((r) => r.meal_id) ?? [])]
+        if (mealIds.length === 0) return []
+
+        const { data, error } = await supabase
+          .from('meals')
+          .select('*, meal_items(*)')
+          .in('id', mealIds)
+          .order('consumed_at', { ascending: false })
+          .limit(50)
+
+        if (error) { console.error('searchMeals error', error); return [] }
+
+        type SupabaseMealRow = Omit<MealWithItems, 'items'> & {
+          meal_items: MealWithItems['items']
+        }
+        return (data as SupabaseMealRow[] ?? []).map((m) => ({
+          ...m,
+          items: [...(m.meal_items ?? [])].sort((a, b) => a.position - b.position),
         }))
       },
 

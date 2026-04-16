@@ -11,15 +11,18 @@ import { AuthButton } from './components/AuthButton'
 import { DateNav, offsetDate } from './components/DateNav'
 import { DaySummary } from './components/DaySummary'
 import { ToastProvider, useToast } from './components/Toast'
+import { SearchOverlay } from './components/SearchOverlay'
 import type { MealWithItems, MealType } from './types/database'
+import type { ChipItem } from './lib/store'
 import './App.css'
 
 function AppInner() {
-  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, removeMealLocally, restoreMeal, syncLocalToRemote } =
+  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, removeMealLocally, restoreMeal, syncLocalToRemote, updateItemCalories } =
     useEntriesStore()
   const [user, setUser] = useState<User | null>(null)
   const [editingMeal, setEditingMeal] = useState<MealWithItems | null>(null)
   const [selectedDate, setSelectedDate] = useState(todayString)
+  const [searchOpen, setSearchOpen] = useState(false)
   const toast = useToast()
 
   // Auth listener
@@ -86,7 +89,7 @@ function AppInner() {
 
   async function handleSaveEdit(
     id: string,
-    updates: { meal_type: MealType; consumed_at: string; items: string[] }
+    updates: { meal_type: MealType; consumed_at: string; items: ChipItem[] }
   ) {
     try {
       await editMeal(id, updates)
@@ -163,7 +166,19 @@ function AppInner() {
     <div className="app">
       <header className="app-header">
         <span className="app-header__title">Food Journal</span>
-        <AuthButton user={user} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button
+            className="header-search-btn"
+            aria-label="Search meals"
+            onClick={() => setSearchOpen(true)}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.75"/>
+              <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+            </svg>
+          </button>
+          <AuthButton user={user} />
+        </div>
       </header>
 
       <main className="app-main">
@@ -185,6 +200,13 @@ function AppInner() {
           onEdit={setEditingMeal}
           onDelete={handleDelete}
           onDuplicate={handleDuplicate}
+          onUpdateCalories={async (itemId, calories) => {
+            try {
+              await updateItemCalories(itemId, calories)
+            } catch {
+              toast.error('Failed to save calories')
+            }
+          }}
         />
       </main>
 
@@ -193,6 +215,16 @@ function AppInner() {
           meal={editingMeal}
           onSave={handleSaveEdit}
           onCancel={() => setEditingMeal(null)}
+        />
+      )}
+
+      {searchOpen && (
+        <SearchOverlay
+          onClose={() => setSearchOpen(false)}
+          onNavigateToDate={(date) => {
+            setSelectedDate(date)
+            setSearchOpen(false)
+          }}
         />
       )}
     </div>
