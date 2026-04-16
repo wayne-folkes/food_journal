@@ -12,7 +12,10 @@ import { DateNav, offsetDate } from './components/DateNav'
 import { DaySummary } from './components/DaySummary'
 import { ToastProvider, useToast } from './components/Toast'
 import { SearchOverlay } from './components/SearchOverlay'
+import { AdminPanel } from './components/AdminPanel'
 import { lookupCalories } from './lib/caloriesLookup'
+
+const ADMIN_EMAIL = 'wayne.folkes@gmail.com'
 import type { MealWithItems, MealType } from './types/database'
 import type { ChipItem } from './lib/store'
 import './App.css'
@@ -276,6 +279,8 @@ function AppInner() {
           }}
         />
       )}
+
+      {user?.email === ADMIN_EMAIL && <AdminPanel />}
     </div>
   )
 }

@@ -1131,3 +1131,46 @@ mark {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ── Admin Panel ─────────────────────────────────────────────── */
+.admin-panel {
+  margin: 2rem 1rem 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--paper);
+}
+.admin-panel__title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin: 0 0 0.75rem;
+}
+.admin-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  justify-content: space-between;
+}
+.admin-panel__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+}
+.admin-panel__info strong {
+  color: var(--ink);
+}
+.admin-panel__info span {
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+}
+.btn--danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.btn--danger:hover {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
