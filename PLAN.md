@@ -440,3 +440,4 @@ Within 11.4 all four stat cards are independent.
 - [ ] Compare Days view
 - [ ] LLM parsing + calorie estimation (when budget allows)
 - [ ] Portion size estimation (pair with USDA per-100g values)
+- [ ] Fix lint warnings: `react-refresh/only-export-components` in `client/src/components/DateNav.tsx` (line 23, `offsetDate` exported alongside component) and `client/src/components/Toast.tsx` (line 59, `ToastAction`/`useToast` exported alongside component) — fix by moving non-component exports to separate utility files
