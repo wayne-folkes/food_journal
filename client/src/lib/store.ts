@@ -6,6 +6,16 @@ import { supabase } from './supabase'
 const LOCAL_KEY = 'food_journal_meals'
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'drink']
 
+interface SyncedLocalMeal {
+  localId: string
+  meal: MealWithItems
+}
+
+interface FailedSyncedLocalMeal {
+  localId: string
+  error: string
+}
+
 export interface ChipItem {
   description: string
   calories: number | null
@@ -130,6 +140,64 @@ function fromRpcMeal(data: unknown, source: string): MealWithItems {
   }
 
   return normalizeMealWithItems(data)
+}
+
+function isSyncedLocalMeal(value: unknown): value is { local_id: string; meal: unknown } {
+  return isRecord(value)
+    && typeof value.local_id === 'string'
+    && 'meal' in value
+}
+
+function isFailedSyncedLocalMeal(value: unknown): value is { local_id: string; error: string } {
+  return isRecord(value)
+    && typeof value.local_id === 'string'
+    && typeof value.error === 'string'
+}
+
+function serializeBatchSyncMeals(meals: MealWithItems[]): Json {
+  return meals.map((meal) => ({
+    local_id: meal.id,
+    meal_type: meal.meal_type,
+    consumed_at: meal.consumed_at,
+    raw_input: meal.raw_input,
+    items: serializeRpcItems(
+      meal.items.map((item) => ({
+        description: item.description,
+        calories: item.calories,
+        consumed_at: item.consumed_at,
+      }))
+    ),
+  }))
+}
+
+function fromBatchSyncRpc(data: unknown, source: string): {
+  synced: SyncedLocalMeal[]
+  failed: FailedSyncedLocalMeal[]
+} {
+  if (!Array.isArray(data)) {
+    throw new Error(`Invalid meal batch payload returned from ${source}`)
+  }
+
+  const synced: SyncedLocalMeal[] = []
+  const failed: FailedSyncedLocalMeal[] = []
+
+  for (const entry of data) {
+    if (isFailedSyncedLocalMeal(entry)) {
+      failed.push({ localId: entry.local_id, error: entry.error })
+      continue
+    }
+
+    if (!isSyncedLocalMeal(entry)) {
+      throw new Error(`Invalid meal batch payload returned from ${source}`)
+    }
+
+    synced.push({
+      localId: entry.local_id,
+      meal: fromRpcMeal(entry.meal, source),
+    })
+  }
+
+  return { synced, failed }
 }
 
 /** Build a full local MealWithItems from an insert payload. */
@@ -390,41 +458,38 @@ export const useEntriesStore = create<MealsState>()(
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
-        const synced: MealWithItems[] = []
-        const syncedLocalIds = new Set<string>()
+        try {
+          const { data, error } = await supabase.rpc('create_meals_with_items_batch', {
+            p_meals: serializeBatchSyncMeals(localMeals),
+          })
 
-        for (const m of localMeals) {
-          try {
-            const { data, error } = await supabase.rpc('create_meal_with_items', {
-              p_meal_type: m.meal_type,
-              p_consumed_at: m.consumed_at,
-              p_raw_input: m.raw_input,
-              p_items: serializeRpcItems(
-                m.items.map((item) => ({
-                  description: item.description,
-                  calories: item.calories,
-                  consumed_at: item.consumed_at,
-                }))
-              ),
-            })
-
-            if (error || !data) {
-              console.error('syncLocalToRemote meal error', error)
-              continue
-            }
-
-            synced.push(fromRpcMeal(data, 'create_meal_with_items'))
-            syncedLocalIds.add(m.id)
-          } catch (err) {
-            console.error('syncLocalToRemote item error', err)
+          if (error || !data) {
+            console.error('syncLocalToRemote batch error', error)
+            return
           }
+
+          const { synced: successfulSyncs, failed } = fromBatchSyncRpc(
+            data,
+            'create_meals_with_items_batch'
+          )
+
+          for (const failure of failed) {
+            console.error('syncLocalToRemote meal error', failure.error)
+          }
+
+          if (successfulSyncs.length === 0) return
+
+          const synced = successfulSyncs.map((result) => result.meal)
+          const syncedLocalIds = new Set(successfulSyncs.map((result) => result.localId))
+
+          if (syncedLocalIds.size === 0) return
+
+          set((s) => ({
+            meals: [...s.meals.filter((m) => !syncedLocalIds.has(m.id)), ...synced],
+          }))
+        } catch (err) {
+          console.error('syncLocalToRemote batch error', err)
         }
-
-        if (syncedLocalIds.size === 0) return
-
-        set((s) => ({
-          meals: [...s.meals.filter((m) => !syncedLocalIds.has(m.id)), ...synced],
-        }))
       },
     }),
     {

@@ -107,6 +107,12 @@ export type Database = {
     }
     Views: Record<string, never>
     Functions: {
+      create_meals_with_items_batch: {
+        Args: {
+          p_meals: Json
+        }
+        Returns: Json
+      }
       create_meal_with_items: {
         Args: {
           p_meal_type: MealType

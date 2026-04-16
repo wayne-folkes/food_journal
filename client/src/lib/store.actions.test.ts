@@ -23,7 +23,41 @@ vi.mock('./supabase', () => ({
   supabase: mockSupabase,
 }))
 
+import type { MealWithItems } from '../types/database'
 import { useEntriesStore } from './store'
+
+function makeStoredMeal({
+  id,
+  description,
+  consumedAt,
+  userId,
+}: {
+  id: string
+  description: string
+  consumedAt: string
+  userId: string | null
+}): MealWithItems {
+  return {
+    id,
+    user_id: userId,
+    meal_type: 'snack',
+    consumed_at: consumedAt,
+    raw_input: description,
+    created_at: consumedAt,
+    updated_at: consumedAt,
+    items: [
+      {
+        id: `${id}-item`,
+        meal_id: id,
+        description,
+        position: 0,
+        consumed_at: consumedAt,
+        created_at: consumedAt,
+        calories: null,
+      },
+    ],
+  }
+}
 
 describe('useEntriesStore.addMeal', () => {
   beforeEach(() => {
@@ -246,13 +280,154 @@ describe('useEntriesStore.addMeal', () => {
 
     useEntriesStore.setState({ meals: [firstLocalMeal, secondLocalMeal], isAuthed: true, isLoading: false })
     mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null })
-    mockSupabase.rpc
-      .mockResolvedValueOnce({ data: syncedRemoteMeal, error: null })
-      .mockResolvedValueOnce({ data: null, error: new Error('insert failed') })
+    mockSupabase.rpc.mockResolvedValue({
+      data: [
+        { local_id: 'local-1', meal: syncedRemoteMeal },
+        { local_id: 'local-2', error: 'insert failed' },
+      ],
+      error: null,
+    })
 
     await useEntriesStore.getState().syncLocalToRemote()
 
     expect(useEntriesStore.getState().meals).toEqual([secondLocalMeal, syncedRemoteMeal])
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('create_meals_with_items_batch', {
+      p_meals: [
+        {
+          local_id: 'local-1',
+          meal_type: 'snack',
+          consumed_at: '2026-04-15T12:00:00.000Z',
+          raw_input: 'apple',
+          items: [
+            {
+              description: 'apple',
+              position: 0,
+              consumed_at: '2026-04-15T12:00:00.000Z',
+              calories: 95,
+            },
+          ],
+        },
+        {
+          local_id: 'local-2',
+          meal_type: 'lunch',
+          consumed_at: '2026-04-15T13:00:00.000Z',
+          raw_input: 'sandwich',
+          items: [
+            {
+              description: 'sandwich',
+              position: 0,
+              consumed_at: '2026-04-15T13:00:00.000Z',
+              calories: 300,
+            },
+          ],
+        },
+      ],
+    })
+  })
+
+  it('syncs local meals with a single batch RPC call', async () => {
+    const localMeals = [
+      makeStoredMeal({
+        id: 'local-1',
+        description: 'apple',
+        consumedAt: '2026-04-15T12:00:00.000Z',
+        userId: null,
+      }),
+      makeStoredMeal({
+        id: 'local-2',
+        description: 'sandwich',
+        consumedAt: '2026-04-15T13:00:00.000Z',
+        userId: null,
+      }),
+      makeStoredMeal({
+        id: 'local-3',
+        description: 'coffee',
+        consumedAt: '2026-04-15T14:00:00.000Z',
+        userId: null,
+      }),
+    ]
+    const remoteMeals = [
+      makeStoredMeal({
+        id: 'remote-1',
+        description: 'apple',
+        consumedAt: '2026-04-15T12:00:00.000Z',
+        userId: 'user-1',
+      }),
+      makeStoredMeal({
+        id: 'remote-2',
+        description: 'sandwich',
+        consumedAt: '2026-04-15T13:00:00.000Z',
+        userId: 'user-1',
+      }),
+      makeStoredMeal({
+        id: 'remote-3',
+        description: 'coffee',
+        consumedAt: '2026-04-15T14:00:00.000Z',
+        userId: 'user-1',
+      }),
+    ]
+
+    useEntriesStore.setState({ meals: localMeals, isAuthed: true, isLoading: false })
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null })
+    mockSupabase.rpc.mockResolvedValue({
+      data: [
+        { local_id: 'local-1', meal: remoteMeals[0] },
+        { local_id: 'local-2', meal: remoteMeals[1] },
+        { local_id: 'local-3', meal: remoteMeals[2] },
+      ],
+      error: null,
+    })
+
+    await useEntriesStore.getState().syncLocalToRemote()
+
+    expect(useEntriesStore.getState().meals).toEqual(remoteMeals)
+    expect(mockSupabase.rpc).toHaveBeenCalledTimes(1)
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('create_meals_with_items_batch', {
+      p_meals: [
+        {
+          local_id: 'local-1',
+          meal_type: 'snack',
+          consumed_at: '2026-04-15T12:00:00.000Z',
+          raw_input: 'apple',
+          items: [
+            {
+              description: 'apple',
+              position: 0,
+              consumed_at: '2026-04-15T12:00:00.000Z',
+              calories: null,
+            },
+          ],
+        },
+        {
+          local_id: 'local-2',
+          meal_type: 'snack',
+          consumed_at: '2026-04-15T13:00:00.000Z',
+          raw_input: 'sandwich',
+          items: [
+            {
+              description: 'sandwich',
+              position: 0,
+              consumed_at: '2026-04-15T13:00:00.000Z',
+              calories: null,
+            },
+          ],
+        },
+        {
+          local_id: 'local-3',
+          meal_type: 'snack',
+          consumed_at: '2026-04-15T14:00:00.000Z',
+          raw_input: 'coffee',
+          items: [
+            {
+              description: 'coffee',
+              position: 0,
+              consumed_at: '2026-04-15T14:00:00.000Z',
+              calories: null,
+            },
+          ],
+        },
+      ],
+    })
   })
 
   it('escapes wildcard characters before issuing remote search patterns', async () => {

@@ -25,6 +25,7 @@ supabase/migrations/0003_meal_items_calories.sql  -- calories column
 supabase/migrations/0004_food_lookup.sql           -- USDA cache table
 supabase/migrations/0005_sync_meals_schema.sql     -- raw_input + updated_at on meals
 supabase/migrations/0006_transactional_meal_writes.sql -- transactional meal RPCs
+supabase/migrations/0007_batch_sync_local_meals.sql -- batched local-to-remote sync RPC
 ```
 
 ### 2. Supabase — enable Google OAuth
