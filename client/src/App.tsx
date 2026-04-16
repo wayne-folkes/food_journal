@@ -89,7 +89,7 @@ function AppInner() {
                   }
                 })
                 const found = results.filter((r) => r.calories !== null).length
-                if (found > 0) toast.success(`Estimated ${found} calorie${found === 1 ? '' : 's'} from USDA`)
+                if (found > 0) toast.success(`Got calorie estimate${found === 1 ? '' : 's'} for ${found} item${found === 1 ? '' : 's'} from USDA`)
               })
               .catch(() => {
                 // silently fail — calorie lookup is best-effort
@@ -200,7 +200,7 @@ function AppInner() {
         if (r.calories !== null) await updateItemCalories(r.id, r.calories)
       }
       const found = results.filter((r) => r.calories !== null).length
-      if (found > 0) toast.success(`Estimated ${found} calorie${found === 1 ? '' : 's'} from USDA`)
+      if (found > 0) toast.success(`Got calorie estimate${found === 1 ? '' : 's'} for ${found} item${found === 1 ? '' : 's'} from USDA`)
       else toast.error('No calorie data found for these items')
     } catch {
       toast.error('Failed to estimate calories')

@@ -33,7 +33,7 @@ async function fetchFromUsda(description: string): Promise<{ calories: number | 
     body: JSON.stringify({
       query: description,
       dataType: ['Foundation', 'SR Legacy'],
-      pageSize: 5,
+      pageSize: 25,
       sortBy: 'score',
       sortOrder: 'desc'
     })
@@ -43,24 +43,43 @@ async function fetchFromUsda(description: string): Promise<{ calories: number | 
     foods?: Array<{
       fdcId: number
       description: string
+      dataType?: string
       foodNutrients?: Array<{
-        nutrientNumber?: string  // search endpoint field name
-        number?: string          // fallback
+        nutrientNumber?: string
+        number?: string
         nutrientName?: string
         name?: string
-        value?: number           // search endpoint field name
-        amount?: number          // fallback
+        value?: number
+        amount?: number
         unitName?: string
       }>
     }>
   }
 
-  // Prefer a food whose description starts with the query (most generic/basic form).
-  // e.g. "orange" should match "Oranges, raw" not "Marmalade, orange"
+  const foods = data.foods ?? []
   const queryLower = description.toLowerCase().trim()
-  const food =
-    data.foods?.find(f => f.description.toLowerCase().startsWith(queryLower)) ??
-    data.foods?.[0]
+
+  // Score each candidate — higher is better:
+  // +30  Foundation dataset (whole, minimally processed foods)
+  // +20  description starts with query or its plural (e.g. "oranges" for "orange")
+  // +10  query is the first comma-separated word of description
+  //  -1 per char  shorter descriptions preferred (more generic)
+  function scoreFood(f: typeof foods[0]): number {
+    let score = 0
+    const desc = f.description.toLowerCase()
+    const firstSegment = desc.split(',')[0].trim()
+
+    if (f.dataType === 'Foundation') score += 30
+    if (desc.startsWith(queryLower) || desc.startsWith(queryLower + 's')) score += 20
+    if (firstSegment === queryLower || firstSegment === queryLower + 's') score += 10
+    score -= f.description.length * 0.1   // shorter = more generic
+
+    return score
+  }
+
+  const food = foods.length > 0
+    ? [...foods].sort((a, b) => scoreFood(b) - scoreFood(a))[0]
+    : undefined
 
   // Find energy nutrient — search endpoint uses nutrientNumber/value; details endpoint uses number/amount
   const energyNutrient = food?.foodNutrients?.find(n =>
