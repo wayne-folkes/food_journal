@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { useEntriesStore, recentDistinct, todayString } from './lib/store'
@@ -23,7 +23,7 @@ import type { ChipItem } from './lib/store'
 import './App.css'
 
 function AppInner() {
-  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, removeMealLocally, restoreMeal, syncLocalToRemote, updateItemCalories } =
+  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, syncLocalToRemote, updateItemCalories } =
     useEntriesStore()
   const [user, setUser] = useState<User | null>(null)
   const [editingMeal, setEditingMeal] = useState<MealWithItems | null>(null)
@@ -37,6 +37,7 @@ function AppInner() {
       setUser(session?.user ?? null)
       if (event === 'SIGNED_IN') {
         await syncLocalToRemote()
+        useEntriesStore.setState({ meals: [] })
         setAuthed(true)
       } else if (event === 'SIGNED_OUT') {
         useEntriesStore.setState({ meals: [] })
@@ -100,7 +101,7 @@ function AppInner() {
       }
     } catch (err) {
       toast.error('Failed to add meal. Please try again.')
-      console.error('handleAddMeal error', err)
+      console.error('handleAddMeal error:', err instanceof Error ? err.message : String(err))
     }
   }
 
@@ -114,7 +115,7 @@ function AppInner() {
       })
     } catch (err) {
       toast.error('Failed to add entry. Please try again.')
-      console.error('handleRelogItem error', err)
+      console.error('handleRelogItem error:', err instanceof Error ? err.message : String(err))
     }
   }
 
@@ -127,51 +128,36 @@ function AppInner() {
       setEditingMeal(null)
     } catch (err) {
       toast.error('Failed to save changes. Please try again.')
-      console.error('handleSaveEdit error', err)
+      console.error('handleSaveEdit error:', err instanceof Error ? err.message : String(err))
     }
   }
 
-  const pendingDeletes = useRef<Map<string, { meal: MealWithItems; timer: ReturnType<typeof setTimeout> }>>(new Map())
-
   async function handleDelete(id: string) {
-    // Find the meal before removing it
-    const meal = displayedMeals.find((m) => m.id === id)
+    // Capture the full meal object before deleting
+    const meal = useEntriesStore.getState().meals.find((m) => m.id === id)
     if (!meal) return
 
-    // Optimistically remove from UI
-    removeMealLocally(id)
-
-    // Cancel any existing pending delete for this id
-    const existing = pendingDeletes.current.get(id)
-    if (existing) {
-      clearTimeout(existing.timer)
+    // Delete on the server immediately (also removes from local state)
+    try {
+      await deleteMeal(id)
+    } catch (err) {
+      toast.error('Failed to delete meal. Please try again.')
+      console.error('handleDelete error:', err instanceof Error ? err.message : String(err))
+      return
     }
 
-    // Schedule the real delete after 5 seconds
-    const timer = setTimeout(async () => {
-      pendingDeletes.current.delete(id)
-      try {
-        await deleteMeal(id)
-      } catch (err) {
-        // If the real delete fails, restore the meal
-        restoreMeal(meal)
-        toast.error('Failed to delete meal. Please try again.')
-        console.error('handleDelete error', err)
-      }
-    }, 5000)
-
-    pendingDeletes.current.set(id, { meal, timer })
-
-    // Show toast with Undo action
+    // Show toast with Undo action — undo reinserts via a real server call
     toast.success('Meal deleted', {
       label: 'Undo',
       onClick: () => {
-        const pending = pendingDeletes.current.get(id)
-        if (pending) {
-          clearTimeout(pending.timer)
-          pendingDeletes.current.delete(id)
-          restoreMeal(pending.meal)
-        }
+        addMeal({
+          meal_type: meal.meal_type,
+          consumed_at: meal.consumed_at,
+          raw_input: meal.raw_input ?? '',
+          items: meal.items.map((i) => i.description),
+        }).catch(() => {
+          toast.error('Failed to undo delete. Please try again.')
+        })
       },
     })
   }
@@ -186,7 +172,7 @@ function AppInner() {
       })
     } catch (err) {
       toast.error('Failed to log meal again. Please try again.')
-      console.error('handleDuplicate error', err)
+      console.error('handleDuplicate error:', err instanceof Error ? err.message : String(err))
     }
   }
 
