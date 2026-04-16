@@ -33,7 +33,7 @@ async function fetchFromUsda(description: string): Promise<{ calories: number | 
     body: JSON.stringify({
       query: description,
       dataType: ['Foundation', 'SR Legacy'],
-      pageSize: 1,
+      pageSize: 5,
       sortBy: 'score',
       sortOrder: 'desc'
     })
@@ -42,6 +42,7 @@ async function fetchFromUsda(description: string): Promise<{ calories: number | 
   const data = await response.json() as {
     foods?: Array<{
       fdcId: number
+      description: string
       foodNutrients?: Array<{
         nutrientNumber?: string  // search endpoint field name
         number?: string          // fallback
@@ -53,7 +54,13 @@ async function fetchFromUsda(description: string): Promise<{ calories: number | 
       }>
     }>
   }
-  const food = data.foods?.[0]
+
+  // Prefer a food whose description starts with the query (most generic/basic form).
+  // e.g. "orange" should match "Oranges, raw" not "Marmalade, orange"
+  const queryLower = description.toLowerCase().trim()
+  const food =
+    data.foods?.find(f => f.description.toLowerCase().startsWith(queryLower)) ??
+    data.foods?.[0]
 
   // Find energy nutrient — search endpoint uses nutrientNumber/value; details endpoint uses number/amount
   const energyNutrient = food?.foodNutrients?.find(n =>
