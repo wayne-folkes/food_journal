@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { MealWithItems, MealInsert, MealType, MealItem } from '../types/database'
+import type { Json, MealWithItems, MealInsert, MealType, MealItem } from '../types/database'
 import { supabase } from './supabase'
 
 const LOCAL_KEY = 'food_journal_meals'
@@ -11,13 +11,19 @@ export interface ChipItem {
   id?: string
 }
 
+interface RpcMealItem {
+  description: string
+  calories: number | null
+  consumed_at: string
+}
+
 interface MealsState {
   meals: MealWithItems[]
   isAuthed: boolean
   isLoading: boolean
   // Actions
   loadDay: (date?: string) => Promise<void>
-  addMeal: (insert: MealInsert & { items: string[] }) => Promise<void>
+  addMeal: (insert: MealInsert & { items: string[] }) => Promise<MealWithItems>
   editMeal: (
     id: string,
     updates: { meal_type: MealType; consumed_at: string; items: ChipItem[] }
@@ -57,6 +63,34 @@ export function recentDistinct(meals: MealWithItems[], n = 5): string[] {
   return result
 }
 
+function sortMealItems(items: MealItem[]): MealItem[] {
+  return [...items].sort((a, b) => a.position - b.position)
+}
+
+function normalizeMealWithItems(meal: MealWithItems): MealWithItems {
+  return {
+    ...meal,
+    items: sortMealItems(meal.items ?? []),
+  }
+}
+
+function buildRawInput(items: Array<{ description: string }>): string {
+  return items.map((item) => item.description).join(', ')
+}
+
+function serializeRpcItems(items: RpcMealItem[]): Json {
+  return items.map((item, position) => ({
+    description: item.description,
+    position,
+    consumed_at: item.consumed_at,
+    calories: item.calories,
+  }))
+}
+
+function fromRpcMeal(data: unknown): MealWithItems {
+  return normalizeMealWithItems(data as MealWithItems)
+}
+
 /** Build a full local MealWithItems from an insert payload. */
 function localMeal(
   insert: MealInsert & { items: string[] }
@@ -68,6 +102,7 @@ function localMeal(
     meal_id: mealId,
     description: desc,
     position: i,
+    consumed_at: insert.consumed_at ?? now,
     calories: null,
     created_at: now,
   }))
@@ -129,46 +164,34 @@ export const useEntriesStore = create<MealsState>()(
         const { isAuthed } = get()
 
         if (!isAuthed) {
-          set((s) => ({ meals: [...s.meals, localMeal(insert)] }))
-          return
+          const meal = localMeal(insert)
+          set((s) => ({ meals: [...s.meals, meal] }))
+          return meal
         }
 
-        const now = new Date().toISOString()
+        const consumedAt = insert.consumed_at ?? new Date().toISOString()
+        const { data, error } = await supabase.rpc('create_meal_with_items', {
+          p_meal_type: insert.meal_type ?? 'snack',
+          p_consumed_at: consumedAt,
+          p_raw_input: insert.raw_input ?? '',
+          p_items: serializeRpcItems(
+            insert.items.map((description) => ({
+              description,
+              calories: null,
+              consumed_at: consumedAt,
+            }))
+          ),
+        })
 
-        // 1. Insert meal row
-        const { data: meal, error: mealErr } = await supabase
-          .from('meals')
-          .insert({
-            consumed_at: insert.consumed_at,
-            meal_type: insert.meal_type,
-            raw_input: insert.raw_input,
-          })
-          .select()
-          .single()
-
-        if (mealErr || !meal) { console.error('addMeal error', mealErr); throw mealErr }
-
-        // 2. Insert items
-        const itemInserts = insert.items.map((desc, i) => ({
-          meal_id: meal.id,
-          description: desc,
-          position: i,
-        }))
-
-        const { data: items, error: itemsErr } = await supabase
-          .from('meal_items')
-          .insert(itemInserts)
-          .select()
-
-        if (itemsErr) { console.error('addMeal items error', itemsErr); throw itemsErr }
-
-        const mealWithItems: MealWithItems = {
-          ...meal,
-          updated_at: meal.updated_at ?? now,
-          items: (items ?? []).sort((a, b) => a.position - b.position),
+        if (error || !data) {
+          console.error('addMeal error', error)
+          throw error
         }
+
+        const mealWithItems = fromRpcMeal(data)
 
         set((s) => ({ meals: [...s.meals, mealWithItems] }))
+        return mealWithItems
       },
 
       editMeal: async (id, updates) => {
@@ -184,55 +207,46 @@ export const useEntriesStore = create<MealsState>()(
                 meal_id: id,
                 description: chip.description,
                 position: i,
+                consumed_at: updates.consumed_at,
                 calories: chip.calories ?? null,
                 created_at: m.items[i]?.created_at ?? now,
               }))
-              return { ...m, meal_type: updates.meal_type, consumed_at: updates.consumed_at, items, updated_at: now }
+              return {
+                ...m,
+                meal_type: updates.meal_type,
+                consumed_at: updates.consumed_at,
+                raw_input: buildRawInput(updates.items),
+                items,
+                updated_at: now,
+              }
             }),
           }))
           return
         }
 
-        // Update meal row
-        const { error: mealErr } = await supabase
-          .from('meals')
-          .update({
-            meal_type: updates.meal_type,
-            consumed_at: updates.consumed_at,
-            updated_at: now,
-          })
-          .eq('id', id)
+        const { data, error } = await supabase.rpc('update_meal_with_items', {
+          p_meal_id: id,
+          p_meal_type: updates.meal_type,
+          p_consumed_at: updates.consumed_at,
+          p_raw_input: buildRawInput(updates.items),
+          p_items: serializeRpcItems(
+            updates.items.map((item) => ({
+              description: item.description,
+              calories: item.calories ?? null,
+              consumed_at: updates.consumed_at,
+            }))
+          ),
+        })
 
-        if (mealErr) { console.error('editMeal error', mealErr); throw mealErr }
+        if (error || !data) {
+          console.error('editMeal error', error)
+          throw error
+        }
 
-        // Replace all items: delete old, insert new
-        await supabase.from('meal_items').delete().eq('meal_id', id)
-
-        const itemInserts = updates.items.map((chip, i) => ({
-          meal_id: id,
-          description: chip.description,
-          position: i,
-          calories: chip.calories ?? null,
-        }))
-
-        const { data: newItems, error: itemsErr } = await supabase
-          .from('meal_items')
-          .insert(itemInserts)
-          .select()
-
-        if (itemsErr) { console.error('editMeal items error', itemsErr); throw itemsErr }
+        const updatedMeal = fromRpcMeal(data)
 
         set((s) => ({
-          meals: s.meals.map((m) => {
-            if (m.id !== id) return m
-            return {
-              ...m,
-              meal_type: updates.meal_type,
-              consumed_at: updates.consumed_at,
-              updated_at: now,
-              items: (newItems ?? []).sort((a, b) => a.position - b.position),
-            }
-          }),
+          meals: s.meals.map((meal) => (meal.id === id ? updatedMeal : meal)),
         }))
       },
 
@@ -335,45 +349,39 @@ export const useEntriesStore = create<MealsState>()(
         if (!user) return
 
         const synced: MealWithItems[] = []
+        const syncedLocalIds = new Set<string>()
 
         for (const m of localMeals) {
           try {
-            const { data: meal, error: mealErr } = await supabase
-              .from('meals')
-              .insert({
-                consumed_at: m.consumed_at,
-                meal_type: m.meal_type,
-                raw_input: m.raw_input,
-              })
-              .select()
-              .single()
-
-            if (mealErr || !meal) continue
-
-            const itemInserts = m.items.map((item, i) => ({
-              meal_id: meal.id,
-              description: item.description,
-              position: i,
-            }))
-
-            const { data: items } = await supabase
-              .from('meal_items')
-              .insert(itemInserts)
-              .select()
-
-            synced.push({
-              ...meal,
-              updated_at: meal.updated_at ?? new Date().toISOString(),
-              items: (items ?? []).sort((a, b) => a.position - b.position),
+            const { data, error } = await supabase.rpc('create_meal_with_items', {
+              p_meal_type: m.meal_type,
+              p_consumed_at: m.consumed_at,
+              p_raw_input: m.raw_input,
+              p_items: serializeRpcItems(
+                m.items.map((item) => ({
+                  description: item.description,
+                  calories: item.calories,
+                  consumed_at: item.consumed_at,
+                }))
+              ),
             })
+
+            if (error || !data) {
+              console.error('syncLocalToRemote meal error', error)
+              continue
+            }
+
+            synced.push(fromRpcMeal(data))
+            syncedLocalIds.add(m.id)
           } catch (err) {
             console.error('syncLocalToRemote item error', err)
           }
         }
 
-        const localIds = new Set(localMeals.map((m) => m.id))
+        if (syncedLocalIds.size === 0) return
+
         set((s) => ({
-          meals: [...s.meals.filter((m) => !localIds.has(m.id)), ...synced],
+          meals: [...s.meals.filter((m) => !syncedLocalIds.has(m.id)), ...synced],
         }))
       },
     }),

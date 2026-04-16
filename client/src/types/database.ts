@@ -6,6 +6,14 @@
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'dessert' | 'drink'
 
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
 export type Database = {
   public: {
     Tables: {
@@ -42,6 +50,7 @@ export type Database = {
           meal_id: string
           description: string
           position: number
+          consumed_at: string
           created_at: string
           calories: number | null
         }
@@ -50,12 +59,14 @@ export type Database = {
           meal_id: string
           description: string
           position?: number
+          consumed_at?: string
           created_at?: string
           calories?: number | null
         }
         Update: {
           description?: string
           position?: number
+          consumed_at?: string
           calories?: number | null
         }
         Relationships: [
@@ -67,9 +78,55 @@ export type Database = {
           }
         ]
       }
+      food_lookup: {
+        Row: {
+          description_key: string
+          description: string
+          calories_per_100g: number | null
+          source: string
+          usda_fdc_id: number | null
+          created_at: string
+        }
+        Insert: {
+          description_key: string
+          description: string
+          calories_per_100g?: number | null
+          source?: string
+          usda_fdc_id?: number | null
+          created_at?: string
+        }
+        Update: {
+          description?: string
+          calories_per_100g?: number | null
+          source?: string
+          usda_fdc_id?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      create_meal_with_items: {
+        Args: {
+          p_meal_type: MealType
+          p_consumed_at: string
+          p_raw_input: string
+          p_items: Json
+        }
+        Returns: Json
+      }
+      update_meal_with_items: {
+        Args: {
+          p_meal_id: string
+          p_meal_type: MealType
+          p_consumed_at: string
+          p_raw_input: string
+          p_items: Json
+        }
+        Returns: Json
+      }
+    }
     Enums: {
       meal_type: MealType
     }
@@ -87,11 +144,4 @@ export type MealItemInsert = Database['public']['Tables']['meal_items']['Insert'
 /** A meal with its items eagerly loaded — the primary working type. */
 export type MealWithItems = Meal & { items: MealItem[] }
 
-export interface FoodLookup {
-  description_key: string
-  description: string
-  calories_per_100g: number | null
-  source: string
-  usda_fdc_id: number | null
-  created_at: string
-}
+export type FoodLookup = Database['public']['Tables']['food_lookup']['Row']

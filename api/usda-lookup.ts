@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { buildLookupCacheRows, type LookupItem, type LookupResult } from './usda-cache'
 
 const USDA_API_KEY = process.env.USDA_API_KEY!
 const SUPABASE_URL = process.env.SUPABASE_URL!
@@ -13,18 +14,6 @@ const supabaseAnon = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_ANON_KEY!
 )
-
-interface LookupItem {
-  id: string         // meal_item id
-  description: string
-}
-
-interface LookupResult {
-  id: string
-  description: string
-  calories: number | null   // kcal per 100g, or null if not found
-  source: 'cache' | 'usda' | 'not_found'
-}
 
 interface CachedLookupRow {
   description_key: string
@@ -185,16 +174,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     )
 
     // 6. Cache write for new results (upsert all misses, including not_found)
-    const upsertRows = misses.map((item, i) => {
-      const { result, fdcId } = missResults[i]
-      return {
-        description_key: item.description.toLowerCase().trim(),
-        description: item.description,
-        calories_per_100g: result.calories,
-        source: 'usda',
-        usda_fdc_id: fdcId
-      }
-    })
+    const upsertRows = buildLookupCacheRows(misses, missResults)
 
     if (upsertRows.length > 0) {
       const { error: upsertError } = await supabaseAdmin

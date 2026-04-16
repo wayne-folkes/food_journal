@@ -68,39 +68,30 @@ function AppInner() {
     rawInput: string
   }) {
     try {
-      await addMeal({
+      const savedMeal = await addMeal({
         meal_type: payload.mealType,
         consumed_at: payload.consumed_at,
         raw_input: payload.rawInput,
         items: payload.items,
       })
 
-      // After addMeal resolves, find the newly added meal from the store
-      // (it's the last meal with items matching our payload)
       if (isAuthed) {
-        const savedMeals = useEntriesStore.getState().meals
-        const savedMeal = [...savedMeals]
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-          .find((m) => m.items.some((i) => payload.items.includes(i.description)))
-
-        if (savedMeal) {
-          const itemsNeedingCalories = savedMeal.items.filter((i) => i.calories === null)
-          if (itemsNeedingCalories.length > 0) {
-            // fire and forget — non-blocking
-            lookupCalories(itemsNeedingCalories.map((i) => ({ id: i.id, description: i.description })))
-              .then((results) => {
-                results.forEach((r) => {
-                  if (r.calories !== null) {
-                    updateItemCalories(r.id, r.calories)
-                  }
-                })
-                const found = results.filter((r) => r.calories !== null).length
-                if (found > 0) toast.success(`Got calorie estimate${found === 1 ? '' : 's'} for ${found} item${found === 1 ? '' : 's'} from USDA`)
+        const itemsNeedingCalories = savedMeal.items.filter((item) => item.calories === null)
+        if (itemsNeedingCalories.length > 0) {
+          // fire and forget — non-blocking
+          lookupCalories(itemsNeedingCalories.map((item) => ({ id: item.id, description: item.description })))
+            .then((results) => {
+              results.forEach((result) => {
+                if (result.calories !== null) {
+                  updateItemCalories(result.id, result.calories)
+                }
               })
-              .catch(() => {
-                // silently fail — calorie lookup is best-effort
-              })
-          }
+              const found = results.filter((result) => result.calories !== null).length
+              if (found > 0) toast.success(`Got calorie estimate${found === 1 ? '' : 's'} for ${found} item${found === 1 ? '' : 's'} from USDA`)
+            })
+            .catch(() => {
+              // silently fail — calorie lookup is best-effort
+            })
         }
       }
     } catch (err) {

@@ -94,6 +94,7 @@ export function SearchOverlay({ onClose, onNavigateToDate }: SearchOverlayProps)
   const [isSearching, setIsSearching] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestRequestId = useRef(0)
 
   // Autofocus input on mount
   useEffect(() => {
@@ -111,6 +112,8 @@ export function SearchOverlay({ onClose, onNavigateToDate }: SearchOverlayProps)
 
   const handleInputChange = useCallback((value: string) => {
     setInputValue(value)
+    latestRequestId.current += 1
+    const requestId = latestRequestId.current
 
     if (debounceTimer.current) clearTimeout(debounceTimer.current)
 
@@ -125,15 +128,22 @@ export function SearchOverlay({ onClose, onNavigateToDate }: SearchOverlayProps)
     debounceTimer.current = setTimeout(async () => {
       const q = value.trim()
       setQuery(q)
-      const found = await searchMeals(q)
-      setResults(found)
-      setIsSearching(false)
+      try {
+        const found = await searchMeals(q)
+        if (requestId !== latestRequestId.current) return
+        setResults(found)
+      } finally {
+        if (requestId === latestRequestId.current) {
+          setIsSearching(false)
+        }
+      }
     }, 300)
   }, [searchMeals])
 
   // Cleanup timer on unmount
   useEffect(() => {
     return () => {
+      latestRequestId.current += 1
       if (debounceTimer.current) clearTimeout(debounceTimer.current)
     }
   }, [])
