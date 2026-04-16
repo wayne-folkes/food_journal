@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import type { MealItem, MealWithItems } from '../types/database'
 import { MEAL_TYPE_LABELS } from '../lib/mealType'
+import { useEntriesStore } from '../lib/store'
 
 interface Props {
   meal: MealWithItems
@@ -8,6 +9,7 @@ interface Props {
   onDelete: (id: string) => void
   onDuplicate: (meal: MealWithItems) => void
   onUpdateCalories: (itemId: string, calories: number | null) => Promise<void>
+  onEstimateCalories?: (meal: MealWithItems) => Promise<void>
 }
 
 function formatTime(iso: string): string {
@@ -93,14 +95,28 @@ function CalBadge({ item, onUpdateCalories }: CalBadgeProps) {
   )
 }
 
-export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories }: Props) {
+export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [estimating, setEstimating] = useState(false)
+  const isAuthed = useEntriesStore((s) => s.isAuthed)
 
   // Compute calorie subtotal
   const itemsWithCal = meal.items.filter((i) => i.calories != null)
   const totalCal = itemsWithCal.reduce((sum, i) => sum + (i.calories ?? 0), 0)
   const hasPartial = itemsWithCal.length > 0 && itemsWithCal.length < meal.items.length
   const showSubtotal = itemsWithCal.length > 0
+  const hasItemsNeedingCalories = meal.items.some((i) => i.calories === null)
+  const showEstimateBtn = isAuthed && hasItemsNeedingCalories && onEstimateCalories != null
+
+  async function handleEstimate() {
+    if (!onEstimateCalories) return
+    setEstimating(true)
+    try {
+      await onEstimateCalories(meal)
+    } finally {
+      setEstimating(false)
+    }
+  }
 
   return (
     <article className={`meal-card meal-card--${meal.meal_type}`}>
@@ -164,6 +180,18 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
           <p className="meal-card__cal-total">
             {hasPartial ? '~' : ''}{totalCal.toLocaleString()} cal
           </p>
+        )}
+
+        {showEstimateBtn && (
+          <button
+            className="meal-card__estimate-btn"
+            onClick={handleEstimate}
+            disabled={estimating}
+            type="button"
+            aria-label="Estimate calories from USDA database"
+          >
+            ✨ {estimating ? 'Estimating…' : 'Estimate calories'}
+          </button>
         )}
       </div>
     </article>

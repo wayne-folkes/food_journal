@@ -207,7 +207,135 @@ Within calories: 9.1 → 9.2 → 9.3/9.4 (9.3 and 9.4 can parallelize).
 
 ---
 
+## Phase 10: USDA Calorie Lookup
+
+### Overview
+Auto-fill calorie estimates using the free USDA FoodData Central API via a Vercel serverless function. Cached in a `food_lookup` table so repeat queries skip the API entirely. User can always override.
+
+### 10.1 — Vercel API setup (must go first)
+
+- [ ] **Create `api/` directory + serverless function scaffold**
+  - New file: `api/usda-lookup.ts` — Vercel serverless function (Node.js runtime)
+  - Request: `POST { items: [{ id: string, description: string }] }`
+  - Response: `{ results: [{ id: string, description: string, calories: number | null, source: string }] }`
+  - Auth: validate Supabase JWT from `Authorization: Bearer <token>` header using `@supabase/supabase-js` `getUser()` — reject unauthenticated requests
+  - Env vars needed in Vercel: `USDA_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
+
+- [ ] **USDA API integration**
+  - Endpoint: `POST https://api.nal.usda.gov/fdc/v1/foods/search`
+  - Body: `{ query: description, dataType: ["Foundation", "SR Legacy"], pageSize: 1 }`
+  - Prefer Foundation + SR Legacy datasets (generic foods, not branded products)
+  - Extract calories: find nutrient with `number === 208` (Energy, kcal) in `foodNutrients` array
+  - Calories are per 100g — return raw value with a note (future: portion estimation)
+  - Rate limit: 1,000 req/hr — batch items in a single serverless call to minimize API hits
+
+- [ ] **Register USDA API key**
+  - Sign up at `https://fdc.nal.usda.gov/api-key-signup`
+  - Add `USDA_API_KEY` to Vercel env vars
+
+### 10.2 — Cache table (must go first, parallel with 10.1)
+
+- [ ] **DB migration: `food_lookup` table**
+  ```sql
+  CREATE TABLE food_lookup (
+    description_key  text PRIMARY KEY,     -- normalized: lowercase, trimmed
+    description      text NOT NULL,        -- original casing for display
+    calories_per_100g smallint,            -- kcal per 100g (USDA standard)
+    source           text NOT NULL DEFAULT 'usda',  -- 'usda' | 'llm' | 'manual'
+    usda_fdc_id      integer,             -- FDC ID for provenance
+    created_at       timestamptz NOT NULL DEFAULT now()
+  );
+
+  -- No RLS — this is shared/public read data
+  ALTER TABLE food_lookup ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Anyone can read food_lookup"
+    ON food_lookup FOR SELECT USING (true);
+  CREATE POLICY "Service role can insert food_lookup"
+    ON food_lookup FOR INSERT WITH CHECK (true);
+  ```
+  - File: `types/database.ts` — add `FoodLookup` type
+
+- [ ] **Cache-first logic in `api/usda-lookup.ts`**
+  - For each item: check `food_lookup` by `description_key = lower(trim(description))`
+  - Cache hit → return cached calories, skip USDA call
+  - Cache miss → call USDA → insert result into `food_lookup` → return
+  - Use Supabase service role client (bypasses RLS for writes)
+
+### 10.3 — Client integration (depends on 10.1 + 10.2)
+
+- [ ] **Auto-lookup on meal save**
+  - File: `store.ts` or `App.tsx` — after `addMeal()` succeeds, fire off a background call:
+    ```ts
+    const itemsWithoutCal = meal.items.filter(i => i.calories === null)
+    if (itemsWithoutCal.length > 0 && isAuthed) {
+      fetch('/api/usda-lookup', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: itemsWithoutCal.map(i => ({ id: i.id, description: i.description })) })
+      })
+    ```
+  - On response: update each item's calories in the store + optimistic local update
+  - Show a brief toast: *"Estimated calories from USDA"*
+  - Non-blocking: don't await this during save, fire and update when ready
+
+- [ ] **"Estimate calories" button on MealCard**
+  - File: `MealCard.tsx` — new button in the card footer (near the calorie subtotal area)
+  - Only shows when ≥1 item has null calories AND user is authed
+  - Calls the same `/api/usda-lookup` endpoint
+  - Loading state on button while fetching
+  - On success, update item calories in store
+
+- [ ] **Visual indicator for estimated vs manual calories**
+  - File: `MealCard.tsx` — when calories came from auto-lookup (not yet user-edited), show a subtle `~` prefix or different badge color to indicate "estimate"
+  - User editing a calorie removes the estimate indicator
+
+### 10.4 — Vercel config updates (parallel with 10.1)
+
+- [ ] **Update `vercel.json`**
+  - Add API rewrites so `/api/*` routes to serverless functions while SPA catch-all still works
+  ```json
+  {
+    "buildCommand": "cd client && npm install && npm run build",
+    "outputDirectory": "client/dist",
+    "rewrites": [
+      { "source": "/api/(.*)", "destination": "/api/$1" },
+      { "source": "/(.*)", "destination": "/index.html" }
+    ]
+  }
+  ```
+
+- [ ] **Root `package.json` for API dependencies**
+  - New file: `package.json` — minimal, with `@supabase/supabase-js` as dependency (needed by the serverless function)
+  - Update `.gitignore` if needed
+
+---
+
+### Dependency Graph
+
+```
+Phase 10.1  ── API function scaffold ──────┐
+                                            │
+Phase 10.2  ── food_lookup table ──────────┤
+                                            │
+Phase 10.4  ── vercel.json + root pkg ─────┤
+                                            │
+Phase 10.3  ── Client integration ─────────┘
+              ├── Auto-lookup on save
+              └── "Estimate" button on MealCard
+```
+
+10.1, 10.2, and 10.4 can all run in parallel.
+10.3 depends on all three.
+
+---
+
+### Open questions for future
+- Calories are per 100g — adding portion size estimation (LLM or manual weight input) is a natural follow-up
+- When LLM lookup is added, it becomes another `source` value in `food_lookup` and a second `api/llm-estimate.ts` function
+
+---
+
 ## Backlog
 - [ ] Compare Days view
 - [ ] LLM parsing + calorie estimation (when budget allows)
-- [ ] Shared food_lookup cache table (pairs with LLM feature)
+- [ ] Portion size estimation (pair with USDA per-100g values)

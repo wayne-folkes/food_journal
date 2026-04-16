@@ -17,3 +17,7 @@ dist/
 playwright-report/
 test-results/
 .vercel
+
+# API dependencies
+/node_modules/
+/package-lock.json

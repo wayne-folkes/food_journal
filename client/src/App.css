@@ -1108,3 +1108,26 @@ mark {
   border-radius: 2px;
   padding: 0 1px;
 }
+
+/* ── USDA Estimate calories button ───────────────────────────────────────── */
+.meal-card__estimate-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.meal-card__estimate-btn:hover {
+  color: var(--terra);
+  background: var(--terra-light);
+}
+.meal-card__estimate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

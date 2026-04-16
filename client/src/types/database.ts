@@ -86,3 +86,12 @@ export type MealItemInsert = Database['public']['Tables']['meal_items']['Insert'
 
 /** A meal with its items eagerly loaded — the primary working type. */
 export type MealWithItems = Meal & { items: MealItem[] }
+
+export interface FoodLookup {
+  description_key: string
+  description: string
+  calories_per_100g: number | null
+  source: string
+  usda_fdc_id: number | null
+  created_at: string
+}

@@ -12,6 +12,7 @@ import { DateNav, offsetDate } from './components/DateNav'
 import { DaySummary } from './components/DaySummary'
 import { ToastProvider, useToast } from './components/Toast'
 import { SearchOverlay } from './components/SearchOverlay'
+import { lookupCalories } from './lib/caloriesLookup'
 import type { MealWithItems, MealType } from './types/database'
 import type { ChipItem } from './lib/store'
 import './App.css'
@@ -67,6 +68,35 @@ function AppInner() {
         raw_input: payload.rawInput,
         items: payload.items,
       })
+
+      // After addMeal resolves, find the newly added meal from the store
+      // (it's the last meal with items matching our payload)
+      if (isAuthed) {
+        const savedMeals = useEntriesStore.getState().meals
+        const savedMeal = [...savedMeals]
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .find((m) => m.items.some((i) => payload.items.includes(i.description)))
+
+        if (savedMeal) {
+          const itemsNeedingCalories = savedMeal.items.filter((i) => i.calories === null)
+          if (itemsNeedingCalories.length > 0) {
+            // fire and forget — non-blocking
+            lookupCalories(itemsNeedingCalories.map((i) => ({ id: i.id, description: i.description })))
+              .then((results) => {
+                results.forEach((r) => {
+                  if (r.calories !== null) {
+                    updateItemCalories(r.id, r.calories)
+                  }
+                })
+                const found = results.filter((r) => r.calories !== null).length
+                if (found > 0) toast.success(`Estimated ${found} calorie${found === 1 ? '' : 's'} from USDA`)
+              })
+              .catch(() => {
+                // silently fail — calorie lookup is best-effort
+              })
+          }
+        }
+      }
     } catch (err) {
       toast.error('Failed to add meal. Please try again.')
       console.error('handleAddMeal error', err)
@@ -159,6 +189,24 @@ function AppInner() {
     }
   }
 
+  async function handleEstimateCalories(meal: MealWithItems) {
+    const itemsNeedingCalories = meal.items.filter((i) => i.calories === null)
+    if (itemsNeedingCalories.length === 0) return
+    try {
+      const results = await lookupCalories(
+        itemsNeedingCalories.map((i) => ({ id: i.id, description: i.description }))
+      )
+      for (const r of results) {
+        if (r.calories !== null) await updateItemCalories(r.id, r.calories)
+      }
+      const found = results.filter((r) => r.calories !== null).length
+      if (found > 0) toast.success(`Estimated ${found} calorie${found === 1 ? '' : 's'} from USDA`)
+      else toast.error('No calorie data found for these items')
+    } catch {
+      toast.error('Failed to estimate calories')
+    }
+  }
+
   const isViewingToday = selectedDate === todayString()
   const recent = recentDistinct(meals)
 
@@ -207,6 +255,7 @@ function AppInner() {
               toast.error('Failed to save calories')
             }
           }}
+          onEstimateCalories={handleEstimateCalories}
         />
       </main>
 
