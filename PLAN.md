@@ -436,8 +436,145 @@ Within 11.4 all four stat cards are independent.
 
 ---
 
+### 11.6 — Security fixes (independent of 11.1–11.5, parallelize)
+
+Findings from the 2026-04-16 security/performance review. Ordered by priority.
+
+- [x] **[S1, HIGH] Tighten `food_lookup` INSERT RLS policy**
+  - File: new migration `supabase/migrations/0009_food_lookup_rls_fix.sql`
+  - The current policy in `0004_food_lookup.sql` uses `with check (true)` with no role restriction, so any `anon`/`authenticated` caller can insert poisoned cache rows via the REST API. Service role bypasses RLS, so the policy is not needed for the server code path.
+  - Drop the insert policy entirely: `drop policy "Service role can insert food_lookup" on public.food_lookup;` (or recreate it `to service_role`)
+  - Verify: unauth curl `POST /rest/v1/food_lookup` with the anon key returns 401/403
+
+- [x] **[S3, HIGH] Cap description length in `/api/usda-lookup`**
+  - File: `api/usda-lookup.ts` — add validation after the existing 20-item check:
+    ```ts
+    if (items.some(i => typeof i.description !== 'string' || i.description.trim().length === 0 || i.description.length > 200)) {
+      return res.status(400).json({ error: 'each item description must be 1–200 chars' })
+    }
+    ```
+  - Protects against memory blowup and cache-row bloat from oversized payloads
+
+- [x] **[S2, HIGH] Rate limit `/api/usda-lookup` per user**
+  - Add a small `api_rate_limit` table: `(user_id uuid, window_start timestamptz, count int, primary key (user_id, window_start))` with a 1-hour tumbling window
+  - New RPC `check_and_increment_rate_limit(p_limit int)` using `security definer` — increments the current hour's counter for `auth.uid()` and raises if over limit
+  - `api/usda-lookup.ts` — call the RPC before the USDA fanout; 429 on limit exceeded. Start with 60 req/hr per user.
+  - Same treatment (smaller cap, e.g. 10/hr) for `api/admin/flush-cache.ts`
+
+- [x] **[S5, MEDIUM] Move USDA API key from query string to header**
+  - File: `api/usda-lookup.ts:25` — change to `headers: { 'Content-Type': 'application/json', 'X-Api-Key': USDA_API_KEY }` and drop `?api_key=…` from the URL
+  - Prevents the key from appearing in Vercel function access logs and USDA-side proxy logs
+
+- [x] **[S4, MEDIUM] Replace hardcoded admin email with JWT claim**
+  - File: Supabase dashboard — add an auth hook / trigger to set `raw_app_meta_data.is_admin = true` for the admin user
+  - File: `api/admin/flush-cache.ts` — check `user.app_metadata?.is_admin === true` instead of `user.email === ADMIN_EMAIL`
+  - File: `client/src/App.tsx:20` — read the claim from the session user metadata instead of importing a hardcoded constant
+  - Removes admin email from the shipped client bundle
+
+- [x] **[S6, MEDIUM] Bound `food_lookup` growth**
+  - File: new migration — add `create index food_lookup_created_at on public.food_lookup (created_at desc);`
+  - Add a pg_cron job (or manual script until cron is wired) that deletes rows older than 90 days: `delete from public.food_lookup where created_at < now() - interval '90 days';`
+  - Alternatively: cap the table at N rows via a periodic `delete ... order by created_at asc limit ...`
+
+- [x] **[S7, MEDIUM] Add security headers to `vercel.json`**
+  - File: `vercel.json` — add a `headers` block applying to `/(.*)`:
+    - `X-Content-Type-Options: nosniff`
+    - `Referrer-Policy: strict-origin-when-cross-origin`
+    - `Content-Security-Policy: default-src 'self'; connect-src 'self' https://*.supabase.co https://api.nal.usda.gov; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none';` (tune after testing)
+    - `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`
+
+- [x] **[S8, LOW] Guard `loadDay` against auth state flips**
+  - File: `client/src/lib/store.ts:288-319` — after the `await`, re-check `get().isAuthed` before calling `set({ meals })`. If it flipped to false during the request, drop the result.
+
+- [x] **[S9, LOW] Clear anon localStorage after successful sign-in sync**
+  - File: `client/src/App.tsx:38-40` — in the `SIGNED_IN` branch, after `syncLocalToRemote()` completes, call `useEntriesStore.persist.clearStorage()` (or a similar zustand persist API) to remove stale anon meals from the device
+  - Prevents leakage when a device is shared across accounts
+
+- [x] **[S10, LOW] Scrub raw errors from `console.error`**
+  - Audit: `store.ts`, `App.tsx`, `usda-lookup.ts`, `flush-cache.ts`
+  - Replace `console.error('xxx error', error)` with a single correlation id + a server-side log entry (or drop the payload in prod)
+
+---
+
+### 11.7 — Performance fixes (independent of 11.1–11.6, parallelize)
+
+Ordered by impact.
+
+- [x] **[P1, HIGH] Memoize `displayedMeals`**
+  - File: `client/src/App.tsx:57-62` — wrap the filter in `useMemo(() => …, [meals, isAuthed, selectedDate])`
+  - For the authed branch, short-circuit to `meals` directly (already day-filtered by `loadDay`)
+
+- [x] **[P2, HIGH] Scope `updateItemCalories` optimistic update**
+  - File: `client/src/lib/store.ts:436-446` — only rewrite the meal that contains the item, instead of mapping every meal/every item:
+    ```ts
+    set((s) => ({
+      meals: s.meals.map((m) =>
+        m.items.some((i) => i.id === itemId)
+          ? { ...m, items: m.items.map((i) => i.id === itemId ? { ...i, calories } : i) }
+          : m
+      ),
+    }))
+    ```
+
+- [x] **[P3, HIGH] Day-level cache for `loadDay`**
+  - File: `client/src/lib/store.ts` — add `dayCache: Map<string, MealWithItems[]>` to state
+  - `loadDay`: serve from cache when present; refetch only when cache miss or after a mutation for that day
+  - Invalidate in `addMeal`, `editMeal`, `deleteMeal`, `updateItemCalories`, `restoreMeal` for the affected day(s)
+
+- [x] **[P4, MEDIUM] Cap concurrency on USDA fanout**
+  - File: `api/usda-lookup.ts:149-175` — replace `Promise.all(misses.map(...))` with a small `pLimit(5)` helper (inline, no dep needed)
+  - Keeps burst rate at ~5 req/sec instead of 20
+
+- [ ] **[P5, MEDIUM] Replace per-meal savepoints in batch sync**
+  - File: `supabase/migrations/0010_batch_sync_setops.sql` — rewrite `create_meals_with_items_batch` to use set-based inserts (one `INSERT ... SELECT` into meals keyed by local_id, one into meal_items using the returning rows)
+  - Tradeoff: loses per-meal error isolation. Either accept transactional all-or-nothing, or keep the savepoint version behind a `p_safe boolean` flag for the rare large-sync path.
+
+- [x] **[P6, LOW] Drop unused `entries` table**
+  - File: `supabase/migrations/0011_drop_entries.sql` — `drop table if exists public.entries cascade;`
+  - The app uses `meals`/`meal_items` exclusively; `entries` from `0001_init.sql` still has RLS policies, an index, and an updated_at trigger. Delete to reduce plan cache noise and schema confusion.
+
+- [x] **[P7, LOW] Memoize `groupByDate` in SearchOverlay**
+  - File: `client/src/components/SearchOverlay.tsx:151` — `const grouped = useMemo(() => groupByDate(results), [results])`
+  - Negligible today (max 50 results) but worth doing if the LIMIT ever increases
+
+- [x] **[P8, LOW] Persist pending deletes or switch to immediate-delete-with-undo**
+  - File: `client/src/App.tsx:130-173` — current 5-second window means closing the tab mid-undo loses the delete intent; the meal reappears on next load
+  - Option A: persist pending delete ids to localStorage; replay on mount
+  - Option B: delete immediately on the server; Undo performs an insert (reusing `addMeal` with the captured payload). Simpler, more robust.
+
+---
+
+### Dependency Graph (Phase 11 full)
+
+```
+Phase 11.1  ── loadWeek + loadPriorItems ──────┐
+                                                │
+Phase 11.2  ── Week navigation (DateNav) ──────┤
+                                                │
+Phase 11.3  ── WeekView component ─────────────┤
+                                                │
+Phase 11.4  ──┬── Most consumed items          │
+              ├── Meal pattern grid     ────────┘
+              ├── New items this week
+              └── Total items logged
+
+Phase 11.5  ── CSS (parallel with 11.3/11.4)
+
+Phase 11.6  ── Security fixes (all independent of 11.1–11.5)
+              └── S1, S3, S2 first — HIGH severity, deploy before next major release
+
+Phase 11.7  ── Performance fixes (all independent of 11.1–11.5)
+              └── P1, P2 first — zero-risk client-only wins
+```
+
+11.6 and 11.7 can run fully in parallel with the weekly view work.
+S1 (food_lookup RLS) should land before the next deploy regardless of sequencing.
+
+---
+
 ## Backlog
 - [ ] Compare Days view
 - [ ] LLM parsing + calorie estimation (when budget allows)
 - [ ] Portion size estimation (pair with USDA per-100g values)
 - [ ] Fix lint warnings: `react-refresh/only-export-components` in `client/src/components/DateNav.tsx` (line 23, `offsetDate` exported alongside component) and `client/src/components/Toast.tsx` (line 59, `ToastAction`/`useToast` exported alongside component) — fix by moving non-component exports to separate utility files
+- [ ] **CI schema-drift check** — add a GitHub Actions step that runs `supabase db diff --project-id kbdtcoyrspyjqjsgkwjl` on every push to main and fails the build if there is unapplied local migration drift vs. prod. Prevents the 2026-04-16 incident where migrations 0005–0008 were committed but never applied, taking down meal saves for all authed users.

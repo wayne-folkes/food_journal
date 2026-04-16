@@ -107,6 +107,14 @@ export type Database = {
     }
     Views: Record<string, never>
     Functions: {
+      check_and_increment_api_rate_limit: {
+        Args: { p_user_id: string; p_limit: number }
+        Returns: boolean
+      }
+      get_prior_item_descriptions: {
+        Args: { p_before_date: string }
+        Returns: { description: string }[]
+      }
       create_meals_with_items_batch: {
         Args: {
           p_meals: Json
