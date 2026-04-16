@@ -22,9 +22,9 @@ interface CachedLookupRow {
 }
 
 async function fetchFromUsda(description: string): Promise<{ calories: number | null; fdcId: number | null }> {
-  const response = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${USDA_API_KEY}`, {
+  const response = await fetch('https://api.nal.usda.gov/fdc/v1/foods/search', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Api-Key': USDA_API_KEY },
     body: JSON.stringify({
       query: description,
       dataType: ['Foundation', 'SR Legacy'],
@@ -114,6 +114,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (items.length > 20) {
       return res.status(400).json({ error: 'items array must not exceed 20 entries' })
+    }
+    if (items.some(i => typeof i.description !== 'string' || i.description.length === 0 || i.description.length > 200)) {
+      return res.status(400).json({ error: 'each item description must be 1–200 characters' })
     }
 
     // 4. Batch cache lookup
