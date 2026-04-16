@@ -117,11 +117,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
 
-    // 2. Parse body: { items: LookupItem[] }
+    // 2. Per-user rate limit check (60 req/hr)
+    const { data: overLimit, error: rlError } = await supabaseAdmin
+      .rpc('check_and_increment_api_rate_limit', {
+        p_user_id: user.id,
+        p_limit: 60   // 60 requests per hour per user
+      })
+
+    if (rlError) {
+      console.error('rate limit check failed:', rlError instanceof Error ? rlError.message : String(rlError))
+      // Fail open — don't block the request if the rate limit table has an issue
+    } else if (overLimit) {
+      return res.status(429).json({ error: 'Rate limit exceeded. Try again next hour.' })
+    }
+
+    // 3. Parse body: { items: LookupItem[] }
     const body = req.body as { items?: LookupItem[] }
     const items = body?.items
 
-    // 3. Validate items array (max 20 items)
+    // 4. Validate items array (max 20 items)
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'items must be a non-empty array' })
     }
@@ -132,7 +146,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'each item description must be 1–200 characters' })
     }
 
-    // 4. Batch cache lookup
+    // 5. Batch cache lookup
     const keys = items.map(i => i.description.toLowerCase().trim())
     const { data: cached } = await supabaseAdmin
       .from('food_lookup')
@@ -161,7 +175,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // 5. USDA calls for misses (concurrency-limited to 5)
+    // 6. USDA calls for misses (concurrency-limited to 5)
     const missResults = await pLimit(
       misses.map((item) => async (): Promise<{ result: LookupResult; fdcId: number | null }> => {
         try {
@@ -191,7 +205,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       5
     )
 
-    // 6. Cache write for new results (upsert all misses, including not_found)
+    // 7. Cache write for new results (upsert all misses, including not_found)
     const upsertRows = buildLookupCacheRows(misses, missResults)
 
     if (upsertRows.length > 0) {
@@ -204,7 +218,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // 7. Return { results: LookupResult[] } preserving original order
+    // 8. Return { results: LookupResult[] } preserving original order
     const hitResultMap = new Map(hits.map((result) => [result.id, result]))
     const missResultMap = new Map(missResults.map(({ result }) => [result.id, result]))
     const results: LookupResult[] = []
