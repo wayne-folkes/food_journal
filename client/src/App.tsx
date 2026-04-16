@@ -17,7 +17,6 @@ import { lookupCalories } from './lib/caloriesLookup'
 import { offsetDate } from './lib/date'
 import { useToast } from './lib/toast'
 
-const ADMIN_EMAIL = 'wayne.folkes@gmail.com'
 import type { MealWithItems, MealType } from './types/database'
 import type { ChipItem } from './lib/store'
 import './App.css'
@@ -264,7 +263,7 @@ function AppInner() {
         />
       )}
 
-      {user?.email === ADMIN_EMAIL && <AdminPanel />}
+      {user?.app_metadata?.is_admin && <AdminPanel />}
     </div>
   )
 }
