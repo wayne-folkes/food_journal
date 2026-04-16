@@ -89,10 +89,8 @@ export function WeekView({ weekMeals, weekStart, isLoading, onNavigateToDay }: W
     }))
   , [groupedByDate])
 
-  if (isLoading) return <div className="week-view week-view--loading"><span className="skeleton-line" /></div>
-
   return (
-    <div className="week-view">
+    <div className={`week-view${isLoading ? ' week-view--loading' : ''}`} aria-busy={isLoading}>
 
       {/* ── Stats row ── */}
       <div className="week-stats">

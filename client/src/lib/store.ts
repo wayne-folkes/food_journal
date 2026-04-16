@@ -551,7 +551,9 @@ export const useEntriesStore = create<MealsState>()(
           return
         }
 
-        set({ weekLoading: true })
+        // Clear stale data immediately so WeekView renders the new week's
+        // skeleton structure rather than the previous week's content.
+        set({ weekLoading: true, weekMeals: [] })
         try {
           const startISO = new Date(`${start}T00:00:00`).toISOString()
           const endISO = new Date(`${end}T23:59:59.999`).toISOString()

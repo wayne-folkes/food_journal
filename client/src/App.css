@@ -1248,8 +1248,13 @@ mark {
   gap: 20px;
 }
 
+.week-view {
+  transition: opacity 0.15s ease;
+}
+
 .week-view--loading {
-  padding: 24px 16px;
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 /* ── Stats row ───────────────────────────────────────────────────── */
