@@ -1,33 +1,39 @@
 # Food Journal
 
-A fast food logging web app. Log what you eat with natural language input.
+A meal logging web app. Log meals with chip-style input, auto-estimated calories, and weekly stats.
+
+Live at **[food.folkes.dev](https://food.folkes.dev)**
 
 ## Stack
 
 - **Client**: React 19 + Vite + TypeScript, vanilla CSS
 - **Auth + DB**: Supabase (Google OAuth, Postgres + RLS)
-- **State**: Zustand with localStorage for anonymous users
+- **State**: Zustand with localStorage (anonymous) ↔ Supabase (signed in)
+- **API functions**: Vercel serverless (Node.js) — USDA calorie lookup
+- **Calorie data**: USDA FoodData Central API (free, cached in `food_lookup` table)
 
 ## Setup
 
-### 1. Supabase — run the migration
+### 1. Supabase — run migrations
 
-In your Supabase dashboard, go to **SQL Editor** and run the contents of:
-```
-supabase/migrations/0001_init.sql
-```
+In your Supabase dashboard → **SQL Editor**, run each file in order:
 
-This creates the `entries` table and sets up Row Level Security.
+```
+supabase/migrations/0001_init.sql       -- legacy entries table (unused)
+supabase/migrations/0002_meals.sql      -- meals + meal_items tables + RLS
+supabase/migrations/0003_meal_items_calories.sql  -- calories column
+supabase/migrations/0004_food_lookup.sql           -- USDA cache table
+```
 
 ### 2. Supabase — enable Google OAuth
 
-1. In Supabase Dashboard → **Authentication → Providers → Google** → toggle on
-2. You'll need a Google OAuth Client ID and Secret. Create one at:
-   **Google Cloud Console → APIs & Services → Credentials → Create OAuth 2.0 Client ID**
-   - Application type: **Web application**
-   - Authorised JavaScript origins: `http://localhost:5173`
-   - Authorised redirect URIs: copy the **Callback URL** shown in the Supabase Google provider settings (looks like `https://your-project.supabase.co/auth/v1/callback`)
-3. Paste the Client ID and Secret back into Supabase.
+1. Dashboard → **Authentication → Providers → Google** → toggle on
+2. Create OAuth credentials at **Google Cloud Console → APIs & Services → Credentials → Create OAuth 2.0 Client ID**
+   - Type: **Web application**
+   - Authorised origins: `http://localhost:5173` and your production URL
+   - Redirect URI: the Callback URL shown in Supabase Google provider settings
+3. Paste Client ID and Secret back into Supabase
+4. Add your production domain to **Authentication → URL Configuration → Redirect URLs**
 
 ### 3. Client — environment variables
 
@@ -36,21 +42,34 @@ cd client
 cp .env.example .env.local
 ```
 
-Fill in `.env.local`:
+Fill in `client/.env.local`:
 ```
-VITE_SUPABASE_URL=https://kbdtcoyrspyjqjsgkwjl.supabase.co
-VITE_SUPABASE_ANON_KEY=<your anon key from Supabase Dashboard → Project Settings → API>
+VITE_SUPABASE_URL=https://<your-project>.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon key from Supabase Dashboard → Project Settings → API>
 ```
 
-### 4. Run the dev server
+### 4. Vercel API — environment variables
+
+The `/api/usda-lookup` serverless function needs these set in your Vercel project settings:
+
+| Variable | Where to get it |
+|---|---|
+| `SUPABASE_URL` | Supabase Dashboard → Project Settings → API |
+| `SUPABASE_ANON_KEY` | Supabase Dashboard → Project Settings → API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase Dashboard → Project Settings → API (service_role) |
+| `USDA_API_KEY` | Sign up free at [fdc.nal.usda.gov/api-key-signup](https://fdc.nal.usda.gov/api-key-signup) |
+
+### 5. Run the dev server
 
 ```bash
 cd client
-npm install   # if you haven't already
+npm install
 npm run dev
 ```
 
 Open [http://localhost:5173](http://localhost:5173).
+
+> **Note:** The `/api/usda-lookup` serverless function only runs in Vercel's environment. Calorie estimation won't work locally unless you run `vercel dev` from the repo root.
 
 ## Scripts
 
@@ -62,23 +81,50 @@ From `client/`:
 | `npm run build` | Type-check + build for production |
 | `npm run lint` | Run ESLint |
 | `npm test` | Run Vitest unit tests |
-| `npm run test:e2e` | Run Playwright E2E tests |
+| `npm run test:e2e` | Run Playwright E2E tests (requires `npx playwright install`) |
 
 ## Project structure
 
 ```
 food_journal/
+├── api/
+│   ├── usda-lookup.ts      # Vercel serverless: USDA calorie lookup + cache
+│   └── admin/
+│       └── flush-cache.ts  # Admin-only: flush food_lookup cache
 ├── client/
 │   ├── src/
-│   │   ├── components/     # InputBar, LogList, EntryRow, EditModal, RecentChips, AuthButton
+│   │   ├── components/     # MealComposer, MealCard, MealLog, SearchOverlay, ...
 │   │   ├── lib/
-│   │   │   ├── supabase.ts # Supabase client instance
-│   │   │   ├── parser.ts   # chrono-node time extraction
-│   │   │   └── store.ts    # Zustand store (localStorage ↔ Supabase)
+│   │   │   ├── supabase.ts     # Supabase client
+│   │   │   ├── store.ts        # Zustand store
+│   │   │   ├── parser.ts       # chrono-node chip parsing
+│   │   │   ├── mealType.ts     # meal type suggestion by time of day
+│   │   │   └── caloriesLookup.ts  # client-side USDA fetch helper
 │   │   └── types/
-│   │       └── database.ts # Supabase table types
-│   └── e2e/                # Playwright tests
+│   │       └── database.ts     # Supabase table types
+│   └── e2e/                    # Playwright E2E tests
 ├── supabase/
-│   └── migrations/         # SQL run against your Supabase project
-└── README.md
+│   └── migrations/             # SQL migrations (run in order)
+└── vercel.json                 # Build config + API rewrites
 ```
+
+## Database schema
+
+```
+meals          — one record per eating occasion (meal_type, consumed_at, user_id)
+  └── meal_items — food items within a meal (description, calories, position)
+
+food_lookup    — shared USDA calorie cache (description_key, calories_per_100g)
+```
+
+## Features
+
+- **Chip-style meal composer** — type items separated by Enter or comma
+- **Meal types** — Breakfast / Lunch / Dinner / Snack / Dessert / Drink, auto-suggested by time
+- **Color-coded meal cards** — distinct accent color per meal type
+- **Date navigation** — browse any past day
+- **Calorie tracking** — manual entry or auto-estimated from USDA FoodData Central
+- **Search** — full-text search across all logged items
+- **Dark mode** — respects system preference
+- **PWA** — installable on mobile (Add to Home Screen)
+- **Undo delete** — 5-second grace period after deleting a meal

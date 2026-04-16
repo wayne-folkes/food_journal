@@ -133,52 +133,52 @@ Phase 8.4 is independent of everything.
 
 ### 9.1 — Calorie Schema (must go first)
 
-- [ ] **DB migration: add calories column**
+- [x] **DB migration: add calories column**
   - Supabase SQL: `ALTER TABLE meal_items ADD COLUMN calories smallint;`
   - File: `types/database.ts` — add `calories: number | null` to `MealItem`, `MealItemInsert`
   - No store changes needed — column comes back for free in existing `select('*, meal_items(*)')` join
 
 ### 9.2 — Calorie Input UI (depends on 9.1)
 
-- [ ] **Inline calorie editing on MealCard**
+- [x] **Inline calorie editing on MealCard**
   - File: `MealCard.tsx` — each item row gets a tappable calorie badge: shows `— cal` when null, `150 cal` when set. Tap opens a small inline `<input type="number">` (or popover). Blur/Enter saves.
   - File: `App.css` — `.meal-card__cal` badge style: pill-shaped, muted when empty, sage-colored when filled
   - Keep it minimal: no calorie input in MealComposer — calories are added after the meal is logged
 
-- [ ] **Save calorie to Supabase**
+- [x] **Save calorie to Supabase**
   - File: `store.ts` — new action `updateItemCalories(itemId: string, calories: number | null)` — calls `supabase.from('meal_items').update({ calories }).eq('id', itemId)`, updates local state
   - Optimistic update: set locally first, rollback on error + toast
 
-- [ ] **Meal calorie subtotal**
+- [x] **Meal calorie subtotal**
   - File: `MealCard.tsx` — below the items list, show sum: *"420 cal"* (only when ≥1 item has calories). If some items are missing calories, show *"~420 cal"* with a tooltip/title explaining it's partial
 
 ### 9.3 — Day calorie total (depends on 9.2)
 
-- [ ] **Day summary with calories**
+- [x] **Day summary with calories**
   - File: `DaySummary.tsx` — extend to show *"3 meals · 8 items · 1,420 cal"*. Only show calorie segment when ≥1 item across the day has calories. Use `~` prefix when any items are missing calories.
 
 ### 9.4 — Calorie editing in EditMealModal (depends on 9.2)
 
-- [ ] **Calorie field in edit modal**
+- [x] **Calorie field in edit modal**
   - File: `EditMealModal.tsx` — each chip in the edit list gets an optional calorie input beside it
   - On save, update `meal_items.calories` for each changed item
   - Track calorie changes in `isDirty` check
 
 ### 9.5 — Search (independent of 9.1–9.4, parallelize)
 
-- [ ] **Search icon + expandable bar**
+- [x] **Search icon + expandable bar**
   - File: `App.tsx` — add search icon button in header. Clicking toggles a `SearchOverlay` component.
   - New file: `components/SearchOverlay.tsx` — full-screen overlay with autofocused text input, debounced 300ms
   - File: `App.css` — `.search-overlay` slide-down animation, input styling consistent with app theme
 
-- [ ] **Search query + results**
+- [x] **Search query + results**
   - File: `store.ts` — new action `searchItems(query: string): Promise<MealWithItems[]>` — calls `supabase.from('meals').select('*, meal_items!inner(*)').ilike('meal_items.description', '%query%').order('consumed_at', { ascending: false }).limit(50)`
   - For anonymous users: filter local meals in-memory with `item.description.toLowerCase().includes(query)`
 
-- [ ] **Search results display**
+- [x] **Search results display**
   - File: `SearchOverlay.tsx` — results grouped by date (date header + MealCards). Matching item text highlighted (bold/underline). Empty state: *"No meals found"*. Tap a result → close search, navigate to that date.
 
-- [ ] **Keyboard / mobile UX**
+- [x] **Keyboard / mobile UX**
   - Escape key or back button closes search
   - Search input gets `inputmode="search"` + `enterkeyhint="search"` for mobile keyboards
   - Results are scrollable, overlay traps focus
@@ -214,14 +214,14 @@ Auto-fill calorie estimates using the free USDA FoodData Central API via a Verce
 
 ### 10.1 — Vercel API setup (must go first)
 
-- [ ] **Create `api/` directory + serverless function scaffold**
+- [x] **Create `api/` directory + serverless function scaffold**
   - New file: `api/usda-lookup.ts` — Vercel serverless function (Node.js runtime)
   - Request: `POST { items: [{ id: string, description: string }] }`
   - Response: `{ results: [{ id: string, description: string, calories: number | null, source: string }] }`
   - Auth: validate Supabase JWT from `Authorization: Bearer <token>` header using `@supabase/supabase-js` `getUser()` — reject unauthenticated requests
   - Env vars needed in Vercel: `USDA_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 
-- [ ] **USDA API integration**
+- [x] **USDA API integration**
   - Endpoint: `POST https://api.nal.usda.gov/fdc/v1/foods/search`
   - Body: `{ query: description, dataType: ["Foundation", "SR Legacy"], pageSize: 1 }`
   - Prefer Foundation + SR Legacy datasets (generic foods, not branded products)
@@ -229,13 +229,13 @@ Auto-fill calorie estimates using the free USDA FoodData Central API via a Verce
   - Calories are per 100g — return raw value with a note (future: portion estimation)
   - Rate limit: 1,000 req/hr — batch items in a single serverless call to minimize API hits
 
-- [ ] **Register USDA API key**
+- [x] **Register USDA API key**
   - Sign up at `https://fdc.nal.usda.gov/api-key-signup`
   - Add `USDA_API_KEY` to Vercel env vars
 
 ### 10.2 — Cache table (must go first, parallel with 10.1)
 
-- [ ] **DB migration: `food_lookup` table**
+- [x] **DB migration: `food_lookup` table**
   ```sql
   CREATE TABLE food_lookup (
     description_key  text PRIMARY KEY,     -- normalized: lowercase, trimmed
@@ -255,7 +255,7 @@ Auto-fill calorie estimates using the free USDA FoodData Central API via a Verce
   ```
   - File: `types/database.ts` — add `FoodLookup` type
 
-- [ ] **Cache-first logic in `api/usda-lookup.ts`**
+- [x] **Cache-first logic in `api/usda-lookup.ts`**
   - For each item: check `food_lookup` by `description_key = lower(trim(description))`
   - Cache hit → return cached calories, skip USDA call
   - Cache miss → call USDA → insert result into `food_lookup` → return
@@ -263,7 +263,7 @@ Auto-fill calorie estimates using the free USDA FoodData Central API via a Verce
 
 ### 10.3 — Client integration (depends on 10.1 + 10.2)
 
-- [ ] **Auto-lookup on meal save**
+- [x] **Auto-lookup on meal save**
   - File: `store.ts` or `App.tsx` — after `addMeal()` succeeds, fire off a background call:
     ```ts
     const itemsWithoutCal = meal.items.filter(i => i.calories === null)
@@ -278,20 +278,20 @@ Auto-fill calorie estimates using the free USDA FoodData Central API via a Verce
   - Show a brief toast: *"Estimated calories from USDA"*
   - Non-blocking: don't await this during save, fire and update when ready
 
-- [ ] **"Estimate calories" button on MealCard**
+- [x] **"Estimate calories" button on MealCard**
   - File: `MealCard.tsx` — new button in the card footer (near the calorie subtotal area)
   - Only shows when ≥1 item has null calories AND user is authed
   - Calls the same `/api/usda-lookup` endpoint
   - Loading state on button while fetching
   - On success, update item calories in store
 
-- [ ] **Visual indicator for estimated vs manual calories**
+- [x] **Visual indicator for estimated vs manual calories**
   - File: `MealCard.tsx` — when calories came from auto-lookup (not yet user-edited), show a subtle `~` prefix or different badge color to indicate "estimate"
   - User editing a calorie removes the estimate indicator
 
 ### 10.4 — Vercel config updates (parallel with 10.1)
 
-- [ ] **Update `vercel.json`**
+- [x] **Update `vercel.json`**
   - Add API rewrites so `/api/*` routes to serverless functions while SPA catch-all still works
   ```json
   {
@@ -304,7 +304,7 @@ Auto-fill calorie estimates using the free USDA FoodData Central API via a Verce
   }
   ```
 
-- [ ] **Root `package.json` for API dependencies**
+- [x] **Root `package.json` for API dependencies**
   - New file: `package.json` — minimal, with `@supabase/supabase-js` as dependency (needed by the serverless function)
   - Update `.gitignore` if needed
 
@@ -332,6 +332,107 @@ Phase 10.3  ── Client integration ─────────┘
 ### Open questions for future
 - Calories are per 100g — adding portion size estimation (LLM or manual weight input) is a natural follow-up
 - When LLM lookup is added, it becomes another `source` value in `food_lookup` and a second `api/llm-estimate.ts` function
+
+---
+
+## Phase 11: Weekly View
+
+### Overview
+A dedicated weekly view showing all meals grouped by day, with stats: most consumed items, meal pattern grid, new-to-you items, and total items count. Toggled from the existing DateNav.
+
+### 11.1 — Week data loading (must go first)
+
+- [ ] **`loadWeek` store action**
+  - File: `store.ts` — add `loadWeek(startDate: string): Promise<MealWithItems[]>` to `MealsState`
+  - For authed: query `meals` + `meal_items(*)` where `consumed_at` between Monday 00:00 and Sunday 23:59:59 of the given week
+  - For anon: filter local `meals` array by the same date range
+  - Returns the full week of meals (does NOT replace the `meals` state — stored separately)
+  - Add `weekMeals: MealWithItems[]` and `weekLoading: boolean` to the store
+
+- [ ] **`loadPriorItems` for "new this week" detection**
+  - File: `store.ts` — add `loadPriorItems(beforeDate: string): Promise<Set<string>>` 
+  - For authed: `select distinct lower(description) from meal_items join meals on ... where consumed_at < weekStart`
+  - Returns a Set of normalized description strings logged before this week
+  - Can use a simple RPC or just `supabase.from('meal_items').select('description, meals!inner(consumed_at)').lt('meals.consumed_at', weekStart)`
+
+### 11.2 — Week navigation (depends on 11.1)
+
+- [ ] **View toggle in DateNav**
+  - File: `DateNav.tsx` — add a "Day | Week" toggle (two small pills/tabs) in the header area
+  - When "Week" is selected: arrows navigate by 7 days, label shows "Apr 7 – 13" format
+  - File: `App.tsx` — add `viewMode: 'day' | 'week'` state. When `viewMode === 'week'`, call `loadWeek` instead of `loadDay`, render `WeekView` instead of `MealLog`
+  - `selectedDate` continues to anchor the view — in week mode it determines which week to show (week containing that date)
+
+### 11.3 — WeekView component (depends on 11.1, parallel with 11.2)
+
+- [ ] **New file: `components/WeekView.tsx`**
+  - Props: `weekMeals: MealWithItems[]`, `weekStart: string`, `isLoading: boolean`
+  - Layout: stats cards at top, then day-by-day meal list below
+
+- [ ] **Day-by-day meal list**
+  - Group `weekMeals` by date (local timezone)
+  - Each day: date header ("Monday, Apr 7") + compact MealCards
+  - Days with no meals: show a muted "No meals logged" row
+  - MealCards are **read-only** in this view (no edit/delete/duplicate — that's the day view's job). Tapping a day header navigates to that day in day view.
+
+### 11.4 — Stats cards (depends on 11.1, parallelize internally)
+
+- [ ] **Most consumed items**
+  - File: `WeekView.tsx` — count occurrences of each `item.description` (case-insensitive) across the week
+  - Display top 5 as: "Eggs × 5, Coffee × 4, Rice × 3"
+  - Style: ranked list, count badge on the right
+
+- [ ] **Meal pattern grid**
+  - File: `WeekView.tsx` — 7 rows (Mon–Sun) × 4 columns (B/L/D/S)
+  - Each cell: filled dot (has a meal of that type) or empty circle (no meal)
+  - Color-coded using existing meal-type colors (`--meal-breakfast`, `--meal-lunch`, etc.)
+  - Shows at a glance: "I skipped breakfast 3 days this week"
+
+- [ ] **New items this week**
+  - File: `WeekView.tsx` — compare this week's item descriptions against `priorItems` Set from 11.1
+  - Display items that don't appear in prior history: "🆕 Quinoa, Mango lassi, Tempeh"
+  - If none: "No new foods this week"
+
+- [ ] **Total items logged**
+  - File: `WeekView.tsx` — simple count of all `meal_items` across the week
+  - Display: "42 items logged this week"
+
+### 11.5 — CSS (parallel with 11.3/11.4)
+
+- [ ] **WeekView styles**
+  - File: `App.css`
+  - `.week-view` container
+  - `.week-stats` — grid or flex row of stat cards, scrollable horizontally on mobile
+  - `.week-stat-card` — rounded card with label + value, subtle background
+  - `.meal-pattern-grid` — CSS grid 7×4, small dots, gap between cells
+  - `.meal-pattern-grid__dot--filled` / `--empty` — colored vs muted circles
+  - `.week-day-group` — day sections with header + compact meal list
+  - `.week-top-items` — ranked list with count badges
+  - `.week-new-items` — tag/chip style for each new food
+  - `.view-toggle` — pill tabs for Day|Week in DateNav
+
+---
+
+### Dependency Graph
+
+```
+Phase 11.1  ── loadWeek + loadPriorItems ──────┐
+                                                │
+Phase 11.2  ── Week navigation (DateNav) ──────┤
+                                                │
+Phase 11.3  ── WeekView component ─────────────┤
+                                                │
+Phase 11.4  ──┬── Most consumed items          │
+              ├── Meal pattern grid     ────────┘
+              ├── New items this week
+              └── Total items logged
+
+Phase 11.5  ── CSS (parallel with 11.3/11.4)
+```
+
+11.1 must go first (data layer).
+11.2, 11.3, 11.4, 11.5 can all progress in parallel once 11.1 is done.
+Within 11.4 all four stat cards are independent.
 
 ---
 

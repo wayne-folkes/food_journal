@@ -21,3 +21,6 @@ test-results/
 # API dependencies
 /node_modules/
 /package-lock.json
+
+# Claude Code agent artifacts
+.claude/worktrees/
