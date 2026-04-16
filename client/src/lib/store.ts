@@ -44,6 +44,8 @@ interface MealsState {
   dayCache: Record<string, MealWithItems[]>
   isAuthed: boolean
   isLoading: boolean
+  weekMeals: MealWithItems[]
+  weekLoading: boolean
   // Actions
   loadDay: (date?: string) => Promise<void>
   addMeal: (insert: MealInsert & { items: string[] }) => Promise<MealWithItems>
@@ -58,11 +60,27 @@ interface MealsState {
   setAuthed: (authed: boolean) => void
   updateItemCalories: (itemId: string, calories: number | null) => Promise<void>
   searchMeals: (query: string) => Promise<MealWithItems[]>
+  loadWeek: (date?: string) => Promise<void>
+  loadPriorItems: (beforeDate: string) => Promise<Set<string>>
 }
 
 /** Returns today's date string in YYYY-MM-DD (local time). */
 export function todayString(): string {
   return new Date().toLocaleDateString('sv')
+}
+
+export function getWeekBounds(anchor: string): { start: string; end: string } {
+  const d = new Date(`${anchor}T12:00:00`)
+  const day = d.getDay() // 0=Sun
+  const diffToMonday = day === 0 ? -6 : 1 - day
+  const monday = new Date(d)
+  monday.setDate(d.getDate() + diffToMonday)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  return {
+    start: monday.toLocaleDateString('sv'),
+    end: sunday.toLocaleDateString('sv'),
+  }
 }
 
 /** Returns the N most-recent distinct item descriptions across all meals. */
@@ -284,6 +302,8 @@ export const useEntriesStore = create<MealsState>()(
       dayCache: {},
       isAuthed: false,
       isLoading: false,
+      weekMeals: [],
+      weekLoading: false,
 
       setAuthed: (authed) => set({ isAuthed: authed }),
 
@@ -513,6 +533,58 @@ export const useEntriesStore = create<MealsState>()(
           console.error('searchMeals parse error:', err instanceof Error ? err.message : String(err))
           return []
         }
+      },
+
+      loadWeek: async (date = todayString()) => {
+        const { isAuthed } = get()
+        const { start, end } = getWeekBounds(date)
+
+        if (!isAuthed) {
+          const startTs = new Date(`${start}T00:00:00`).getTime()
+          const endTs = new Date(`${end}T23:59:59.999`).getTime()
+          set({
+            weekMeals: get().meals.filter((m) => {
+              const t = new Date(m.consumed_at).getTime()
+              return t >= startTs && t <= endTs
+            }),
+          })
+          return
+        }
+
+        set({ weekLoading: true })
+        try {
+          const startISO = new Date(`${start}T00:00:00`).toISOString()
+          const endISO = new Date(`${end}T23:59:59.999`).toISOString()
+          const { data, error } = await supabase
+            .from('meals')
+            .select('*, meal_items(*)')
+            .gte('consumed_at', startISO)
+            .lte('consumed_at', endISO)
+            .order('consumed_at', { ascending: true })
+          if (error) { console.error('loadWeek:', error.message); return }
+          type SupabaseMealRow = Omit<MealWithItems, 'items'> & { meal_items: MealWithItems['items'] }
+          const weekMeals = (data as SupabaseMealRow[] ?? []).map((m) =>
+            normalizeMealWithItems({ ...m, items: m.meal_items ?? [] })
+          )
+          set({ weekMeals })
+        } finally {
+          set({ weekLoading: false })
+        }
+      },
+
+      loadPriorItems: async (beforeDate: string) => {
+        const { isAuthed } = get()
+        const beforeISO = new Date(`${beforeDate}T00:00:00`).toISOString()
+
+        if (!isAuthed) {
+          const priorMeals = get().meals.filter((m) => m.consumed_at < beforeISO)
+          return new Set(priorMeals.flatMap((m) => m.items.map((i) => i.description.toLowerCase())))
+        }
+
+        const { data, error } = await supabase
+          .rpc('get_prior_item_descriptions', { p_before_date: beforeISO })
+        if (error) { console.error('loadPriorItems:', error.message); return new Set<string>() }
+        return new Set<string>((data ?? []).map((row: { description: string }) => row.description))
       },
 
       syncLocalToRemote: async () => {
