@@ -1,8 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
-const ADMIN_EMAIL = 'wayne.folkes@gmail.com'
-
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -30,8 +28,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Admin-only
-  if (user.email !== ADMIN_EMAIL) {
+  if (!user.app_metadata?.is_admin) {
     return res.status(403).json({ error: 'Forbidden' })
+  }
+
+  // Rate limit: 10 flushes/hr
+  const { data: overLimit, error: rlError } = await supabaseAdmin
+    .rpc('check_and_increment_api_rate_limit', {
+      p_user_id: user.id,
+      p_limit: 10
+    })
+  if (!rlError && overLimit) {
+    return res.status(429).json({ error: 'Rate limit exceeded.' })
   }
 
   try {
