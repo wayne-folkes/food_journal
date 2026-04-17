@@ -46,6 +46,7 @@ interface MealsState {
   isLoading: boolean
   weekMeals: MealWithItems[]
   weekLoading: boolean
+  itemHistory: string[]
   // Actions
   loadDay: (date?: string) => Promise<void>
   addMeal: (insert: MealInsert & { items: string[] }) => Promise<MealWithItems>
@@ -62,7 +63,6 @@ interface MealsState {
   searchMeals: (query: string) => Promise<MealWithItems[]>
   loadWeek: (date?: string) => Promise<void>
   loadPriorItems: (beforeDate: string) => Promise<Set<string>>
-  itemHistory: string[]
   loadItemHistory: () => Promise<void>
 }
 
@@ -672,3 +672,4 @@ export const useEntriesStore = create<MealsState>()(
     }
   )
 )
+

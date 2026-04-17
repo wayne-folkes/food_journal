@@ -181,6 +181,7 @@
 }
 
 .chip-input {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -1494,4 +1495,42 @@ mark {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ── Autocomplete suggestions dropdown ───────────────────────────── */
+
+.chip-suggestions {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  z-index: 200;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.chip-suggestions__item {
+  padding: 10px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 0.9375rem;
+  color: var(--ink);
+  line-height: 1.2;
+  /* 44px touch target */
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.chip-suggestions__item:hover,
+.chip-suggestions__item--active {
+  background: color-mix(in srgb, var(--sage) 12%, transparent);
+  color: var(--ink);
 }
