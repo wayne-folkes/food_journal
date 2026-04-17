@@ -9,7 +9,10 @@ if (
   supabaseUrl === 'https://placeholder.supabase.co' ||
   supabaseAnonKey === 'placeholder-anon-key'
 ) {
-  log.warn('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Copy client/.env.example → client/.env.local and fill in your Supabase credentials. Anonymous local logging still works without them.')
+  log.warn('Missing Supabase configuration', {
+    hint: 'Copy client/.env.example → client/.env.local and fill in your Supabase credentials',
+    fallback: 'Anonymous local logging still works without them',
+  })
 }
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
