@@ -23,7 +23,7 @@ import type { ChipItem } from './lib/store'
 import './App.css'
 
 function AppInner() {
-  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, syncLocalToRemote, updateItemCalories, loadWeek, weekMeals, weekLoading } =
+  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, syncLocalToRemote, updateItemCalories, loadWeek, weekMeals, weekLoading, loadItemHistory } =
     useEntriesStore()
   const [user, setUser] = useState<User | null>(null)
   const [editingMeal, setEditingMeal] = useState<MealWithItems | null>(null)
@@ -49,6 +49,13 @@ function AppInner() {
     })
     return () => subscription.unsubscribe()
   }, [setAuthed, syncLocalToRemote])
+
+  // Load item history for autocomplete whenever auth state is established
+  useEffect(() => {
+    if (isAuthed) {
+      loadItemHistory()
+    }
+  }, [isAuthed, loadItemHistory])
 
   // Reload meals whenever the selected date or auth state changes
   useEffect(() => {

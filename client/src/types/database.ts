@@ -155,6 +155,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_recent_item_descriptions: {
+        Args: { p_limit?: number }
+        Returns: { description: string }[]
+      }
     }
     Enums: {
       meal_type: MealType

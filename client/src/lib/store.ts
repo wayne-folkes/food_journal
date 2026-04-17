@@ -62,6 +62,8 @@ interface MealsState {
   searchMeals: (query: string) => Promise<MealWithItems[]>
   loadWeek: (date?: string) => Promise<void>
   loadPriorItems: (beforeDate: string) => Promise<Set<string>>
+  itemHistory: string[]
+  loadItemHistory: () => Promise<void>
 }
 
 /** Returns today's date string in YYYY-MM-DD (local time). */
@@ -304,6 +306,7 @@ export const useEntriesStore = create<MealsState>()(
       isLoading: false,
       weekMeals: [],
       weekLoading: false,
+      itemHistory: [],
 
       setAuthed: (authed) => set({ isAuthed: authed }),
 
@@ -590,6 +593,35 @@ export const useEntriesStore = create<MealsState>()(
           .rpc('get_prior_item_descriptions', { p_before_date: beforeISO })
         if (error) { console.error('loadPriorItems:', error.message); return new Set<string>() }
         return new Set<string>((data ?? []).map((row: { description: string }) => row.description))
+      },
+
+      loadItemHistory: async () => {
+        const { isAuthed } = get()
+
+        if (!isAuthed) {
+          // Derive from all local meals — collect distinct descriptions, most recent first
+          const seen = new Set<string>()
+          const history: string[] = []
+          const sorted = [...get().meals].sort(
+            (a, b) => new Date(b.consumed_at).getTime() - new Date(a.consumed_at).getTime()
+          )
+          for (const meal of sorted) {
+            for (const item of meal.items) {
+              const key = item.description.toLowerCase()
+              if (!seen.has(key)) {
+                seen.add(key)
+                history.push(item.description)
+              }
+            }
+          }
+          set({ itemHistory: history })
+          return
+        }
+
+        const { data, error } = await supabase
+          .rpc('get_recent_item_descriptions', { p_limit: 500 })
+        if (error) { console.error('loadItemHistory:', error instanceof Error ? error.message : String(error)); return }
+        set({ itemHistory: (data ?? []).map((r: { description: string }) => r.description) })
       },
 
       syncLocalToRemote: async () => {
