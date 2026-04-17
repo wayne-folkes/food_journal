@@ -119,7 +119,7 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
   }
 
   return (
-    <article className={`meal-card meal-card--${meal.meal_type}`}>
+    <article className={`meal-card meal-card--${meal.meal_type}${menuOpen ? ' meal-card--menu-open' : ''}`}>
       <div className="meal-card__accent" aria-hidden="true" />
 
       <div className="meal-card__body">

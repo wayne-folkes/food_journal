@@ -60,6 +60,15 @@ describe('MealCard', () => {
     expect(screen.getByText('Delete')).toBeInTheDocument()
   })
 
+  it('adds menu-open class to card when menu is open for z-index stacking', () => {
+    renderCard()
+    const card = document.querySelector('.meal-card')!
+    expect(card.classList.contains('meal-card--menu-open')).toBe(false)
+
+    fireEvent.click(screen.getByLabelText('Meal options'))
+    expect(card.classList.contains('meal-card--menu-open')).toBe(true)
+  })
+
   it('calls onDelete with the meal id when Delete is clicked', () => {
     const { onDelete } = renderCard()
 
