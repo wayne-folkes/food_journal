@@ -8,8 +8,12 @@ import { LogLayer } from 'loglayer'
 import { PinoTransport } from '@loglayer/transport-pino'
 import pino from 'pino'
 
+const logLevel =
+  process.env.LOG_LEVEL ??
+  (process.env.NODE_ENV === 'production' ? 'info' : 'debug')
+
 export const log = new LogLayer({
   transport: new PinoTransport({
-    logger: pino({ level: 'debug' }),
+    logger: pino({ level: logLevel }),
   }),
 })
