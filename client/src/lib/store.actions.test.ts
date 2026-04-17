@@ -430,6 +430,90 @@ describe('useEntriesStore.addMeal', () => {
     })
   })
 
+  it('removes an anonymous meal from local state without calling supabase', async () => {
+    const localMeal = makeStoredMeal({
+      id: 'local-1',
+      description: 'apple',
+      consumedAt: '2026-04-15T12:00:00.000Z',
+      userId: null,
+    })
+    useEntriesStore.setState({ meals: [localMeal], isAuthed: false, isLoading: false })
+
+    await useEntriesStore.getState().deleteMeal('local-1')
+
+    expect(useEntriesStore.getState().meals).toEqual([])
+    expect(mockSupabase.from).not.toHaveBeenCalled()
+  })
+
+  it('deletes an authenticated meal via supabase and removes it from state', async () => {
+    const remoteMeal = makeStoredMeal({
+      id: 'meal-1',
+      description: 'salad',
+      consumedAt: '2026-04-15T12:00:00.000Z',
+      userId: 'user-1',
+    })
+    useEntriesStore.setState({ meals: [remoteMeal], isAuthed: true, isLoading: false })
+
+    const mockEq = vi.fn().mockResolvedValue({ error: null })
+    const mockDelete = vi.fn().mockReturnValue({ eq: mockEq })
+    mockSupabase.from.mockReturnValue({ delete: mockDelete })
+
+    await useEntriesStore.getState().deleteMeal('meal-1')
+
+    expect(mockSupabase.from).toHaveBeenCalledWith('meals')
+    expect(mockDelete).toHaveBeenCalled()
+    expect(mockEq).toHaveBeenCalledWith('id', 'meal-1')
+    expect(useEntriesStore.getState().meals).toEqual([])
+  })
+
+  it('throws and keeps the meal in state when supabase delete fails', async () => {
+    const remoteMeal = makeStoredMeal({
+      id: 'meal-1',
+      description: 'salad',
+      consumedAt: '2026-04-15T12:00:00.000Z',
+      userId: 'user-1',
+    })
+    useEntriesStore.setState({ meals: [remoteMeal], isAuthed: true, isLoading: false })
+
+    const dbError = { message: 'delete failed' }
+    const mockEq = vi.fn().mockResolvedValue({ error: dbError })
+    const mockDelete = vi.fn().mockReturnValue({ eq: mockEq })
+    mockSupabase.from.mockReturnValue({ delete: mockDelete })
+
+    await expect(useEntriesStore.getState().deleteMeal('meal-1')).rejects.toEqual(dbError)
+
+    // Meal should remain in state since delete failed
+    expect(useEntriesStore.getState().meals).toHaveLength(1)
+    expect(useEntriesStore.getState().meals[0].id).toBe('meal-1')
+  })
+
+  it('invalidates the day cache for the deleted meal date', async () => {
+    const remoteMeal = makeStoredMeal({
+      id: 'meal-1',
+      description: 'salad',
+      consumedAt: '2026-04-15T12:00:00.000Z',
+      userId: 'user-1',
+    })
+    useEntriesStore.setState({
+      meals: [remoteMeal],
+      isAuthed: true,
+      isLoading: false,
+      dayCache: { '2026-04-15': [remoteMeal], '2026-04-14': [] },
+    })
+
+    const mockEq = vi.fn().mockResolvedValue({ error: null })
+    const mockDelete = vi.fn().mockReturnValue({ eq: mockEq })
+    mockSupabase.from.mockReturnValue({ delete: mockDelete })
+
+    await useEntriesStore.getState().deleteMeal('meal-1')
+
+    // Cache for the deleted meal's date should be invalidated
+    const cache = useEntriesStore.getState().dayCache
+    expect(cache['2026-04-15']).toBeUndefined()
+    // Other dates should remain
+    expect(cache['2026-04-14']).toEqual([])
+  })
+
   it('passes wildcard characters through to the search RPC as literal user input', async () => {
     useEntriesStore.setState({ meals: [], isAuthed: true, isLoading: false })
 
