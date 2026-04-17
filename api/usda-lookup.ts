@@ -219,7 +219,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .upsert(upsertRows, { onConflict: 'description_key' })
 
       if (upsertError) {
-        log.withMetadata({ error: errorMessage(upsertError) }).error('cache upsert failed')
+        log.withMetadata({ error: errorMessage(upsertError) }).warn('cache upsert failed')
       }
     }
 
