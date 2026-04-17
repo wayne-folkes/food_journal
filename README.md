@@ -4,6 +4,27 @@ A meal logging web app. Log meals with chip-style input, auto-estimated calories
 
 Live at **[food.folkes.dev](https://food.folkes.dev)**
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><strong>Home</strong></td>
+    <td align="center"><strong>Day View</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/01-home.png" width="200" alt="Home screen showing the meal composer with meal type pills and empty log" /></td>
+    <td><img src="docs/screenshots/02-day-view.png" width="200" alt="Day view with two logged meals and recent item chips" /></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Week View</strong></td>
+    <td align="center"><strong>Search</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/04-week-view.png" width="200" alt="Week view showing item count, most logged items, and new this week chips" /></td>
+    <td><img src="docs/screenshots/05-search.png" width="200" alt="Search overlay with highlighted keyword match in results" /></td>
+  </tr>
+</table>
+
 ## Stack
 
 - **Client**: React 19 + Vite + TypeScript, vanilla CSS
@@ -121,18 +142,21 @@ food_journal/
 ├── client/
 │   ├── src/
 │   │   ├── components/     # MealComposer, MealCard, MealLog, SearchOverlay, ...
-│   │   ├── lib/
-│   │   │   ├── supabase.ts     # Supabase client
-│   │   │   ├── store.ts        # Zustand store
-│   │   │   ├── parser.ts       # chrono-node chip parsing
-│   │   │   ├── mealType.ts     # meal type suggestion by time of day
-│   │   │   └── caloriesLookup.ts  # client-side USDA fetch helper
-│   │   └── types/
-│   │       └── database.ts     # Supabase table types
+│   │   └── lib/
+│   │       ├── supabase.ts     # Supabase client
+│   │       ├── store.ts        # Zustand store
+│   │       ├── analytics.ts    # Typed Vercel Analytics event wrapper
+│   │       ├── parser.ts       # chrono-node chip parsing
+│   │       ├── mealType.ts     # meal type suggestion by time of day
+│   │       └── caloriesLookup.ts  # client-side USDA fetch helper
 │   └── e2e/                    # Playwright E2E tests
+├── shared/
+│   ├── types/
+│   │   └── database.ts     # Supabase table + RPC types (shared by client + api)
+│   └── usda-lookup.ts      # Shared lookup request/response types
 ├── supabase/
-│   └── migrations/             # SQL migrations (run in order)
-└── vercel.json                 # Build config + API rewrites
+│   └── migrations/         # SQL migrations (run in order)
+└── vercel.json             # Build config + API rewrites
 ```
 
 ## Database schema
