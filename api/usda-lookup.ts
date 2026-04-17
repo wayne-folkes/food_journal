@@ -130,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
 
     if (rlError) {
-      log.withMetadata({ error: errorMessage(rlError) }).error('rate limit check failed')
+      log.withMetadata({ error: errorMessage(rlError) }).warn('rate limit check failed')
       // Fail open — don't block the request if the rate limit table has an issue
     } else if (overLimit) {
       return res.status(429).json({ error: 'Rate limit exceeded. Try again next hour.' })
