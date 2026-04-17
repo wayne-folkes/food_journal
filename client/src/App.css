@@ -1501,7 +1501,7 @@ mark {
 
 .chip-suggestions {
   position: absolute;
-  bottom: calc(100% + 6px);
+  top: calc(100% + 6px);
   left: 0;
   right: 0;
   /* Slightly lifted from the composer card so it reads as a separate surface */
