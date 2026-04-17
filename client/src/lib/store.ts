@@ -335,7 +335,7 @@ export const useEntriesStore = create<MealsState>()(
             .lte('consumed_at', end)
             .order('consumed_at', { ascending: true })
 
-          if (error) { log.error('loadDay failed', { error: errorMessage(error) }); return }
+          if (error) { log.withMetadata({ error: errorMessage(error) }).error('loadDay failed'); return }
 
           // S8: re-check auth after await — drop result if user signed out mid-flight
           if (!get().isAuthed) return
@@ -380,7 +380,7 @@ export const useEntriesStore = create<MealsState>()(
         })
 
         if (error || !data) {
-          log.error('addMeal failed', { error: errorMessage(error) })
+          log.withMetadata({ error: errorMessage(error) }).error('addMeal failed')
           throw error
         }
 
@@ -439,7 +439,7 @@ export const useEntriesStore = create<MealsState>()(
         })
 
         if (error || !data) {
-          log.error('editMeal failed', { error: errorMessage(error) })
+          log.withMetadata({ error: errorMessage(error) }).error('editMeal failed')
           throw error
         }
 
@@ -468,7 +468,7 @@ export const useEntriesStore = create<MealsState>()(
         const deletedDate = mealToDelete ? new Date(mealToDelete.consumed_at).toLocaleDateString('sv') : null
 
         const { error } = await supabase.from('meals').delete().eq('id', id)
-        if (error) { log.error('deleteMeal failed', { error: errorMessage(error) }); throw error }
+        if (error) { log.withMetadata({ error: errorMessage(error) }).error('deleteMeal failed'); throw error }
 
         // P3: invalidate cache for the deleted meal's date
         if (deletedDate) {
@@ -514,7 +514,7 @@ export const useEntriesStore = create<MealsState>()(
         if (error) {
           // Revert on error
           set({ meals: prevMeals })
-          log.error('updateItemCalories failed', { itemId, error: errorMessage(error) })
+          log.withMetadata({ itemId, error: errorMessage(error) }).error('updateItemCalories failed')
           throw error
         }
       },
@@ -533,12 +533,12 @@ export const useEntriesStore = create<MealsState>()(
         const { data, error } = await supabase
           .rpc('search_meals', { p_query: normalizedQuery })
 
-        if (error) { log.error('searchMeals failed', { error: errorMessage(error) }); return [] }
+        if (error) { log.withMetadata({ error: errorMessage(error) }).error('searchMeals failed'); return [] }
 
         try {
           return fromSearchMealsRpc(data, 'search_meals')
         } catch (err) {
-          log.error('searchMeals parse failed', { error: errorMessage(err) })
+          log.withMetadata({ error: errorMessage(err) }).error('searchMeals parse failed')
           return []
         }
       },
@@ -571,7 +571,7 @@ export const useEntriesStore = create<MealsState>()(
             .gte('consumed_at', startISO)
             .lte('consumed_at', endISO)
             .order('consumed_at', { ascending: true })
-          if (error) { log.error('loadWeek failed', { error: error.message }); return }
+          if (error) { log.withMetadata({ error: error.message }).error('loadWeek failed'); return }
           type SupabaseMealRow = Omit<MealWithItems, 'items'> & { meal_items: MealWithItems['items'] }
           const weekMeals = (data as SupabaseMealRow[] ?? []).map((m) =>
             normalizeMealWithItems({ ...m, items: m.meal_items ?? [] })
@@ -593,7 +593,7 @@ export const useEntriesStore = create<MealsState>()(
 
         const { data, error } = await supabase
           .rpc('get_prior_item_descriptions', { p_before_date: beforeISO })
-        if (error) { log.error('loadPriorItems failed', { error: error.message }); return new Set<string>() }
+        if (error) { log.withMetadata({ error: error.message }).error('loadPriorItems failed'); return new Set<string>() }
         return new Set<string>((data ?? []).map((row: { description: string }) => row.description))
       },
 
@@ -622,7 +622,7 @@ export const useEntriesStore = create<MealsState>()(
 
         const { data, error } = await supabase
           .rpc('get_recent_item_descriptions', { p_limit: 500 })
-        if (error) { log.error('loadItemHistory failed', { error: errorMessage(error) }); return }
+        if (error) { log.withMetadata({ error: errorMessage(error) }).error('loadItemHistory failed'); return }
         set({ itemHistory: (data ?? []).map((r: { description: string }) => r.description) })
       },
 
@@ -640,7 +640,7 @@ export const useEntriesStore = create<MealsState>()(
           })
 
           if (error || !data) {
-            log.error('syncLocalToRemote batch failed', { error: errorMessage(error) })
+            log.withMetadata({ error: errorMessage(error) }).error('syncLocalToRemote batch failed')
             return
           }
 
@@ -650,7 +650,7 @@ export const useEntriesStore = create<MealsState>()(
           )
 
           for (const failure of failed) {
-            log.error('syncLocalToRemote meal failed', { error: failure.error })
+            log.withMetadata({ error: failure.error }).error('syncLocalToRemote meal failed')
           }
 
           if (successfulSyncs.length === 0) return
@@ -664,7 +664,7 @@ export const useEntriesStore = create<MealsState>()(
             meals: [...s.meals.filter((m) => !syncedLocalIds.has(m.id)), ...synced],
           }))
         } catch (err) {
-          log.error('syncLocalToRemote batch failed', { error: errorMessage(err) })
+          log.withMetadata({ error: errorMessage(err) }).error('syncLocalToRemote batch failed')
         }
       },
     }),

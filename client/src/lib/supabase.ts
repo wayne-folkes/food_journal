@@ -9,10 +9,10 @@ if (
   supabaseUrl === 'https://placeholder.supabase.co' ||
   supabaseAnonKey === 'placeholder-anon-key'
 ) {
-  log.warn('Missing Supabase configuration', {
+  log.withMetadata({
     hint: 'Copy client/.env.example → client/.env.local and fill in your Supabase credentials',
     fallback: 'Anonymous local logging still works without them',
-  })
+  }).warn('Missing Supabase configuration')
 }
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)

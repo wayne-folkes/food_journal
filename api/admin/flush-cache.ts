@@ -55,7 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({ ok: true, message: 'food_lookup cache flushed' })
   } catch (err) {
-    log.error('flush-cache failed', { error: errorMessage(err) })
+    log.withMetadata({ error: errorMessage(err) }).error('flush-cache failed')
     return res.status(500).json({ error: 'Failed to flush cache' })
   }
 }

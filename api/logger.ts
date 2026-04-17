@@ -1,21 +1,15 @@
 /**
  * Server-side structured logger for Vercel serverless functions.
  *
- * Outputs JSON lines so Vercel's log viewer can parse and filter them.
- * Uses `console.error` / `console.warn` / `console.log` to preserve
- * Vercel's level-based colouring in the dashboard.
+ * Uses LogLayer with Pino transport. Pino outputs JSON lines that
+ * Vercel's log viewer can parse and filter automatically.
  */
-import { createLogger, type LogLevel } from '../shared/logger'
+import { LogLayer } from 'loglayer'
+import { PinoTransport } from '@loglayer/transport-pino'
+import pino from 'pino'
 
-const consoleMethods: Record<LogLevel, (...args: string[]) => void> = {
-  debug: console.log,
-  info: console.log,
-  warn: console.warn,
-  error: console.error,
-}
-
-export const log = createLogger((entry) => {
-  const { level, ...rest } = entry
-  const output = JSON.stringify({ level, ...rest, timestamp: new Date().toISOString() })
-  consoleMethods[level](output)
+export const log = new LogLayer({
+  transport: new PinoTransport({
+    logger: pino({ level: 'debug' }),
+  }),
 })

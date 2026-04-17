@@ -129,7 +129,7 @@ function AppInner() {
       }
     } catch (err) {
       toast.error('Failed to add meal. Please try again.')
-      log.error('handleAddMeal failed', { error: errorMessage(err) })
+      log.withMetadata({ error: errorMessage(err) }).error('handleAddMeal failed')
     }
   }
 
@@ -143,7 +143,7 @@ function AppInner() {
       })
     } catch (err) {
       toast.error('Failed to add entry. Please try again.')
-      log.error('handleRelogItem failed', { error: errorMessage(err) })
+      log.withMetadata({ error: errorMessage(err) }).error('handleRelogItem failed')
     }
   }
 
@@ -160,7 +160,7 @@ function AppInner() {
       setEditingMeal(null)
     } catch (err) {
       toast.error('Failed to save changes. Please try again.')
-      log.error('handleSaveEdit failed', { error: errorMessage(err) })
+      log.withMetadata({ error: errorMessage(err) }).error('handleSaveEdit failed')
     }
   }
 
@@ -175,7 +175,7 @@ function AppInner() {
       track('meal_deleted', {})
     } catch (err) {
       toast.error('Failed to delete meal. Please try again.')
-      log.error('handleDelete failed', { error: errorMessage(err) })
+      log.withMetadata({ error: errorMessage(err) }).error('handleDelete failed')
       return
     }
 
@@ -205,7 +205,7 @@ function AppInner() {
       })
     } catch (err) {
       toast.error('Failed to log meal again. Please try again.')
-      log.error('handleDuplicate failed', { error: errorMessage(err) })
+      log.withMetadata({ error: errorMessage(err) }).error('handleDuplicate failed')
     }
   }
 

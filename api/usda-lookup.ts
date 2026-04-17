@@ -119,7 +119,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
 
-    const log = rootLog.child({ handler: 'usda-lookup', userId: user.id })
+    const log = rootLog.child()
+    log.withContext({ handler: 'usda-lookup', userId: user.id })
 
     // 2. Per-user rate limit check (60 req/hr)
     const { data: overLimit, error: rlError } = await supabaseAdmin
@@ -129,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
 
     if (rlError) {
-      log.error('rate limit check failed', { error: errorMessage(rlError) })
+      log.withMetadata({ error: errorMessage(rlError) }).error('rate limit check failed')
       // Fail open — don't block the request if the rate limit table has an issue
     } else if (overLimit) {
       return res.status(429).json({ error: 'Rate limit exceeded. Try again next hour.' })
@@ -194,7 +195,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             fdcId
           }
         } catch (err) {
-          log.error('USDA lookup failed', { description: item.description, error: errorMessage(err) })
+          log.withMetadata({ description: item.description, error: errorMessage(err) }).error('USDA lookup failed')
           return {
             result: {
               id: item.id,
@@ -218,7 +219,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .upsert(upsertRows, { onConflict: 'description_key' })
 
       if (upsertError) {
-        log.error('cache upsert failed', { error: errorMessage(upsertError) })
+        log.withMetadata({ error: errorMessage(upsertError) }).error('cache upsert failed')
       }
     }
 
@@ -231,7 +232,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const result = hitResultMap.get(item.id) ?? missResultMap.get(item.id)
 
       if (!result) {
-        log.error('missing assembled result', { itemId: item.id })
+        log.withMetadata({ itemId: item.id }).error('missing assembled result')
         return res.status(500).json({ error: 'Failed to assemble lookup results' })
       }
 
@@ -240,7 +241,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({ results })
   } catch (err) {
-    rootLog.error('usda-lookup unexpected error', { handler: 'usda-lookup', error: errorMessage(err) })
+    rootLog.withMetadata({ handler: 'usda-lookup', error: errorMessage(err) }).error('usda-lookup unexpected error')
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
