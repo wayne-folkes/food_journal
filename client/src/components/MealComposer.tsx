@@ -3,6 +3,7 @@ import type { MealType } from '@shared/types/database'
 import { suggestMealType } from '../lib/mealType'
 import { parseChip } from '../lib/parser'
 import { useEntriesStore } from '../lib/store'
+import { track } from '../lib/analytics'
 import { MealTypePills } from './MealTypePills'
 import { ChipInput } from './ChipInput'
 
@@ -80,6 +81,7 @@ export function MealComposer({ onAdd }: Props) {
   }
 
   function handleSuggestionSelect(description: string) {
+    track('autocomplete_used', {})
     setChips(prev => [...prev, description])
     setInputValue('')
   }

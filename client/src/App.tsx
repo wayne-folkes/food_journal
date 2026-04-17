@@ -17,6 +17,7 @@ import { WeekView } from './components/WeekView'
 import { lookupCalories } from './lib/caloriesLookup'
 import { offsetDate } from './lib/date'
 import { useToast } from './lib/toast'
+import { track } from './lib/analytics'
 
 import type { MealWithItems, MealType } from '@shared/types/database'
 import type { ChipItem } from './lib/store'
@@ -95,9 +96,19 @@ function AppInner() {
         items: payload.items,
       })
 
+      track('meal_logged', {
+        meal_type: payload.mealType,
+        item_count: payload.items.length,
+        authed: isAuthed,
+      })
+
       if (isAuthed) {
         const itemsNeedingCalories = savedMeal.items.filter((item) => item.calories === null)
         if (itemsNeedingCalories.length > 0) {
+          track('calorie_estimate_requested', {
+            item_count: itemsNeedingCalories.length,
+            trigger: 'auto',
+          })
           // fire and forget — non-blocking
           lookupCalories(itemsNeedingCalories.map((item) => ({ id: item.id, description: item.description })))
             .then((results) => {
@@ -140,6 +151,10 @@ function AppInner() {
   ) {
     try {
       await editMeal(id, updates)
+      track('meal_edited', {
+        meal_type: updates.meal_type,
+        item_count: updates.items.length,
+      })
       setEditingMeal(null)
     } catch (err) {
       toast.error('Failed to save changes. Please try again.')
@@ -155,6 +170,7 @@ function AppInner() {
     // Delete on the server immediately (also removes from local state)
     try {
       await deleteMeal(id)
+      track('meal_deleted', {})
     } catch (err) {
       toast.error('Failed to delete meal. Please try again.')
       console.error('handleDelete error:', err instanceof Error ? err.message : String(err))
@@ -194,6 +210,10 @@ function AppInner() {
   async function handleEstimateCalories(meal: MealWithItems) {
     const itemsNeedingCalories = meal.items.filter((i) => i.calories === null)
     if (itemsNeedingCalories.length === 0) return
+    track('calorie_estimate_requested', {
+      item_count: itemsNeedingCalories.length,
+      trigger: 'manual',
+    })
     try {
       const results = await lookupCalories(
         itemsNeedingCalories.map((i) => ({ id: i.id, description: i.description }))
@@ -221,7 +241,7 @@ function AppInner() {
           <button
             className="header-search-btn"
             aria-label="Search meals"
-            onClick={() => setSearchOpen(true)}
+            onClick={() => { track('search_opened', {}); setSearchOpen(true) }}
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.75"/>
@@ -243,7 +263,7 @@ function AppInner() {
           onNext={() => setSelectedDate((d) => offsetDate(d, step))}
           onToday={() => setSelectedDate(todayString())}
           viewMode={viewMode}
-          onViewModeChange={setViewMode}
+          onViewModeChange={(m) => { track('view_mode_changed', { mode: m }); setViewMode(m) }}
         />
         {viewMode === 'week' ? (
           <WeekView
