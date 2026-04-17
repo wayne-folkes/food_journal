@@ -1,7 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import type { LookupItem, LookupResult } from '../shared/usda-lookup'
+import { errorMessage } from '../shared/logger'
 import { buildLookupCacheRows } from './usda-cache'
+import { log as rootLog } from './logger'
 
 async function pLimit<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
   const results: T[] = []
@@ -117,6 +119,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
 
+    const log = rootLog.child()
+    log.withContext({ handler: 'usda-lookup', userId: user.id })
+
     // 2. Per-user rate limit check (60 req/hr)
     const { data: overLimit, error: rlError } = await supabaseAdmin
       .rpc('check_and_increment_api_rate_limit', {
@@ -125,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
 
     if (rlError) {
-      console.error('rate limit check failed:', rlError instanceof Error ? rlError.message : String(rlError))
+      log.withMetadata({ error: errorMessage(rlError) }).warn('rate limit check failed')
       // Fail open — don't block the request if the rate limit table has an issue
     } else if (overLimit) {
       return res.status(429).json({ error: 'Rate limit exceeded. Try again next hour.' })
@@ -190,7 +195,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             fdcId
           }
         } catch (err) {
-          console.error(`USDA lookup failed for "${item.description}":`, err instanceof Error ? err.message : String(err))
+          log.withMetadata({ description: item.description, error: errorMessage(err) }).error('USDA lookup failed')
           return {
             result: {
               id: item.id,
@@ -214,7 +219,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .upsert(upsertRows, { onConflict: 'description_key' })
 
       if (upsertError) {
-        console.error('Cache upsert error:', upsertError instanceof Error ? upsertError.message : String(upsertError))
+        log.withMetadata({ error: errorMessage(upsertError) }).warn('cache upsert failed')
       }
     }
 
@@ -227,7 +232,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const result = hitResultMap.get(item.id) ?? missResultMap.get(item.id)
 
       if (!result) {
-        console.error('usda-lookup missing assembled result for item', item.id)
+        log.withMetadata({ itemId: item.id }).error('missing assembled result')
         return res.status(500).json({ error: 'Failed to assemble lookup results' })
       }
 
@@ -236,7 +241,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({ results })
   } catch (err) {
-    console.error('usda-lookup unexpected error:', err instanceof Error ? err.message : String(err))
+    rootLog.withMetadata({ handler: 'usda-lookup', error: errorMessage(err) }).error('usda-lookup unexpected error')
     return res.status(500).json({ error: 'Internal server error' })
   }
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { errorMessage } from '@shared/logger'
 import { supabase } from './lib/supabase'
 import { useEntriesStore, recentDistinct, todayString, getWeekBounds } from './lib/store'
 import { MealComposer } from './components/MealComposer'
@@ -18,6 +19,7 @@ import { lookupCalories } from './lib/caloriesLookup'
 import { offsetDate } from './lib/date'
 import { useToast } from './lib/toast'
 import { track } from './lib/analytics'
+import { log } from './lib/logger'
 
 import type { MealWithItems, MealType } from '@shared/types/database'
 import type { ChipItem } from './lib/store'
@@ -127,7 +129,7 @@ function AppInner() {
       }
     } catch (err) {
       toast.error('Failed to add meal. Please try again.')
-      console.error('handleAddMeal error:', err instanceof Error ? err.message : String(err))
+      log.withMetadata({ error: errorMessage(err) }).error('handleAddMeal failed')
     }
   }
 
@@ -141,7 +143,7 @@ function AppInner() {
       })
     } catch (err) {
       toast.error('Failed to add entry. Please try again.')
-      console.error('handleRelogItem error:', err instanceof Error ? err.message : String(err))
+      log.withMetadata({ error: errorMessage(err) }).error('handleRelogItem failed')
     }
   }
 
@@ -158,7 +160,7 @@ function AppInner() {
       setEditingMeal(null)
     } catch (err) {
       toast.error('Failed to save changes. Please try again.')
-      console.error('handleSaveEdit error:', err instanceof Error ? err.message : String(err))
+      log.withMetadata({ error: errorMessage(err) }).error('handleSaveEdit failed')
     }
   }
 
@@ -173,7 +175,7 @@ function AppInner() {
       track('meal_deleted', {})
     } catch (err) {
       toast.error('Failed to delete meal. Please try again.')
-      console.error('handleDelete error:', err instanceof Error ? err.message : String(err))
+      log.withMetadata({ error: errorMessage(err) }).error('handleDelete failed')
       return
     }
 
@@ -203,7 +205,7 @@ function AppInner() {
       })
     } catch (err) {
       toast.error('Failed to log meal again. Please try again.')
-      console.error('handleDuplicate error:', err instanceof Error ? err.message : String(err))
+      log.withMetadata({ error: errorMessage(err) }).error('handleDuplicate failed')
     }
   }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useRef, useState, type KeyboardEvent } from 'react'
 
 interface Props {
   chips: string[]
@@ -20,11 +20,6 @@ interface Props {
 export function ChipInput({ chips, inputValue, onChange, onInputChange, placeholder = 'Add item…', suggestions, onSuggestionSelect }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [activeIdx, setActiveIdx] = useState(-1)
-
-  // Reset active index whenever the suggestions list changes
-  useEffect(() => {
-    setActiveIdx(-1)
-  }, [suggestions])
 
   function commitChip(raw: string) {
     const trimmed = raw.trim().replace(/,+$/, '').trim()
@@ -71,6 +66,7 @@ export function ChipInput({ chips, inputValue, onChange, onInputChange, placehol
       commitChip(raw)
     } else {
       onInputChange(raw)
+      setActiveIdx(-1)
     }
   }
 
