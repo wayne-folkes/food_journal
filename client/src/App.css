@@ -1504,10 +1504,11 @@ mark {
   bottom: calc(100% + 6px);
   left: 0;
   right: 0;
-  background: var(--paper);
-  border: 1px solid var(--border);
+  /* Slightly lifted from the composer card so it reads as a separate surface */
+  background: var(--cream-mid);
+  border: 1.5px solid color-mix(in srgb, var(--ink) 22%, transparent);
   border-radius: 10px;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-md);
   list-style: none;
   margin: 0;
   padding: 4px;
@@ -1529,8 +1530,20 @@ mark {
   align-items: center;
 }
 
+/* Subtle divider between rows so items read as distinct */
+.chip-suggestions__item + .chip-suggestions__item {
+  border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
 .chip-suggestions__item:hover,
 .chip-suggestions__item--active {
-  background: color-mix(in srgb, var(--sage) 12%, transparent);
+  background: color-mix(in srgb, var(--terra) 18%, transparent);
   color: var(--ink);
+  /* Remove the top divider on the active row so it reads as a single pill */
+  border-top-color: transparent;
+}
+
+/* Also remove the divider on the row immediately after the active row */
+.chip-suggestions__item--active + .chip-suggestions__item {
+  border-top-color: transparent;
 }
