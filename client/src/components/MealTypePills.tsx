@@ -1,4 +1,4 @@
-import type { MealType } from '../types/database'
+import type { MealType } from '@shared/types/database'
 import { MEAL_TYPES, MEAL_TYPE_LABELS } from '../lib/mealType'
 
 interface Props {

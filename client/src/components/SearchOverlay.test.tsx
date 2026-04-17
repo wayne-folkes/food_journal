@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { MealWithItems } from '../types/database'
+import type { MealWithItems } from '@shared/types/database'
 import { SearchOverlay } from './SearchOverlay'
 
 const mockUseEntriesStore = vi.fn()

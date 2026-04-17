@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import type { MealType } from '../types/database'
+import type { MealType } from '@shared/types/database'
 import { suggestMealType } from '../lib/mealType'
 import { parseChip } from '../lib/parser'
 import { useEntriesStore } from '../lib/store'

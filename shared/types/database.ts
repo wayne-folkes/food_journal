@@ -1,7 +1,7 @@
 /**
  * Hand-written Supabase schema types for the meals redesign.
  * Regenerate with:
- *   npx supabase gen types typescript --project-id kbdtcoyrspyjqjsgkwjl > src/types/database.ts
+ *   npx supabase gen types typescript --project-id kbdtcoyrspyjqjsgkwjl > shared/types/database.ts
  */
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'dessert' | 'drink'

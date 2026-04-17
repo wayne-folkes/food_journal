@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import type { MealWithItems, MealType } from '../types/database'
+import type { MealWithItems, MealType } from '@shared/types/database'
 import { useEntriesStore, getWeekBounds } from '../lib/store'
 import { MEAL_TYPE_LABELS } from '../lib/mealType'
 

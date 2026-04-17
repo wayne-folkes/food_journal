@@ -1,4 +1,4 @@
-import type { MealType } from '../types/database'
+import type { MealType } from '@shared/types/database'
 
 /** Human-readable labels */
 export const MEAL_TYPE_LABELS: Record<MealType, string> = {

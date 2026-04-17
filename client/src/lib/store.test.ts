@@ -6,7 +6,7 @@ vi.mock('./supabase', () => ({
 }))
 
 import { todayString, recentDistinct } from './store'
-import type { MealWithItems } from '../types/database'
+import type { MealWithItems } from '@shared/types/database'
 
 // ---------------------------------------------------------------------------
 // Helpers

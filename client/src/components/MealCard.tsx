@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import type { MealItem, MealWithItems } from '../types/database'
+import type { MealItem, MealWithItems } from '@shared/types/database'
 import { MEAL_TYPE_LABELS } from '../lib/mealType'
 import { useEntriesStore } from '../lib/store'
 

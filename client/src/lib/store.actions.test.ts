@@ -23,7 +23,7 @@ vi.mock('./supabase', () => ({
   supabase: mockSupabase,
 }))
 
-import type { MealWithItems } from '../types/database'
+import type { MealWithItems } from '@shared/types/database'
 import { useEntriesStore } from './store'
 
 function makeStoredMeal({

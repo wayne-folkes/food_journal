@@ -18,7 +18,7 @@ import { lookupCalories } from './lib/caloriesLookup'
 import { offsetDate } from './lib/date'
 import { useToast } from './lib/toast'
 
-import type { MealWithItems, MealType } from './types/database'
+import type { MealWithItems, MealType } from '@shared/types/database'
 import type { ChipItem } from './lib/store'
 import './App.css'
 

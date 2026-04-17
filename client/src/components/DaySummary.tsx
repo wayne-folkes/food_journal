@@ -1,4 +1,4 @@
-import type { MealWithItems } from '../types/database'
+import type { MealWithItems } from '@shared/types/database'
 
 interface Props {
   meals: MealWithItems[]

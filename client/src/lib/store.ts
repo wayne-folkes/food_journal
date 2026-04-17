@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Json, MealWithItems, MealInsert, MealType, MealItem } from '../types/database'
+import type { Json, MealWithItems, MealInsert, MealType, MealItem } from '@shared/types/database'
 import { supabase } from './supabase'
 
 const LOCAL_KEY = 'food_journal_meals'
