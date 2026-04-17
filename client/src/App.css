@@ -478,7 +478,6 @@
   background: var(--paper);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
-  overflow: hidden;
   transition: box-shadow 0.15s;
   animation: card-in 0.22s ease-out both;
 }
@@ -490,7 +489,7 @@
 .meal-card__accent {
   width: 4px;
   flex-shrink: 0;
-  border-radius: 0;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
 }
 
 .meal-card--breakfast .meal-card__accent { background: var(--meal-breakfast); }
