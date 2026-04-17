@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import type { MealType } from '../types/database'
 import { suggestMealType } from '../lib/mealType'
 import { parseChip } from '../lib/parser'
+import { useEntriesStore } from '../lib/store'
 import { MealTypePills } from './MealTypePills'
 import { ChipInput } from './ChipInput'
 
@@ -30,6 +31,25 @@ export function MealComposer({ onAdd }: Props) {
   const [mealTime, setMealTime] = useState<string>(now.toISOString())
   const [showTimePicker, setShowTimePicker] = useState(false)
 
+  const itemHistory = useEntriesStore(s => s.itemHistory)
+
+  const suggestions = useMemo(() => {
+    const q = inputValue.trim().toLowerCase()
+    if (q.length < 1) return []
+    const alreadyAdded = new Set(chips.map(c => c.toLowerCase()))
+    const matches = itemHistory.filter(s =>
+      !alreadyAdded.has(s.toLowerCase()) &&
+      s.toLowerCase().includes(q)
+    )
+    // Prefix matches first, then contains
+    matches.sort((a, b) => {
+      const aPrefix = a.toLowerCase().startsWith(q)
+      const bPrefix = b.toLowerCase().startsWith(q)
+      return aPrefix === bPrefix ? 0 : aPrefix ? -1 : 1
+    })
+    return matches.slice(0, 6)
+  }, [inputValue, itemHistory, chips])
+
   /** Commit a raw string as a chip, stripping any time phrase and updating mealTime. */
   function commitChipText(raw: string): string[] {
     const trimmed = raw.trim().replace(/,+$/, '').trim()
@@ -57,6 +77,11 @@ export function MealComposer({ onAdd }: Props) {
     } else {
       setChips(newChips)
     }
+  }
+
+  function handleSuggestionSelect(description: string) {
+    setChips(prev => [...prev, description])
+    setInputValue('')
   }
 
   const canSave = chips.length > 0 || inputValue.trim().length > 0
@@ -101,6 +126,8 @@ export function MealComposer({ onAdd }: Props) {
           onChange={handleChipsChange}
           onInputChange={setInputValue}
           placeholder="e.g. scrambled eggs, toast, coffee…"
+          suggestions={suggestions}
+          onSuggestionSelect={handleSuggestionSelect}
         />
         {chips.length === 0 && !inputValue && (
           <p className="meal-composer__hint">Press Enter or , to add items</p>

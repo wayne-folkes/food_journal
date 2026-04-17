@@ -46,6 +46,7 @@ interface MealsState {
   isLoading: boolean
   weekMeals: MealWithItems[]
   weekLoading: boolean
+  itemHistory: string[]
   // Actions
   loadDay: (date?: string) => Promise<void>
   addMeal: (insert: MealInsert & { items: string[] }) => Promise<MealWithItems>
@@ -81,6 +82,23 @@ export function getWeekBounds(anchor: string): { start: string; end: string } {
     start: monday.toLocaleDateString('sv'),
     end: sunday.toLocaleDateString('sv'),
   }
+}
+
+/** Returns all distinct item descriptions across all meals, most-recent first. */
+export function allDistinct(meals: MealWithItems[]): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  const allItems = [...meals]
+    .sort((a, b) => new Date(b.consumed_at).getTime() - new Date(a.consumed_at).getTime())
+    .flatMap((m) => [...m.items].sort((a, b) => a.position - b.position))
+  for (const item of allItems) {
+    const key = item.description.toLowerCase()
+    if (!seen.has(key)) {
+      seen.add(key)
+      result.push(item.description)
+    }
+  }
+  return result
 }
 
 /** Returns the N most-recent distinct item descriptions across all meals. */
@@ -304,6 +322,7 @@ export const useEntriesStore = create<MealsState>()(
       isLoading: false,
       weekMeals: [],
       weekLoading: false,
+      itemHistory: [],
 
       setAuthed: (authed) => set({ isAuthed: authed }),
 
@@ -640,3 +659,14 @@ export const useEntriesStore = create<MealsState>()(
     }
   )
 )
+
+// Keep itemHistory in sync whenever meals change
+useEntriesStore.subscribe((state, prev) => {
+  if (state.meals !== prev.meals) {
+    useEntriesStore.setState({ itemHistory: allDistinct(state.meals) })
+  }
+})
+// Initialise itemHistory from any meals rehydrated by persist
+useEntriesStore.setState({
+  itemHistory: allDistinct(useEntriesStore.getState().meals),
+})

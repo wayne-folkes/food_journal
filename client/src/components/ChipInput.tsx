@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 interface Props {
   chips: string[]
@@ -6,6 +6,8 @@ interface Props {
   onChange: (chips: string[]) => void
   onInputChange: (value: string) => void
   placeholder?: string
+  suggestions?: string[]
+  onSuggestionSelect?: (s: string) => void
 }
 
 /**
@@ -13,9 +15,16 @@ interface Props {
  * - Press Enter or type comma to commit the current value as a chip.
  * - Backspace on empty input removes the last chip.
  * - Input value is controlled (lifted to parent) so parent can commit on submit.
+ * - Optional suggestions dropdown with keyboard navigation.
  */
-export function ChipInput({ chips, inputValue, onChange, onInputChange, placeholder = 'Add item…' }: Props) {
+export function ChipInput({ chips, inputValue, onChange, onInputChange, placeholder = 'Add item…', suggestions, onSuggestionSelect }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [activeIdx, setActiveIdx] = useState(-1)
+
+  // Reset active index whenever the suggestions list changes
+  useEffect(() => {
+    setActiveIdx(-1)
+  }, [suggestions])
 
   function commitChip(raw: string) {
     const trimmed = raw.trim().replace(/,+$/, '').trim()
@@ -25,6 +34,28 @@ export function ChipInput({ chips, inputValue, onChange, onInputChange, placehol
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (suggestions && suggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setActiveIdx(i => Math.min(i + 1, suggestions.length - 1))
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setActiveIdx(i => Math.max(i - 1, -1))
+        return
+      }
+      if (e.key === 'Enter' && activeIdx >= 0) {
+        e.preventDefault()
+        onSuggestionSelect?.(suggestions[activeIdx])
+        setActiveIdx(-1)
+        return
+      }
+      if (e.key === 'Escape') {
+        setActiveIdx(-1)
+        return
+      }
+    }
     if (e.key === 'Enter') {
       e.preventDefault()
       commitChip(inputValue)
@@ -72,6 +103,25 @@ export function ChipInput({ chips, inputValue, onChange, onInputChange, placehol
         onKeyDown={handleKeyDown}
         autoFocus
       />
+      {suggestions && suggestions.length > 0 && (
+        <ul className="chip-suggestions" role="listbox" aria-label="Suggestions">
+          {suggestions.map((s, i) => (
+            <li
+              key={s}
+              role="option"
+              aria-selected={i === activeIdx}
+              className={`chip-suggestions__item${i === activeIdx ? ' chip-suggestions__item--active' : ''}`}
+              onMouseDown={(e) => {
+                e.preventDefault() // prevent blur before click registers
+                onSuggestionSelect?.(s)
+                setActiveIdx(-1)
+              }}
+            >
+              {s}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
