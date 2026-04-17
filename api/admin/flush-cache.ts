@@ -1,5 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { errorMessage } from '../../shared/logger'
+import { log } from '../logger'
 
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL!,
@@ -53,7 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({ ok: true, message: 'food_lookup cache flushed' })
   } catch (err) {
-    console.error('flush-cache error:', err)
+    log.error('flush-cache failed', { error: errorMessage(err) })
     return res.status(500).json({ error: 'Failed to flush cache' })
   }
 }

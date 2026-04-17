@@ -1,7 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Json, MealWithItems, MealInsert, MealType, MealItem } from '@shared/types/database'
+import { errorMessage } from '@shared/logger'
 import { supabase } from './supabase'
+import { log } from './logger'
 
 const LOCAL_KEY = 'food_journal_meals'
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'drink']
@@ -333,7 +335,7 @@ export const useEntriesStore = create<MealsState>()(
             .lte('consumed_at', end)
             .order('consumed_at', { ascending: true })
 
-          if (error) { console.error('loadDay error:', error instanceof Error ? error.message : String(error)); return }
+          if (error) { log.error('loadDay failed', { error: errorMessage(error) }); return }
 
           // S8: re-check auth after await — drop result if user signed out mid-flight
           if (!get().isAuthed) return
@@ -378,7 +380,7 @@ export const useEntriesStore = create<MealsState>()(
         })
 
         if (error || !data) {
-          console.error('addMeal error:', error instanceof Error ? error.message : String(error))
+          log.error('addMeal failed', { error: errorMessage(error) })
           throw error
         }
 
@@ -437,7 +439,7 @@ export const useEntriesStore = create<MealsState>()(
         })
 
         if (error || !data) {
-          console.error('editMeal error:', error instanceof Error ? error.message : String(error))
+          log.error('editMeal failed', { error: errorMessage(error) })
           throw error
         }
 
@@ -466,7 +468,7 @@ export const useEntriesStore = create<MealsState>()(
         const deletedDate = mealToDelete ? new Date(mealToDelete.consumed_at).toLocaleDateString('sv') : null
 
         const { error } = await supabase.from('meals').delete().eq('id', id)
-        if (error) { console.error('deleteMeal error:', error instanceof Error ? error.message : String(error)); throw error }
+        if (error) { log.error('deleteMeal failed', { error: errorMessage(error) }); throw error }
 
         // P3: invalidate cache for the deleted meal's date
         if (deletedDate) {
@@ -512,7 +514,7 @@ export const useEntriesStore = create<MealsState>()(
         if (error) {
           // Revert on error
           set({ meals: prevMeals })
-          console.error('updateItemCalories error:', error instanceof Error ? error.message : String(error))
+          log.error('updateItemCalories failed', { itemId, error: errorMessage(error) })
           throw error
         }
       },
@@ -531,12 +533,12 @@ export const useEntriesStore = create<MealsState>()(
         const { data, error } = await supabase
           .rpc('search_meals', { p_query: normalizedQuery })
 
-        if (error) { console.error('searchMeals error:', error instanceof Error ? error.message : String(error)); return [] }
+        if (error) { log.error('searchMeals failed', { error: errorMessage(error) }); return [] }
 
         try {
           return fromSearchMealsRpc(data, 'search_meals')
         } catch (err) {
-          console.error('searchMeals parse error:', err instanceof Error ? err.message : String(err))
+          log.error('searchMeals parse failed', { error: errorMessage(err) })
           return []
         }
       },
@@ -569,7 +571,7 @@ export const useEntriesStore = create<MealsState>()(
             .gte('consumed_at', startISO)
             .lte('consumed_at', endISO)
             .order('consumed_at', { ascending: true })
-          if (error) { console.error('loadWeek:', error.message); return }
+          if (error) { log.error('loadWeek failed', { error: error.message }); return }
           type SupabaseMealRow = Omit<MealWithItems, 'items'> & { meal_items: MealWithItems['items'] }
           const weekMeals = (data as SupabaseMealRow[] ?? []).map((m) =>
             normalizeMealWithItems({ ...m, items: m.meal_items ?? [] })
@@ -591,7 +593,7 @@ export const useEntriesStore = create<MealsState>()(
 
         const { data, error } = await supabase
           .rpc('get_prior_item_descriptions', { p_before_date: beforeISO })
-        if (error) { console.error('loadPriorItems:', error.message); return new Set<string>() }
+        if (error) { log.error('loadPriorItems failed', { error: error.message }); return new Set<string>() }
         return new Set<string>((data ?? []).map((row: { description: string }) => row.description))
       },
 
@@ -620,7 +622,7 @@ export const useEntriesStore = create<MealsState>()(
 
         const { data, error } = await supabase
           .rpc('get_recent_item_descriptions', { p_limit: 500 })
-        if (error) { console.error('loadItemHistory:', error instanceof Error ? error.message : String(error)); return }
+        if (error) { log.error('loadItemHistory failed', { error: errorMessage(error) }); return }
         set({ itemHistory: (data ?? []).map((r: { description: string }) => r.description) })
       },
 
@@ -638,7 +640,7 @@ export const useEntriesStore = create<MealsState>()(
           })
 
           if (error || !data) {
-            console.error('syncLocalToRemote batch error:', error instanceof Error ? error.message : String(error))
+            log.error('syncLocalToRemote batch failed', { error: errorMessage(error) })
             return
           }
 
@@ -648,7 +650,7 @@ export const useEntriesStore = create<MealsState>()(
           )
 
           for (const failure of failed) {
-            console.error('syncLocalToRemote meal error:', failure.error)
+            log.error('syncLocalToRemote meal failed', { error: failure.error })
           }
 
           if (successfulSyncs.length === 0) return
@@ -662,7 +664,7 @@ export const useEntriesStore = create<MealsState>()(
             meals: [...s.meals.filter((m) => !syncedLocalIds.has(m.id)), ...synced],
           }))
         } catch (err) {
-          console.error('syncLocalToRemote batch error:', err instanceof Error ? err.message : String(err))
+          log.error('syncLocalToRemote batch failed', { error: errorMessage(err) })
         }
       },
     }),
