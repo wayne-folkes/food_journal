@@ -12,6 +12,7 @@ import { EITile } from './EITile'
 interface Props {
   onAdd: (payload: { mealType: MealType; items: string[]; consumed_at: string; rawInput: string }) => void
   onCancel?: () => void
+  initialInput?: string
 }
 
 function formatTimeInput(d: Date): string {
@@ -31,11 +32,11 @@ function getDayName(): string {
   return new Date().toLocaleDateString(undefined, { weekday: 'long' })
 }
 
-export function MealComposer({ onAdd, onCancel }: Props) {
+export function MealComposer({ onAdd, onCancel, initialInput = '' }: Props) {
   const now = new Date()
   const [mealType, setMealType] = useState<MealType>(() => suggestMealType(now))
   const [chips, setChips] = useState<string[]>([])
-  const [inputValue, setInputValue] = useState('')
+  const [inputValue, setInputValue] = useState(initialInput)
   const [mealTime, setMealTime] = useState<string>(now.toISOString())
   const [showTimePicker, setShowTimePicker] = useState(false)
 

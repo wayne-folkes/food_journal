@@ -105,7 +105,7 @@ function CalBadge({ item, onUpdateCalories }: CalBadgeProps) {
   )
 }
 
-export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories }: Props) {
+export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories, groupPosition }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [estimating, setEstimating] = useState(false)
   const isAuthed = useEntriesStore((s) => s.isAuthed)
@@ -129,7 +129,7 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
   const headline = generateHeadline(meal.items)
 
   return (
-    <article className={`meal-card${menuOpen ? ' meal-card--menu-open' : ''}`} style={{ position: 'relative' }}>
+    <article className={`meal-card${menuOpen ? ' meal-card--menu-open' : ''}${groupPosition === 'first' ? ' meal-card--group-first' : groupPosition === 'middle' ? ' meal-card--group-middle' : groupPosition === 'last' ? ' meal-card--group-last' : ''}`} style={{ position: 'relative' }}>
       {/* Kicker row */}
       <div className="meal-card__kicker">
         <span className="meal-card__type">— {MEAL_TYPE_LABELS[meal.meal_type]}</span>

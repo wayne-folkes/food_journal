@@ -990,6 +990,25 @@
   position: relative;
 }
 
+/* ── Meal group connectors ──────────────────────────────────────────── */
+.meal-card--group-first {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  margin-bottom: 0;
+}
+.meal-card--group-middle {
+  border-radius: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  border-top: 1px solid var(--sep);
+}
+.meal-card--group-last {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  margin-top: 0;
+  border-top: 1px solid var(--sep);
+}
+
 /* ─── Editorial Meal Card: Kicker Row ─── */
 .meal-card__kicker {
   padding: 14px 16px 8px;

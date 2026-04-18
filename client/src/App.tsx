@@ -33,6 +33,7 @@ function AppInner() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day')
   const [composerOpen, setComposerOpen] = useState(false)
+  const [composerInitialInput, setComposerInitialInput] = useState('')
   const activeUserIdRef = useRef<string | null>(null)
   const toast = useToast()
 
@@ -344,7 +345,8 @@ function AppInner() {
                 }
               }}
               onEstimateCalories={handleEstimateCalories}
-              onTryExample={() => {
+              onTryExample={(sentence) => {
+                setComposerInitialInput(sentence)
                 setComposerOpen(true)
               }}
             />
@@ -367,9 +369,13 @@ function AppInner() {
       )}
 
       {composerOpen && (
-        <div className="ei-compose-overlay" onClick={(e) => { if (e.target === e.currentTarget) setComposerOpen(false) }}>
+        <div className="ei-compose-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setComposerOpen(false); setComposerInitialInput('') } }}>
           <div className="ei-compose-sheet">
-            <MealComposer onAdd={(payload) => { handleAddMeal(payload); setComposerOpen(false) }} onCancel={() => setComposerOpen(false)} />
+            <MealComposer
+              initialInput={composerInitialInput}
+              onAdd={(payload) => { handleAddMeal(payload); setComposerOpen(false); setComposerInitialInput('') }}
+              onCancel={() => { setComposerOpen(false); setComposerInitialInput('') }}
+            />
           </div>
         </div>
       )}
