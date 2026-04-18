@@ -1674,8 +1674,17 @@ mark {
   /* CTA button: ensure text stays dark on bright cyan background */
   .btn--primary { color: #000; }
 
-  /* Active toggle pill: cyan bg needs dark text */
-  .view-toggle__btn--active { color: #000; }
+  /* Active toggle pill: force cyan fill + dark text (overrides the later
+     .view-toggle__btn--active rule that resets to --paper background) */
+  .view-toggle__btn--active {
+    background: var(--terra);
+    color: #000;
+    box-shadow: 0 0 10px rgba(0, 207, 255, 0.4);
+  }
+  /* Lift inactive toggle text off pure black */
+  .view-toggle__btn:not(.view-toggle__btn--active) {
+    color: var(--ink-mid);
+  }
 
   /* Neon cyan glow on primary CTA */
   .btn--primary {
