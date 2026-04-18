@@ -12,6 +12,7 @@ interface Props {
   onUpdateCalories: (itemId: string, calories: number | null) => Promise<void>
   onEstimateCalories?: (meal: MealWithItems) => Promise<void>
   groupPosition?: 'first' | 'middle' | 'last'
+  isFirst?: boolean
 }
 
 function formatTime(iso: string): string {
@@ -111,7 +112,7 @@ function CalBadge({ item, onUpdateCalories }: CalBadgeProps) {
   )
 }
 
-export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories, groupPosition }: Props) {
+export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories, groupPosition, isFirst }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [estimating, setEstimating] = useState(false)
   const isAuthed = useEntriesStore((s) => s.isAuthed)
@@ -135,7 +136,7 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
   const headline = useMemo(() => generateHeadline(meal.items), [meal.items])
 
   return (
-    <article className={`meal-card${menuOpen ? ' meal-card--menu-open' : ''}${groupPosition === 'first' ? ' meal-card--group-first' : groupPosition === 'middle' ? ' meal-card--group-middle' : groupPosition === 'last' ? ' meal-card--group-last' : ''}`} style={{ position: 'relative' }}>
+    <article className={`meal-card${isFirst ? ' meal-card--lede' : ''}${menuOpen ? ' meal-card--menu-open' : ''}${groupPosition === 'first' ? ' meal-card--group-first' : groupPosition === 'middle' ? ' meal-card--group-middle' : groupPosition === 'last' ? ' meal-card--group-last' : ''}`} style={{ position: 'relative' }}>
       {/* Kicker row */}
       <div className="meal-card__kicker">
         <span className="meal-card__type">— {MEAL_TYPE_LABELS[meal.meal_type]}</span>
@@ -148,9 +149,6 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
       {/* Headline */}
       <div className="meal-card__headline">
         <p className="meal-card__headline-text">{headline}</p>
-        <div className="meal-card__item-count">
-          {meal.items.length} item{meal.items.length === 1 ? '' : 's'}
-        </div>
       </div>
 
       {/* Item rows */}

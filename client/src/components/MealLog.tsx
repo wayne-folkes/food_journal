@@ -112,21 +112,25 @@ export function MealLog({ meals, isLoading, selectedDate, onEdit, onDelete, onDu
           </div>
         </div>
       ) : (
-        groups.map((group) =>
-          group.length === 1 ? (
-            <MealCard key={group[0].id} {...cardProps(group[0], handlers)} />
-          ) : (
-            <div key={group[0].id} className="meal-group">
-              {group.map((meal, idx) => (
-                <MealCard
-                  key={meal.id}
-                  {...cardProps(meal, handlers)}
-                  groupPosition={idx === 0 ? 'first' : idx === group.length - 1 ? 'last' : 'middle'}
-                />
-              ))}
-            </div>
+        (() => {
+          const firstCardId = groups[0][0].id
+          return groups.map((group) =>
+            group.length === 1 ? (
+              <MealCard key={group[0].id} {...cardProps(group[0], handlers)} isFirst={group[0].id === firstCardId} />
+            ) : (
+              <div key={group[0].id} className="meal-group">
+                {group.map((meal, idx) => (
+                  <MealCard
+                    key={meal.id}
+                    {...cardProps(meal, handlers)}
+                    isFirst={meal.id === firstCardId}
+                    groupPosition={idx === 0 ? 'first' : idx === group.length - 1 ? 'last' : 'middle'}
+                  />
+                ))}
+              </div>
+            )
           )
-        )
+        })()
       )}
     </section>
   )
