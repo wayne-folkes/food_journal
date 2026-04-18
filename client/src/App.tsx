@@ -5,6 +5,7 @@ import { supabase } from './lib/supabase'
 import { useEntriesStore, todayString, getWeekBounds } from './lib/store'
 import { MealComposer } from './components/MealComposer'
 import { MealLog } from './components/MealLog'
+import { MealDetail } from './components/MealDetail'
 import { EditMealModal } from './components/EditMealModal'
 import { AuthButton } from './components/AuthButton'
 import { DateNav } from './components/DateNav'
@@ -29,6 +30,7 @@ function AppInner() {
   const [user, setUser] = useState<User | null>(null)
   const [authResolved, setAuthResolved] = useState(false)
   const [editingMeal, setEditingMeal] = useState<MealWithItems | null>(null)
+  const [selectedMeal, setSelectedMeal] = useState<MealWithItems | null>(null)
   const [selectedDate, setSelectedDate] = useState(todayString)
   const [searchOpen, setSearchOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day')
@@ -55,6 +57,7 @@ function AppInner() {
         resetEntriesState()
         setSearchOpen(false)
         setEditingMeal(null)
+        setSelectedMeal(null)
         setComposerOpen(false)
 
         if (nextUserId !== null && hadAnonymousMeals) {
@@ -345,6 +348,7 @@ function AppInner() {
                 }
               }}
               onEstimateCalories={handleEstimateCalories}
+              onSelect={(meal) => setSelectedMeal(meal)}
               onTryExample={(sentence) => {
                 setComposerInitialInput(sentence)
                 setComposerOpen(true)
@@ -378,6 +382,15 @@ function AppInner() {
             />
           </div>
         </div>
+      )}
+
+      {selectedMeal && (
+        <MealDetail
+          meal={selectedMeal}
+          onClose={() => setSelectedMeal(null)}
+          onEdit={(meal) => { setSelectedMeal(null); setEditingMeal(meal) }}
+          onDelete={(id) => { setSelectedMeal(null); handleDelete(id) }}
+        />
       )}
 
       {editingMeal && (

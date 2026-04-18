@@ -300,6 +300,8 @@ function fromSearchMealsRpc(data: unknown, source: string): MealWithItems[] {
       consumed_at: entry.consumed_at,
       meal_type: entry.meal_type,
       raw_input: entry.raw_input,
+      headline: null,
+      note: null,
       created_at: entry.created_at,
       updated_at: entry.updated_at,
       items: entry.items,
@@ -326,6 +328,7 @@ function localMeal(
     position: i,
     consumed_at: insert.consumed_at ?? now,
     calories: null,
+    qty: null,
     created_at: now,
   }))
   return {
@@ -334,6 +337,8 @@ function localMeal(
     consumed_at: insert.consumed_at ?? now,
     meal_type: insert.meal_type ?? 'snack',
     raw_input: insert.raw_input ?? '',
+    headline: null,
+    note: null,
     created_at: now,
     updated_at: now,
     items,
@@ -450,6 +455,7 @@ export const useEntriesStore = create<MealsState>()(
                 position: i,
                 consumed_at: updates.consumed_at,
                 calories: chip.calories ?? null,
+                qty: null,
                 created_at: m.items[i]?.created_at ?? now,
               }))
               return {

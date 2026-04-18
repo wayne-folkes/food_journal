@@ -43,6 +43,8 @@ function makeStoredMeal({
     meal_type: 'snack',
     consumed_at: consumedAt,
     raw_input: description,
+    headline: null,
+    note: null,
     created_at: consumedAt,
     updated_at: consumedAt,
     items: [
@@ -54,6 +56,7 @@ function makeStoredMeal({
         consumed_at: consumedAt,
         created_at: consumedAt,
         calories: null,
+        qty: null,
       },
     ],
   }
@@ -92,6 +95,8 @@ describe('useEntriesStore.addMeal', () => {
       meal_type: 'drink' as const,
       consumed_at: '2026-04-15T10:00:00.000Z',
       raw_input: 'coffee',
+      headline: null,
+      note: null,
       created_at: '2026-04-15T10:00:00.000Z',
       updated_at: '2026-04-15T10:00:00.000Z',
       items: [
@@ -103,6 +108,7 @@ describe('useEntriesStore.addMeal', () => {
           consumed_at: '2026-04-15T10:00:00.000Z',
           created_at: '2026-04-15T10:00:00.000Z',
           calories: null,
+          qty: null,
         },
       ],
     }
@@ -157,6 +163,8 @@ describe('useEntriesStore.addMeal', () => {
       meal_type: 'drink' as const,
       consumed_at: '2026-04-15T10:00:00.000Z',
       raw_input: 'coffee',
+      headline: null,
+      note: null,
       created_at: '2026-04-15T10:00:00.000Z',
       updated_at: '2026-04-15T10:00:00.000Z',
       items: [
@@ -168,6 +176,7 @@ describe('useEntriesStore.addMeal', () => {
           consumed_at: '2026-04-15T10:00:00.000Z',
           created_at: '2026-04-15T10:00:00.000Z',
           calories: null,
+          qty: null,
         },
       ],
     }
@@ -186,6 +195,7 @@ describe('useEntriesStore.addMeal', () => {
           consumed_at: '2026-04-15T11:00:00.000Z',
           created_at: '2026-04-15T11:00:00.000Z',
           calories: 5,
+          qty: null,
         },
       ],
     }
@@ -223,6 +233,8 @@ describe('useEntriesStore.addMeal', () => {
       meal_type: 'snack' as const,
       consumed_at: '2026-04-15T12:00:00.000Z',
       raw_input: 'apple',
+      headline: null,
+      note: null,
       created_at: '2026-04-15T12:00:00.000Z',
       updated_at: '2026-04-15T12:00:00.000Z',
       items: [
@@ -234,6 +246,7 @@ describe('useEntriesStore.addMeal', () => {
           consumed_at: '2026-04-15T12:00:00.000Z',
           created_at: '2026-04-15T12:00:00.000Z',
           calories: 95,
+          qty: null,
         },
       ],
     }
@@ -243,6 +256,8 @@ describe('useEntriesStore.addMeal', () => {
       meal_type: 'lunch' as const,
       consumed_at: '2026-04-15T13:00:00.000Z',
       raw_input: 'sandwich',
+      headline: null,
+      note: null,
       created_at: '2026-04-15T13:00:00.000Z',
       updated_at: '2026-04-15T13:00:00.000Z',
       items: [
@@ -254,6 +269,7 @@ describe('useEntriesStore.addMeal', () => {
           consumed_at: '2026-04-15T13:00:00.000Z',
           created_at: '2026-04-15T13:00:00.000Z',
           calories: 300,
+          qty: null,
         },
       ],
     }
@@ -263,6 +279,8 @@ describe('useEntriesStore.addMeal', () => {
       meal_type: 'snack' as const,
       consumed_at: '2026-04-15T12:00:00.000Z',
       raw_input: 'apple',
+      headline: null,
+      note: null,
       created_at: '2026-04-15T12:00:00.000Z',
       updated_at: '2026-04-15T12:00:00.000Z',
       items: [
@@ -274,6 +292,7 @@ describe('useEntriesStore.addMeal', () => {
           consumed_at: '2026-04-15T12:00:00.000Z',
           created_at: '2026-04-15T12:00:00.000Z',
           calories: 95,
+          qty: null,
         },
       ],
     }
@@ -534,6 +553,8 @@ describe('useEntriesStore.addMeal', () => {
           consumed_at: '2026-04-15T09:00:00.000Z',
           meal_type: 'breakfast',
           raw_input: 'coffee, toast',
+          headline: null,
+          note: null,
           created_at: '2026-04-15T09:00:00.000Z',
           updated_at: '2026-04-15T09:00:00.000Z',
           items: [
@@ -545,6 +566,7 @@ describe('useEntriesStore.addMeal', () => {
               consumed_at: '2026-04-15T09:00:00.000Z',
               created_at: '2026-04-15T09:00:00.000Z',
               calories: null,
+              qty: null,
             },
             {
               id: 'item-2',
@@ -554,6 +576,7 @@ describe('useEntriesStore.addMeal', () => {
               consumed_at: '2026-04-15T09:00:00.000Z',
               created_at: '2026-04-15T09:00:00.000Z',
               calories: 120,
+              qty: null,
             },
           ],
         },
@@ -571,6 +594,8 @@ describe('useEntriesStore.addMeal', () => {
         consumed_at: '2026-04-15T09:00:00.000Z',
         meal_type: 'breakfast',
         raw_input: 'coffee, toast',
+        headline: null,
+        note: null,
         created_at: '2026-04-15T09:00:00.000Z',
         updated_at: '2026-04-15T09:00:00.000Z',
         items: [
@@ -582,6 +607,7 @@ describe('useEntriesStore.addMeal', () => {
             consumed_at: '2026-04-15T09:00:00.000Z',
             created_at: '2026-04-15T09:00:00.000Z',
             calories: null,
+            qty: null,
           },
           {
             id: 'item-2',
@@ -591,6 +617,7 @@ describe('useEntriesStore.addMeal', () => {
             consumed_at: '2026-04-15T09:00:00.000Z',
             created_at: '2026-04-15T09:00:00.000Z',
             calories: 120,
+            qty: null,
           },
         ],
       },

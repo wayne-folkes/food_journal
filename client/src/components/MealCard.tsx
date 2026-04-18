@@ -11,6 +11,7 @@ interface Props {
   onDuplicate: (meal: MealWithItems) => void
   onUpdateCalories: (itemId: string, calories: number | null) => Promise<void>
   onEstimateCalories?: (meal: MealWithItems) => Promise<void>
+  onSelect?: (meal: MealWithItems) => void
   groupPosition?: 'first' | 'middle' | 'last'
   isFirst?: boolean
 }
@@ -112,7 +113,7 @@ function CalBadge({ item, onUpdateCalories }: CalBadgeProps) {
   )
 }
 
-export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories, groupPosition, isFirst }: Props) {
+export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories, onSelect, groupPosition, isFirst }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [estimating, setEstimating] = useState(false)
   const isAuthed = useEntriesStore((s) => s.isAuthed)
@@ -147,7 +148,7 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
       </div>
 
       {/* Headline */}
-      <div className="meal-card__headline">
+      <div className="meal-card__headline" onClick={() => onSelect?.(meal)} style={{ cursor: onSelect ? 'pointer' : undefined }}>
         <p className="meal-card__headline-text">{headline}</p>
       </div>
 

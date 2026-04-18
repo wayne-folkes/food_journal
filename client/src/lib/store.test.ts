@@ -29,6 +29,7 @@ function makeMeal(opts: MakeMealOptions = {}): MealWithItems {
     position: i,
     consumed_at: opts.consumed_at ?? now,
     calories: null as number | null,
+    qty: null,
     created_at: now,
   }))
 
@@ -38,6 +39,8 @@ function makeMeal(opts: MakeMealOptions = {}): MealWithItems {
     consumed_at: opts.consumed_at ?? now,
     meal_type: opts.meal_type ?? 'snack',
     raw_input: '',
+    headline: null,
+    note: null,
     created_at: now,
     updated_at: now,
     items,

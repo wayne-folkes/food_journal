@@ -13,6 +13,8 @@ function makeMeal(overrides: Partial<MealWithItems> = {}): MealWithItems {
     consumed_at: '2026-04-15T09:00:00.000Z',
     meal_type: 'breakfast',
     raw_input: 'Eggs and toast',
+    headline: null,
+    note: null,
     created_at: '2026-04-15T09:00:00.000Z',
     updated_at: '2026-04-15T09:00:00.000Z',
     items: [
@@ -24,6 +26,7 @@ function makeMeal(overrides: Partial<MealWithItems> = {}): MealWithItems {
         consumed_at: '2026-04-15T09:00:00.000Z',
         created_at: '2026-04-15T09:00:00.000Z',
         calories: null,
+        qty: null,
       },
     ],
     ...overrides,

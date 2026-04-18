@@ -11,6 +11,7 @@ interface Props {
   onDuplicate: (meal: MealWithItems) => void
   onUpdateCalories: (itemId: string, calories: number | null) => Promise<void>
   onEstimateCalories?: (meal: MealWithItems) => Promise<void>
+  onSelect?: (meal: MealWithItems) => void
   onTryExample?: (sentence: string) => void
 }
 
@@ -57,7 +58,7 @@ function formatDateHeading(dateStr: string): string {
 
 const cardProps = (
   meal: MealWithItems,
-  handlers: Pick<Props, 'onEdit' | 'onDelete' | 'onDuplicate' | 'onUpdateCalories' | 'onEstimateCalories'>
+  handlers: Pick<Props, 'onEdit' | 'onDelete' | 'onDuplicate' | 'onUpdateCalories' | 'onEstimateCalories' | 'onSelect'>
 ) => ({
   meal,
   onEdit: handlers.onEdit,
@@ -65,10 +66,11 @@ const cardProps = (
   onDuplicate: handlers.onDuplicate,
   onUpdateCalories: handlers.onUpdateCalories,
   onEstimateCalories: handlers.onEstimateCalories,
+  onSelect: handlers.onSelect,
 })
 
-export function MealLog({ meals, isLoading, selectedDate, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories, onTryExample }: Props) {
-  const handlers = { onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories }
+export function MealLog({ meals, isLoading, selectedDate, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories, onSelect, onTryExample }: Props) {
+  const handlers = { onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories, onSelect }
 
   const groups = useMemo(() => {
     const sorted = [...meals].sort(

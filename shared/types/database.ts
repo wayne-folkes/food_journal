@@ -26,6 +26,8 @@ export type Database = {
           raw_input: string
           created_at: string
           updated_at: string
+          headline: string | null
+          note: string | null
         }
         Insert: {
           id?: string
@@ -35,12 +37,16 @@ export type Database = {
           raw_input?: string
           created_at?: string
           updated_at?: string
+          headline?: string | null
+          note?: string | null
         }
         Update: {
           consumed_at?: string
           meal_type?: MealType
           raw_input?: string
           updated_at?: string
+          headline?: string | null
+          note?: string | null
         }
         Relationships: []
       }
@@ -53,6 +59,7 @@ export type Database = {
           consumed_at: string
           created_at: string
           calories: number | null
+          qty: string | null
         }
         Insert: {
           id?: string
@@ -62,12 +69,14 @@ export type Database = {
           consumed_at?: string
           created_at?: string
           calories?: number | null
+          qty?: string | null
         }
         Update: {
           description?: string
           position?: number
           consumed_at?: string
           calories?: number | null
+          qty?: string | null
         }
         Relationships: [
           {
