@@ -2019,7 +2019,7 @@ mark {
   display: flex;
   flex-direction: column;
   gap: 0;
-  box-shadow: 0 -8px 32px rgba(42, 33, 24, 0.16);
+  box-shadow: var(--shadow-up);
   width: 100%;
   max-width: 640px;
   margin: 0 auto;
