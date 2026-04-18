@@ -1657,3 +1657,41 @@ mark {
 .chip-suggestions__item--active + .chip-suggestions__item {
   border-top-color: transparent;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Cyber-Nutrient dark mode overrides
+   Extra glow + high-contrast treatment that only applies in dark mode.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (prefers-color-scheme: dark) {
+  /* Neon glow on meal accent bars */
+  .meal-card--breakfast .meal-card__accent { box-shadow: 0 0 12px 1px rgba(0, 229, 255, 0.7); }
+  .meal-card--lunch     .meal-card__accent { box-shadow: 0 0 12px 1px rgba(170, 255, 0, 0.7); }
+  .meal-card--dinner    .meal-card__accent { box-shadow: 0 0 12px 1px rgba(255, 0, 255, 0.7); }
+  .meal-card--snack     .meal-card__accent { box-shadow: 0 0 12px 1px rgba(255, 107, 53, 0.6); }
+  .meal-card--dessert   .meal-card__accent { box-shadow: 0 0 12px 1px rgba(255, 51, 153, 0.6); }
+  .meal-card--drink     .meal-card__accent { box-shadow: 0 0 12px 1px rgba(77, 121, 255, 0.6); }
+
+  /* CTA button: ensure text stays dark on bright cyan background */
+  .btn--primary { color: #000; }
+
+  /* Active toggle pill: cyan bg needs dark text */
+  .view-toggle__btn--active { color: #000; }
+
+  /* Neon cyan glow on primary CTA */
+  .btn--primary {
+    box-shadow: 0 0 16px rgba(0, 207, 255, 0.45), 0 2px 8px rgba(0, 0, 0, 0.6);
+  }
+  .btn--primary:hover {
+    box-shadow: 0 0 22px rgba(0, 207, 255, 0.65), 0 2px 8px rgba(0, 0, 0, 0.6);
+  }
+
+  /* Input focus ring: neon cyan glow */
+  .chip-input__field:focus,
+  .input:focus {
+    outline: 2px solid var(--terra);
+    box-shadow: 0 0 0 4px rgba(0, 207, 255, 0.15);
+  }
+
+  /* Underline tab active colour needs brightness boost for neon bg */
+  .meal-type-pill--active { font-weight: 800; }
+}
