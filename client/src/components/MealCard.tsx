@@ -10,6 +10,7 @@ interface Props {
   onDuplicate: (meal: MealWithItems) => void
   onUpdateCalories: (itemId: string, calories: number | null) => Promise<void>
   onEstimateCalories?: (meal: MealWithItems) => Promise<void>
+  groupPosition?: 'first' | 'middle' | 'last'
 }
 
 function formatTime(iso: string): string {
@@ -95,7 +96,7 @@ function CalBadge({ item, onUpdateCalories }: CalBadgeProps) {
   )
 }
 
-export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories }: Props) {
+export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories, groupPosition }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [estimating, setEstimating] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -121,8 +122,10 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
     }
   }
 
+  const groupClass = groupPosition ? ` meal-card--group-${groupPosition}` : ''
+
   return (
-    <article className={`meal-card meal-card--${meal.meal_type}${menuOpen ? ' meal-card--menu-open' : ''}${collapsed ? ' meal-card--collapsed' : ''}`}>
+    <article className={`meal-card meal-card--${meal.meal_type}${menuOpen ? ' meal-card--menu-open' : ''}${collapsed ? ' meal-card--collapsed' : ''}${groupClass}`}>
       <div className="meal-card__accent" aria-hidden="true" />
 
       <div className="meal-card__body">

@@ -521,6 +521,48 @@
   position: relative;
 }
 
+/* ─── Grouped meal cards (logged within same time window) ─── */
+.meal-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.meal-group .meal-card--group-first {
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--shadow-card);
+}
+.meal-group .meal-card--group-first .meal-card__accent {
+  border-radius: var(--radius-lg) 0 0 0;
+}
+
+.meal-group .meal-card--group-middle {
+  border-radius: 0;
+  box-shadow: none;
+  border-top: 1px solid var(--border);
+}
+.meal-group .meal-card--group-middle .meal-card__accent {
+  border-radius: 0;
+}
+
+.meal-group .meal-card--group-last {
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  border-top: 1px solid var(--border);
+}
+.meal-group .meal-card--group-last .meal-card__accent {
+  border-radius: 0 0 0 var(--radius-lg);
+}
+
+/* Single outer shadow for the whole group */
+.meal-group .meal-card--group-first,
+.meal-group .meal-card--group-last {
+  box-shadow: none;
+}
+.meal-group {
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-lg);
+}
+
 /* 4px left accent bar */
 .meal-card__accent {
   width: 4px;

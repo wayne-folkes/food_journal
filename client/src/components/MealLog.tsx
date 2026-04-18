@@ -13,6 +13,27 @@ interface Props {
   onEstimateCalories?: (meal: MealWithItems) => Promise<void>
 }
 
+/** Group meals logged within `windowMinutes` of each other into clusters. */
+function groupMealsByTime(meals: MealWithItems[], windowMinutes = 10): MealWithItems[][] {
+  if (meals.length === 0) return []
+  const groups: MealWithItems[][] = []
+  let current: MealWithItems[] = [meals[0]]
+
+  for (let i = 1; i < meals.length; i++) {
+    const prev = new Date(meals[i - 1].consumed_at).getTime()
+    const curr = new Date(meals[i].consumed_at).getTime()
+    const diffMin = (curr - prev) / 60_000
+    if (diffMin <= windowMinutes) {
+      current.push(meals[i])
+    } else {
+      groups.push(current)
+      current = [meals[i]]
+    }
+  }
+  groups.push(current)
+  return groups
+}
+
 function LoadingSkeleton() {
   return (
     <section className="meal-log meal-log--skeleton">
@@ -33,13 +54,27 @@ function formatDateHeading(dateStr: string): string {
   return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
+const cardProps = (
+  meal: MealWithItems,
+  handlers: Pick<Props, 'onEdit' | 'onDelete' | 'onDuplicate' | 'onUpdateCalories' | 'onEstimateCalories'>
+) => ({
+  meal,
+  onEdit: handlers.onEdit,
+  onDelete: handlers.onDelete,
+  onDuplicate: handlers.onDuplicate,
+  onUpdateCalories: handlers.onUpdateCalories,
+  onEstimateCalories: handlers.onEstimateCalories,
+})
+
 export function MealLog({ meals, isLoading, selectedDate, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories }: Props) {
-  const sorted = useMemo(
-    () => [...meals].sort(
+  const handlers = { onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories }
+
+  const groups = useMemo(() => {
+    const sorted = [...meals].sort(
       (a, b) => new Date(a.consumed_at).getTime() - new Date(b.consumed_at).getTime()
-    ),
-    [meals]
-  )
+    )
+    return groupMealsByTime(sorted)
+  }, [meals])
 
   if (isLoading) return <LoadingSkeleton />
 
@@ -47,14 +82,26 @@ export function MealLog({ meals, isLoading, selectedDate, onEdit, onDelete, onDu
     <section className="meal-log">
       <h2 className="meal-log__heading">{formatDateHeading(selectedDate)}</h2>
 
-      {sorted.length === 0 ? (
+      {groups.length === 0 ? (
         <p className="meal-log__empty">
           Your day is a blank canvas.<br />Log your first meal above.
         </p>
       ) : (
-        sorted.map((meal) => (
-          <MealCard key={meal.id} meal={meal} onEdit={onEdit} onDelete={onDelete} onDuplicate={onDuplicate} onUpdateCalories={onUpdateCalories} onEstimateCalories={onEstimateCalories} />
-        ))
+        groups.map((group) =>
+          group.length === 1 ? (
+            <MealCard key={group[0].id} {...cardProps(group[0], handlers)} />
+          ) : (
+            <div key={group[0].id} className="meal-group">
+              {group.map((meal, idx) => (
+                <MealCard
+                  key={meal.id}
+                  {...cardProps(meal, handlers)}
+                  groupPosition={idx === 0 ? 'first' : idx === group.length - 1 ? 'last' : 'middle'}
+                />
+              ))}
+            </div>
+          )
+        )
       )}
     </section>
   )
