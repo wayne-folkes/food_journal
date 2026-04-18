@@ -31,6 +31,7 @@ export function AuthButton({ user }: Props) {
           src={user.user_metadata.avatar_url}
           alt={user.user_metadata.full_name ?? 'avatar'}
           className="auth-user__avatar"
+          referrerPolicy="no-referrer"
         />
       )}
       <span className="auth-user__name">{user.user_metadata?.full_name ?? user.email}</span>
