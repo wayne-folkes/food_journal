@@ -85,39 +85,39 @@ body {
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Palette — Cyber-Nutrient */
-    --cream:        #000000;
-    --cream-mid:    #0C0C0C;
-    --cream-dark:   #1A1A1A;
-    --paper:        #111111;
-    --ink:          #FFFFFF;
-    --ink-mid:      #BEBEBE;
-    --ink-muted:    #707070;
-    --terra:        #00CFFF;   /* electric cyan — primary CTA */
-    --terra-hover:  #00A8D4;
-    --terra-light:  #001C26;   /* dark cyan tint for hover bgs */
-    --terra-border: #003D54;
-    --sage:         #AAFF00;   /* neon lime — success */
-    --danger:       #FF3333;
-    --border:       rgba(255, 255, 255, 0.12);
+    /* Palette — Vintage Bistro */
+    --cream:        #160C0A;
+    --cream-mid:    #1E1210;
+    --cream-dark:   #2C1A14;
+    --paper:        #1E1410;
+    --ink:          #D0C8BC;   /* warm silver */
+    --ink-mid:      #989088;
+    --ink-muted:    #686058;
+    --terra:        #C07838;   /* copper — primary CTA */
+    --terra-hover:  #A86030;
+    --terra-light:  #1E1008;
+    --terra-border: #5A3018;
+    --sage:         #7A9060;   /* muted olive */
+    --danger:       #CC4444;
+    --border:       #2C1E18;
 
-    /* Card shadow = high-contrast bright outline so cards pop off black */
-    --shadow-sm:   0 1px 4px rgba(0, 0, 0, 0.8);
-    --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 4px 20px rgba(0, 0, 0, 0.9);
-    --shadow-md:   0 4px 24px rgba(0, 0, 0, 0.9);
-    --shadow-up:   0 -2px 16px rgba(0, 0, 0, 0.8);
+    /* Candlelit shadows — faint champagne-gold card outline */
+    --shadow-sm:   0 1px 4px rgba(0, 0, 0, 0.5);
+    --shadow-card: 0 0 0 1px rgba(212, 168, 64, 0.12), 0 4px 16px rgba(0, 0, 0, 0.7);
+    --shadow-md:   0 4px 24px rgba(0, 0, 0, 0.8);
+    --shadow-up:   0 -2px 12px rgba(0, 0, 0, 0.5);
 
-    /* Meal type accents — neon */
-    --meal-breakfast: #00E5FF;   /* electric cyan  */
-    --meal-lunch:     #AAFF00;   /* neon lime      */
-    --meal-dinner:    #FF00FF;   /* vivid magenta  */
-    --meal-snack:     #FF6B35;   /* electric orange */
-    --meal-dessert:   #FF3399;   /* hot pink       */
-    --meal-drink:     #4D79FF;   /* electric blue  */
+    /* Meal type accents */
+    --meal-breakfast: #D4A840;   /* champagne gold */
+    --meal-lunch:     #B87888;   /* dusty rose     */
+    --meal-dinner:    #C07838;   /* copper         */
+    --meal-snack:     #8A6848;   /* caramel-brown  */
+    --meal-dessert:   #9A7898;   /* dusty mauve    */
+    --meal-drink:     #6878A0;   /* muted slate    */
 
     /* Adaptive tokens */
-    --header-bg:  rgba(0, 0, 0, 0.95);
-    --overlay-bg: rgba(0, 0, 0, 0.85);
+    --header-bg:  rgba(22, 12, 10, 0.95);
+    --overlay-bg: rgba(0, 0, 0, 0.75);
 
     background-color: var(--cream);
     color: var(--ink);
