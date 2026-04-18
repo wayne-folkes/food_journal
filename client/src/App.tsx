@@ -40,10 +40,10 @@ function AppInner() {
       setUser(session?.user ?? null)
       if (event === 'SIGNED_IN') {
         await syncLocalToRemote()
-        useEntriesStore.setState({ meals: [] })
+        useEntriesStore.setState({ meals: [], dayCache: {}, weekMeals: [], itemHistory: [] })
         setAuthed(true)
       } else if (event === 'SIGNED_OUT') {
-        useEntriesStore.setState({ meals: [] })
+        useEntriesStore.setState({ meals: [], dayCache: {}, weekMeals: [], itemHistory: [] })
         setAuthed(false)
       } else if (session) {
         setAuthed(!!session)
