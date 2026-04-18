@@ -4,9 +4,6 @@ interface Props {
   meals: MealWithItems[]
 }
 
-function pluralize(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? '' : 's'}`
-}
 
 export function DaySummary({ meals }: Props) {
   if (meals.length === 0) return null
@@ -20,9 +17,11 @@ export function DaySummary({ meals }: Props) {
 
   return (
     <p className="day-summary">
-      {pluralize(meals.length, 'meal')} · {pluralize(itemCount, 'item')}
+      <strong>{meals.length}</strong> meal{meals.length === 1 ? '' : 's'}
+      {' · '}
+      <strong>{itemCount}</strong> item{itemCount === 1 ? '' : 's'}
       {showCal && (
-        <> · {hasPartial ? '~' : ''}{totalCal.toLocaleString()} cal</>
+        <> · {hasPartial ? '~' : ''}<strong>{totalCal.toLocaleString()}</strong> cal</>
       )}
     </p>
   )

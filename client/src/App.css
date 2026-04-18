@@ -345,11 +345,16 @@
   text-align: center;
   font-family: var(--font-serif);
   font-style: italic;
-  font-size: 0.82rem;
-  color: var(--ink-muted);
+  font-size: 0.875rem;
+  color: var(--ink-mid);
   margin: 0;
-  padding: 0 4px;
+  padding: 6px 4px 2px;
   letter-spacing: 0.01em;
+}
+.day-summary strong {
+  font-weight: 700;
+  font-style: normal;
+  color: var(--ink);
 }
 
 /* ── Date navigator ──────────────────────────────────────────────────────── */
@@ -471,6 +476,7 @@
   color: var(--ink-mid);
   letter-spacing: 0.01em;
   padding: 0 2px;
+  margin-top: 6px;
 }
 
 @media (min-width: 640px) {
