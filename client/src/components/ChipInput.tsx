@@ -75,7 +75,7 @@ export function ChipInput({ chips, inputValue, onChange, onInputChange, placehol
   }
 
   return (
-    <div className="chip-input" onClick={() => inputRef.current?.focus()}>
+    <div className="chip-input" onClick={() => requestAnimationFrame(() => inputRef.current?.focus())}>
       {chips.map((chip, i) => (
         <span key={i} className="chip-input__chip">
           {chip}

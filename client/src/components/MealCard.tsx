@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import type { MealItem, MealWithItems } from '@shared/types/database'
 import { MEAL_TYPE_LABELS } from '../lib/mealType'
 import { useEntriesStore } from '../lib/store'
@@ -43,12 +43,10 @@ interface CalBadgeProps {
 function CalBadge({ item, onUpdateCalories }: CalBadgeProps) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState<string>(item.calories != null ? String(item.calories) : '')
-  const inputRef = useRef<HTMLInputElement>(null)
 
   function startEditing() {
     setValue(item.calories != null ? String(item.calories) : '')
     setEditing(true)
-    setTimeout(() => inputRef.current?.focus(), 0)
   }
 
   function commit() {
@@ -73,7 +71,8 @@ function CalBadge({ item, onUpdateCalories }: CalBadgeProps) {
   if (editing) {
     return (
       <input
-        ref={inputRef}
+        // eslint-disable-next-line jsx-a11y/no-autofocus
+        autoFocus
         className="meal-card__cal-input"
         type="number"
         min="0"

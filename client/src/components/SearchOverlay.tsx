@@ -96,9 +96,10 @@ export function SearchOverlay({ onClose, onNavigateToDate }: SearchOverlayProps)
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestRequestId = useRef(0)
 
-  // Autofocus input on mount
+  // Autofocus after overlay entrance animation (~200ms) to avoid forced reflow
   useEffect(() => {
-    inputRef.current?.focus()
+    const id = setTimeout(() => inputRef.current?.focus(), 210)
+    return () => clearTimeout(id)
   }, [])
 
   // Close on Escape
