@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import type { MealItem, MealWithItems } from '@shared/types/database'
 import { MEAL_TYPE_LABELS } from '../lib/mealType'
 import { useEntriesStore } from '../lib/store'
+import { getFoodEmoji } from '../lib/foodEmoji'
 
 interface Props {
   meal: MealWithItems
@@ -102,7 +103,10 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
   const [collapsed, setCollapsed] = useState(false)
   const isAuthed = useEntriesStore((s) => s.isAuthed)
 
-  const summary = meal.items.map(i => i.description).join(', ')
+  const summary = meal.items.map(i => {
+    const emoji = getFoodEmoji(i.description)
+    return emoji ? `${emoji} ${i.description}` : i.description
+  }).join('  ·  ')
 
   // Compute calorie subtotal
   const itemsWithCal = meal.items.filter((i) => i.calories != null)
@@ -186,12 +190,16 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
         <p className="meal-card__summary">{summary}</p>
 
         <ul className="meal-card__items">
-          {meal.items.map((item) => (
-            <li key={item.id} className="meal-card__item">
-              <span className="meal-card__item-desc">{item.description}</span>
-              <CalBadge item={item} onUpdateCalories={onUpdateCalories} />
-            </li>
-          ))}
+          {meal.items.map((item) => {
+            const emoji = getFoodEmoji(item.description)
+            return (
+              <li key={item.id} className="meal-card__item">
+                {emoji && <span className="meal-card__item-emoji" aria-hidden="true">{emoji}</span>}
+                <span className="meal-card__item-desc">{item.description}</span>
+                <CalBadge item={item} onUpdateCalories={onUpdateCalories} />
+              </li>
+            )
+          })}
         </ul>
 
         {showSubtotal && (

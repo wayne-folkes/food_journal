@@ -9,6 +9,9 @@ export default defineConfig({
       '@shared': resolve(__dirname, '../shared'),
     },
   },
+  build: {
+    chunkSizeWarningLimit: 600,
+  },
   test: {
     environment: 'happy-dom',
     setupFiles: ['./src/test/setup.ts'],
