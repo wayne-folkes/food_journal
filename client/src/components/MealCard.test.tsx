@@ -46,7 +46,8 @@ describe('MealCard', () => {
   it('renders meal type and item description', () => {
     renderCard()
     expect(screen.getByText('Breakfast')).toBeInTheDocument()
-    expect(screen.getByText('Eggs and toast')).toBeInTheDocument()
+    // item text appears in both the item list and the collapsed summary
+    expect(screen.getAllByText('Eggs and toast').length).toBeGreaterThan(0)
   })
 
   it('opens the menu when the options button is clicked', () => {

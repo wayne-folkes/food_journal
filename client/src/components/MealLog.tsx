@@ -48,7 +48,9 @@ export function MealLog({ meals, isLoading, selectedDate, onEdit, onDelete, onDu
       <h2 className="meal-log__heading">{formatDateHeading(selectedDate)}</h2>
 
       {sorted.length === 0 ? (
-        <p className="meal-log__empty">Nothing logged yet.</p>
+        <p className="meal-log__empty">
+          Your day is a blank canvas.<br />Log your first meal above.
+        </p>
       ) : (
         sorted.map((meal) => (
           <MealCard key={meal.id} meal={meal} onEdit={onEdit} onDelete={onDelete} onDuplicate={onDuplicate} onUpdateCalories={onUpdateCalories} onEstimateCalories={onEstimateCalories} />

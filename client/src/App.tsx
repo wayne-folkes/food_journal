@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { errorMessage } from '@shared/logger'
 import { supabase } from './lib/supabase'
-import { useEntriesStore, recentDistinct, todayString, getWeekBounds } from './lib/store'
+import { useEntriesStore, contextualRecent, todayString, getWeekBounds } from './lib/store'
 import { MealComposer } from './components/MealComposer'
 import { suggestMealType } from './lib/mealType'
 import { MealLog } from './components/MealLog'
@@ -232,7 +232,15 @@ function AppInner() {
   }
 
   const isViewingToday = selectedDate === todayString()
-  const recent = useMemo(() => recentDistinct(meals), [meals])
+  const currentMealType = suggestMealType()
+  const recent = useMemo(() => {
+    const loggedToday = new Set(
+      displayedMeals.flatMap(m => m.items.map(i => i.description.toLowerCase()))
+    )
+    return contextualRecent(meals, currentMealType).filter(
+      item => !loggedToday.has(item.toLowerCase())
+    )
+  }, [meals, displayedMeals, currentMealType])
   const step = viewMode === 'week' ? 7 : 1
 
   return (

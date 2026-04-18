@@ -98,7 +98,10 @@ function CalBadge({ item, onUpdateCalories }: CalBadgeProps) {
 export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [estimating, setEstimating] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const isAuthed = useEntriesStore((s) => s.isAuthed)
+
+  const summary = meal.items.map(i => i.description).join(', ')
 
   // Compute calorie subtotal
   const itemsWithCal = meal.items.filter((i) => i.calories != null)
@@ -119,7 +122,7 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
   }
 
   return (
-    <article className={`meal-card meal-card--${meal.meal_type}${menuOpen ? ' meal-card--menu-open' : ''}`}>
+    <article className={`meal-card meal-card--${meal.meal_type}${menuOpen ? ' meal-card--menu-open' : ''}${collapsed ? ' meal-card--collapsed' : ''}`}>
       <div className="meal-card__accent" aria-hidden="true" />
 
       <div className="meal-card__body">
@@ -129,6 +132,16 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
           <time className="meal-card__time" dateTime={meal.consumed_at}>
             {formatTime(meal.consumed_at)}
           </time>
+
+          <button
+            className="meal-card__collapse-btn"
+            onClick={() => setCollapsed(c => !c)}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? 'Expand meal' : 'Collapse meal'}
+            type="button"
+          >
+            ▾
+          </button>
 
           <div className="meal-card__menu-wrap">
             <button
@@ -166,6 +179,8 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
             )}
           </div>
         </header>
+
+        <p className="meal-card__summary">{summary}</p>
 
         <ul className="meal-card__items">
           {meal.items.map((item) => (

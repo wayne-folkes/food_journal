@@ -87,7 +87,8 @@
 .btn--primary {
   background: var(--terra);
   color: #fff;
-  box-shadow: 0 1px 3px rgba(194, 90, 42, 0.3);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
 .btn--primary:hover { background: var(--terra-hover); }
 .btn--primary:active { transform: scale(0.97); }
@@ -162,6 +163,12 @@
 }
 
 /* Active states — one per meal type using the accent color */
+.meal-type-pill--active {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 3px 0 0 currentColor;
+  position: relative;
+}
 .meal-type-pill--breakfast.meal-type-pill--active { background: var(--meal-breakfast); color: #fff; border-color: transparent; }
 .meal-type-pill--lunch.meal-type-pill--active     { background: var(--meal-lunch);     color: #fff; border-color: transparent; }
 .meal-type-pill--dinner.meal-type-pill--active    { background: var(--meal-dinner);    color: #fff; border-color: transparent; }
@@ -462,10 +469,24 @@
 }
 
 .meal-log__empty {
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 36px 24px;
+  margin: 0;
+  background: color-mix(in srgb, var(--cream-mid) 60%, transparent);
+  border: 1.5px dashed var(--border);
+  border-radius: 14px;
   color: var(--ink-muted);
-  font-size: 0.9rem;
-  padding: 48px 20px;
+  font-size: 0.9375rem;
+  text-align: center;
+  line-height: 1.5;
+}
+.meal-log__empty::before {
+  content: '🍽️';
+  font-size: 2rem;
+  line-height: 1;
 }
 
 /* ── Meal Card ───────────────────────────────────────────────────────────── */
@@ -519,6 +540,37 @@
   align-items: center;
   gap: 6px;
   margin-bottom: 7px;
+}
+
+.meal-card__collapse-btn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--ink-muted);
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  margin-right: 4px;
+  transition: transform 0.2s ease;
+}
+.meal-card__collapse-btn[aria-expanded="false"] {
+  transform: rotate(-90deg);
+}
+.meal-card--collapsed .meal-card__items,
+.meal-card--collapsed .meal-card__cal-total,
+.meal-card--collapsed .meal-card__estimate-btn {
+  display: none;
+}
+.meal-card--collapsed .meal-card__summary {
+  display: block;
+}
+.meal-card__summary {
+  display: none;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+  padding: 2px 0 6px;
 }
 
 .meal-card__type {

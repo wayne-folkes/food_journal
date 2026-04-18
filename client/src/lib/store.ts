@@ -108,6 +108,47 @@ export function recentDistinct(meals: MealWithItems[], n = 5): string[] {
   return result
 }
 
+/**
+ * Returns recent distinct item descriptions, scored by how often they appear
+ * under the given meal type. Items most commonly logged under that type come
+ * first; others follow in recency order.
+ */
+export function contextualRecent(meals: MealWithItems[], mealType: MealType, n = 5): string[] {
+  // Score each description by how many times it appears under this meal type
+  const typeScore = new Map<string, number>()
+  for (const meal of meals) {
+    for (const item of meal.items) {
+      const key = item.description.toLowerCase()
+      if (meal.meal_type === mealType) {
+        typeScore.set(key, (typeScore.get(key) ?? 0) + 1)
+      }
+    }
+  }
+
+  // Collect distinct descriptions in recency order (newest first)
+  const seen = new Set<string>()
+  const candidates: string[] = []
+  const sorted = [...meals].sort((a, b) => new Date(b.consumed_at).getTime() - new Date(a.consumed_at).getTime())
+  for (const meal of sorted) {
+    for (const item of [...meal.items].sort((a, b) => a.position - b.position)) {
+      const key = item.description.toLowerCase()
+      if (!seen.has(key)) {
+        seen.add(key)
+        candidates.push(item.description)
+      }
+    }
+  }
+
+  // Sort: items with a type score first (highest score first), then by recency
+  candidates.sort((a, b) => {
+    const sa = typeScore.get(a.toLowerCase()) ?? 0
+    const sb = typeScore.get(b.toLowerCase()) ?? 0
+    return sb - sa // higher score first; ties keep recency order (stable sort)
+  })
+
+  return candidates.slice(0, n)
+}
+
 function sortMealItems(items: MealItem[]): MealItem[] {
   return [...items].sort((a, b) => a.position - b.position)
 }
