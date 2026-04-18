@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { errorMessage } from '@shared/logger'
 import { supabase } from './lib/supabase'
@@ -24,64 +24,91 @@ import type { ChipItem } from './lib/store'
 import './App.css'
 
 function AppInner() {
-  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, syncLocalToRemote, updateItemCalories, loadWeek, weekMeals, weekLoading, loadItemHistory } =
+  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, updateItemCalories, loadWeek, weekMeals, weekLoading, loadItemHistory } =
     useEntriesStore()
   const [user, setUser] = useState<User | null>(null)
+  const [authResolved, setAuthResolved] = useState(false)
   const [editingMeal, setEditingMeal] = useState<MealWithItems | null>(null)
   const [selectedDate, setSelectedDate] = useState(todayString)
   const [searchOpen, setSearchOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day')
   const [composerOpen, setComposerOpen] = useState(false)
+  const activeUserIdRef = useRef<string | null>(null)
   const toast = useToast()
 
   // Auth listener
   useEffect(() => {
+    const resetEntriesState = () => {
+      useEntriesStore.setState({ meals: [], dayCache: {}, weekMeals: [], itemHistory: [] })
+      void useEntriesStore.persist.clearStorage()
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const nextUserId = session?.user?.id ?? null
+      const previousUserId = activeUserIdRef.current
+      const hadAnonymousMeals = useEntriesStore.getState().meals.some((meal) => meal.user_id === null)
+
       setUser(session?.user ?? null)
-      if (event === 'SIGNED_IN') {
-        await syncLocalToRemote()
-        useEntriesStore.setState({ meals: [], dayCache: {}, weekMeals: [], itemHistory: [] })
-        setAuthed(true)
-      } else if (event === 'SIGNED_OUT') {
-        useEntriesStore.setState({ meals: [], dayCache: {}, weekMeals: [], itemHistory: [] })
-        setAuthed(false)
-      } else if (session) {
-        setAuthed(!!session)
+
+      if (event === 'SIGNED_OUT' || previousUserId !== nextUserId) {
+        resetEntriesState()
+        setSearchOpen(false)
+        setEditingMeal(null)
+        setComposerOpen(false)
+
+        if (nextUserId !== null && hadAnonymousMeals) {
+          toast.error('Local device-only meals were cleared on sign-in to protect privacy.')
+        }
       }
+
+      activeUserIdRef.current = nextUserId
+      setAuthed(nextUserId !== null)
+      setAuthResolved(true)
     })
     return () => subscription.unsubscribe()
-  }, [setAuthed, syncLocalToRemote])
+  }, [setAuthed, toast])
 
   // Load item history for autocomplete whenever auth state is established
   useEffect(() => {
+    if (!authResolved) return
+
     if (isAuthed) {
       loadItemHistory()
     }
-  }, [isAuthed, loadItemHistory])
+  }, [authResolved, isAuthed, loadItemHistory])
 
   // Reload meals whenever the selected date or auth state changes
   useEffect(() => {
+    if (!authResolved) return
+
     loadDay(selectedDate)
-  }, [isAuthed, selectedDate, loadDay])
+  }, [authResolved, isAuthed, selectedDate, loadDay])
 
   // Load week data when switching to week view or when date changes in week view
   useEffect(() => {
+    if (!authResolved) return
+
     if (viewMode === 'week') {
       loadWeek(selectedDate)
     }
-  }, [viewMode, selectedDate, loadWeek])
+  }, [authResolved, viewMode, selectedDate, loadWeek])
 
   // For anonymous users, filter meals to the selected date
   const displayedMeals = useMemo(
     () =>
-      isAuthed
+      !authResolved
+        ? []
+        : isAuthed
         ? meals
         : meals.filter((m) => {
             const localDate = new Date(m.consumed_at).toLocaleDateString('sv')
             return localDate === selectedDate
           }),
-    [meals, isAuthed, selectedDate]
+    [authResolved, meals, isAuthed, selectedDate]
   )
+
+  const dayIsLoading = !authResolved || isLoading
+  const weekIsLoading = !authResolved || weekLoading
 
   async function handleAddMeal(payload: {
     mealType: MealType
@@ -292,7 +319,7 @@ function AppInner() {
           <WeekView
             weekMeals={weekMeals}
             weekStart={getWeekBounds(selectedDate).start}
-            isLoading={weekLoading}
+            isLoading={weekIsLoading}
             onNavigateToDay={(date) => { setSelectedDate(date); setViewMode('day') }}
           />
         ) : (
@@ -304,7 +331,7 @@ function AppInner() {
             </div>
             <MealLog
               meals={displayedMeals}
-              isLoading={isLoading}
+              isLoading={dayIsLoading}
               selectedDate={selectedDate}
               onEdit={setEditingMeal}
               onDelete={handleDelete}
