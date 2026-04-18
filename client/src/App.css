@@ -162,16 +162,29 @@
   min-height: 32px;
 }
 
-/* Active states — one per meal type using the accent color */
+/* Active states — underline tab style */
 .meal-type-pill--active {
-  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  background: transparent;
+  outline: none;
+  position: relative;
 }
-.meal-type-pill--breakfast.meal-type-pill--active { background: var(--meal-breakfast); color: #fff; border-color: transparent; }
-.meal-type-pill--lunch.meal-type-pill--active     { background: var(--meal-lunch);     color: #fff; border-color: transparent; }
-.meal-type-pill--dinner.meal-type-pill--active    { background: var(--meal-dinner);    color: #fff; border-color: transparent; }
-.meal-type-pill--snack.meal-type-pill--active     { background: var(--meal-snack);     color: #fff; border-color: transparent; }
-.meal-type-pill--dessert.meal-type-pill--active   { background: var(--meal-dessert);   color: #fff; border-color: transparent; }
-.meal-type-pill--drink.meal-type-pill--active     { background: var(--meal-drink);     color: #fff; border-color: transparent; }
+/* Underline bar drawn via pseudo-element, coloured per meal type */
+.meal-type-pill--active::after {
+  content: '';
+  position: absolute;
+  bottom: -11px; /* sits flush with the pill row's bottom border */
+  left: 10%;
+  right: 10%;
+  height: 3px;
+  border-radius: 2px 2px 0 0;
+  background: currentColor;
+}
+.meal-type-pill--breakfast.meal-type-pill--active { color: var(--meal-breakfast); }
+.meal-type-pill--lunch.meal-type-pill--active     { color: var(--meal-lunch);     }
+.meal-type-pill--dinner.meal-type-pill--active    { color: var(--meal-dinner);    }
+.meal-type-pill--snack.meal-type-pill--active     { color: var(--meal-snack);     }
+.meal-type-pill--dessert.meal-type-pill--active   { color: var(--meal-dessert);   }
+.meal-type-pill--drink.meal-type-pill--active     { color: var(--meal-drink);     }
 
 /* Hover (non-active) */
 .meal-type-pill:not(.meal-type-pill--active):hover {
