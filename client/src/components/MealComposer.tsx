@@ -1,14 +1,17 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import type { MealType } from '@shared/types/database'
+import { MEAL_TYPE_LABELS } from '../lib/mealType'
 import { suggestMealType } from '../lib/mealType'
 import { parseChip } from '../lib/parser'
 import { useEntriesStore } from '../lib/store'
 import { track } from '../lib/analytics'
 import { MealTypePills } from './MealTypePills'
 import { ChipInput } from './ChipInput'
+import { EITile } from './EITile'
 
 interface Props {
   onAdd: (payload: { mealType: MealType; items: string[]; consumed_at: string; rawInput: string }) => void
+  onCancel?: () => void
 }
 
 function formatTimeInput(d: Date): string {
@@ -24,7 +27,11 @@ function capitalize(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
 }
 
-export function MealComposer({ onAdd }: Props) {
+function getDayName(): string {
+  return new Date().toLocaleDateString(undefined, { weekday: 'long' })
+}
+
+export function MealComposer({ onAdd, onCancel }: Props) {
   const now = new Date()
   const [mealType, setMealType] = useState<MealType>(() => suggestMealType(now))
   const [chips, setChips] = useState<string[]>([])
@@ -42,7 +49,6 @@ export function MealComposer({ onAdd }: Props) {
       !alreadyAdded.has(s.toLowerCase()) &&
       s.toLowerCase().includes(q)
     )
-    // Prefix matches first, then contains
     matches.sort((a, b) => {
       const aPrefix = a.toLowerCase().startsWith(q)
       const bPrefix = b.toLowerCase().startsWith(q)
@@ -51,14 +57,11 @@ export function MealComposer({ onAdd }: Props) {
     return matches.slice(0, 6)
   }, [inputValue, itemHistory, chips])
 
-  /** Commit a raw string as a chip, stripping any time phrase and updating mealTime. */
   function commitChipText(raw: string): string[] {
     const trimmed = raw.trim().replace(/,+$/, '').trim()
     if (!trimmed) return chips
-
     const { description, consumed_at } = parseChip(trimmed, new Date(mealTime))
     if (consumed_at) setMealTime(consumed_at.toISOString())
-
     const label = capitalize(description || trimmed)
     const next = [...chips, label]
     setChips(next)
@@ -66,9 +69,6 @@ export function MealComposer({ onAdd }: Props) {
   }
 
   function handleChipsChange(newChips: string[]) {
-    // Called when ChipInput commits a chip (Enter/comma).
-    // At this point the chip text has already been processed by ChipInput,
-    // but we need to check the last chip for a time phrase.
     if (newChips.length > chips.length) {
       const lastRaw = newChips[newChips.length - 1]
       const { description, consumed_at } = parseChip(lastRaw, new Date(mealTime))
@@ -90,25 +90,19 @@ export function MealComposer({ onAdd }: Props) {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
-
-    // Auto-commit any text sitting in the input field
     let finalChips = chips
     const pending = inputValue.trim()
     if (pending) {
       finalChips = commitChipText(pending)
       setInputValue('')
     }
-
     if (finalChips.length === 0) return
-
     onAdd({
       mealType,
       items: finalChips,
       consumed_at: mealTime,
       rawInput: finalChips.join(', '),
     })
-
-    // Reset
     const next = new Date()
     setChips([])
     setInputValue('')
@@ -117,27 +111,27 @@ export function MealComposer({ onAdd }: Props) {
     setShowTimePicker(false)
   }
 
-  return (
-    <form className="meal-composer" onSubmit={handleSubmit}>
-      <MealTypePills value={mealType} onChange={setMealType} />
+  const mealLabel = MEAL_TYPE_LABELS[mealType]
 
-      <div className="meal-composer__input-row">
-        <ChipInput
-          chips={chips}
-          inputValue={inputValue}
-          onChange={handleChipsChange}
-          onInputChange={setInputValue}
-          placeholder="e.g. scrambled eggs, toast, coffee…"
-          suggestions={suggestions}
-          onSuggestionSelect={handleSuggestionSelect}
-        />
-        {chips.length === 0 && !inputValue && (
-          <p className="meal-composer__hint">Press Enter or , to add items</p>
+  return (
+    <form className="ei-composer" onSubmit={handleSubmit}>
+      {/* Header bar */}
+      <div className="ei-composer__header">
+        {onCancel ? (
+          <button type="button" className="ei-composer__cancel" onClick={onCancel}>Cancel</button>
+        ) : (
+          <span />
         )}
+        <span className="ei-composer__title">New Entry</span>
+        <button type="submit" className="ei-composer__save" disabled={!canSave}>
+          Save
+        </button>
       </div>
 
-      <div className="meal-composer__footer">
-        <div className="meal-composer__time-wrap">
+      {/* Meal type row + time */}
+      <div className="ei-composer__type-row">
+        <MealTypePills value={mealType} onChange={setMealType} />
+        <div className="ei-composer__time">
           {showTimePicker ? (
             <input
               type="datetime-local"
@@ -152,7 +146,7 @@ export function MealComposer({ onAdd }: Props) {
           ) : (
             <button
               type="button"
-              className="meal-composer__time-badge"
+              className="ei-composer__time-badge"
               onClick={() => setShowTimePicker(true)}
               aria-label="Edit meal time"
             >
@@ -160,15 +154,45 @@ export function MealComposer({ onAdd }: Props) {
             </button>
           )}
         </div>
-
-        <button
-          type="submit"
-          className="btn btn--primary"
-          disabled={!canSave}
-        >
-          Save meal
-        </button>
       </div>
+
+      {/* Paper sheet */}
+      <div className="ei-composer__paper">
+        <span className="ei-composer__kicker">— {mealLabel}, {getDayName()}</span>
+        <div className="ei-composer__input-area">
+          <ChipInput
+            chips={chips}
+            inputValue={inputValue}
+            onChange={handleChipsChange}
+            onInputChange={setInputValue}
+            placeholder="Oats, honey, and a cortado…"
+            suggestions={suggestions}
+            onSuggestionSelect={handleSuggestionSelect}
+          />
+        </div>
+        <p className="ei-composer__hint">
+          Write a sentence. Separate items with commas or "and".
+        </p>
+      </div>
+
+      {/* Recognized items */}
+      {chips.length > 0 && (
+        <div className="ei-composer__recognized">
+          <div className="ei-composer__recognized-header">
+            <span className="ei-composer__recognized-kicker">
+              — Recognized, {chips.length} item{chips.length === 1 ? '' : 's'}
+            </span>
+          </div>
+          <div className="ei-composer__recognized-card">
+            {chips.map((chip, i) => (
+              <div key={i} className="ei-composer__recognized-row">
+                <EITile name={chip} size={28} />
+                <span className="ei-composer__recognized-name">{chip}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </form>
   )
 }

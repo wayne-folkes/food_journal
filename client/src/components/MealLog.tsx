@@ -11,6 +11,7 @@ interface Props {
   onDuplicate: (meal: MealWithItems) => void
   onUpdateCalories: (itemId: string, calories: number | null) => Promise<void>
   onEstimateCalories?: (meal: MealWithItems) => Promise<void>
+  onTryExample?: (sentence: string) => void
 }
 
 /** Group meals logged within `windowMinutes` of each other into clusters. */
@@ -66,7 +67,7 @@ const cardProps = (
   onEstimateCalories: handlers.onEstimateCalories,
 })
 
-export function MealLog({ meals, isLoading, selectedDate, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories }: Props) {
+export function MealLog({ meals, isLoading, selectedDate, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories, onTryExample }: Props) {
   const handlers = { onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories }
 
   const groups = useMemo(() => {
@@ -83,9 +84,33 @@ export function MealLog({ meals, isLoading, selectedDate, onEdit, onDelete, onDu
       <h2 className="meal-log__heading">{formatDateHeading(selectedDate)}</h2>
 
       {groups.length === 0 ? (
-        <p className="meal-log__empty">
-          Your day is a blank canvas.<br />Log your first meal above.
-        </p>
+        <div className="ei-empty">
+          <div className="ei-empty__ornament">
+            <div className="ei-empty__rule-row">
+              <div className="ei-empty__rule" />
+              <span className="ei-empty__section-mark">§</span>
+              <div className="ei-empty__rule" />
+            </div>
+            <h2 className="ei-empty__title">A blank page.</h2>
+            <p className="ei-empty__body">Start by writing what you had for breakfast, lunch, or a quick snack.</p>
+          </div>
+          <div className="ei-empty__try">
+            <span className="ei-empty__kicker">— Try one</span>
+            <div className="ei-empty__try-card">
+              {[
+                'Oats, honey, and a cortado',
+                'Chicken caesar, croutons, water',
+                'An apple and some almonds',
+              ].map((sentence, i) => (
+                <button key={i} className="ei-empty__try-row" type="button" onClick={() => onTryExample?.(sentence)}>
+                  <span className="ei-empty__try-num">{i + 1}.</span>
+                  <span className="ei-empty__try-text">{sentence}</span>
+                  <span className="ei-empty__try-chevron" aria-hidden="true">›</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       ) : (
         groups.map((group) =>
           group.length === 1 ? (

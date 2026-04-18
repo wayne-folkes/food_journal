@@ -33,6 +33,7 @@ function AppInner() {
   const [selectedDate, setSelectedDate] = useState(todayString)
   const [searchOpen, setSearchOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day')
+  const [composerOpen, setComposerOpen] = useState(false)
   const toast = useToast()
 
   // Auth listener
@@ -243,30 +244,67 @@ function AppInner() {
   }, [meals, displayedMeals, currentMealType])
   const step = viewMode === 'week' ? 7 : 1
 
+  function getMastheadKicker(dateStr: string): string {
+    const d = new Date(`${dateStr}T12:00:00`)
+    const startOfYear = new Date(d.getFullYear(), 0, 0)
+    const dayOfYear = Math.floor((d.getTime() - startOfYear.getTime()) / 86400000)
+    const weekNum = Math.ceil(dayOfYear / 7)
+    return `Week ${weekNum} · Day ${dayOfYear}`
+  }
+
+  function getMastheadTitle(dateStr: string): string {
+    const today = todayString()
+    if (dateStr === today) return 'Today'
+    const d = new Date(`${dateStr}T12:00:00`)
+    return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+  }
+
+  function getMastheadSubtitle(dateStr: string, meals: MealWithItems[]): string {
+    const d = new Date(`${dateStr}T12:00:00`)
+    const datePart = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+    const mealCount = meals.length
+    const mealWord = mealCount === 1 ? 'meal' : 'meals'
+    return mealCount > 0
+      ? `${datePart} · ${mealCount} ${mealWord} logged`
+      : datePart
+  }
+
   return (
     <div className="app">
-      <header className="app-header">
-        <span className="app-header__title">Food Journal</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+      <nav className="ei-nav">
+        <span className="ei-nav__back" aria-hidden="true">
+          <svg width="10" height="16" viewBox="0 0 10 16" fill="none">
+            <path d="M8 1L2 8l6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </span>
+        <div className="ei-nav__right">
           <button
-            className="header-search-btn"
+            className="ei-nav__icon-btn"
             aria-label="Search meals"
             onClick={() => { track('search_opened', {}); setSearchOpen(true) }}
           >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-              <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.75"/>
-              <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.6"/>
+              <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
             </svg>
           </button>
           <AuthButton user={user} />
         </div>
-      </header>
+      </nav>
+
+      <div className="ei-masthead">
+        <span className="ei-kicker">
+          {getMastheadKicker(selectedDate)}
+        </span>
+        <h1 className="ei-masthead__title">
+          {getMastheadTitle(selectedDate)}
+        </h1>
+        <p className="ei-masthead__sub">
+          {getMastheadSubtitle(selectedDate, displayedMeals)}
+        </p>
+      </div>
 
       <main className="app-main">
-        {isViewingToday && <MealComposer onAdd={handleAddMeal} />}
-        {isViewingToday && recent.length > 0 && (
-          <RecentChips items={recent} onSelect={handleRelogItem} />
-        )}
         <DateNav
           date={selectedDate}
           onPrev={() => setSelectedDate((d) => offsetDate(d, -step))}
@@ -285,6 +323,10 @@ function AppInner() {
         ) : (
           <>
             <DaySummary meals={displayedMeals} />
+            <div className="ei-section-kicker">
+              <span className="ei-section-kicker__text">— Today's Menu</span>
+              <div className="ei-section-kicker__rule" />
+            </div>
             <MealLog
               meals={displayedMeals}
               isLoading={isLoading}
@@ -300,10 +342,35 @@ function AppInner() {
                 }
               }}
               onEstimateCalories={handleEstimateCalories}
+              onTryExample={(sentence) => {
+                setComposerOpen(true)
+              }}
             />
           </>
         )}
       </main>
+
+      {/* Floating compose pill */}
+      {isViewingToday && viewMode === 'day' && (
+        <div className="ei-compose-pill" onClick={() => setComposerOpen(true)}>
+          <svg className="ei-compose-pill__icon" width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M2 13.5V16h2.5L13.07 7.43 10.57 4.93 2 13.5z" fill="currentColor" opacity="0.55"/>
+            <path d="M15.41 4.59a1 1 0 000-1.42l-1.58-1.58a1 1 0 00-1.42 0L11 3l2.5 2.5 1.91-1.91z" fill="currentColor" opacity="0.55"/>
+          </svg>
+          <span className="ei-compose-pill__text">Log a meal…</span>
+          <div className="ei-compose-pill__btn">
+            <span>✎</span>
+          </div>
+        </div>
+      )}
+
+      {composerOpen && (
+        <div className="ei-compose-overlay" onClick={(e) => { if (e.target === e.currentTarget) setComposerOpen(false) }}>
+          <div className="ei-compose-sheet">
+            <MealComposer onAdd={(payload) => { handleAddMeal(payload); setComposerOpen(false) }} onCancel={() => setComposerOpen(false)} />
+          </div>
+        </div>
+      )}
 
       {editingMeal && (
         <EditMealModal

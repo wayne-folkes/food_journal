@@ -4,7 +4,6 @@ interface Props {
   meals: MealWithItems[]
 }
 
-
 export function DaySummary({ meals }: Props) {
   if (meals.length === 0) return null
 
@@ -16,13 +15,26 @@ export function DaySummary({ meals }: Props) {
   const showCal = itemsWithCal.length > 0
 
   return (
-    <p className="day-summary">
-      <strong>{meals.length}</strong> meal{meals.length === 1 ? '' : 's'}
-      {' · '}
-      <strong>{itemCount}</strong> item{itemCount === 1 ? '' : 's'}
-      {showCal && (
-        <> · {hasPartial ? '~' : ''}<strong>{totalCal.toLocaleString()}</strong> cal</>
-      )}
-    </p>
+    <div className="day-summary">
+      <span className="day-summary__kicker">— Today</span>
+      <p className="day-summary__headline">
+        {meals.length} meal{meals.length === 1 ? '' : 's'}, {itemCount} item{itemCount === 1 ? '' : 's'}
+        <span className="day-summary__period">.</span>
+      </p>
+      <div className="day-summary__stats">
+        <div className="day-summary__stat">
+          <span className="day-summary__stat-value">{meals.length}</span>
+          <span className="day-summary__stat-label">Meals</span>
+        </div>
+        {showCal && (
+          <div className="day-summary__stat day-summary__stat--muted">
+            <span className="day-summary__stat-value">
+              {hasPartial ? '~' : ''}{totalCal.toLocaleString()} kcal
+            </span>
+            <span className="day-summary__stat-label">Calories</span>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import type { MealItem, MealWithItems } from '@shared/types/database'
 import { MEAL_TYPE_LABELS } from '../lib/mealType'
 import { useEntriesStore } from '../lib/store'
-import { getFoodEmoji } from '../lib/foodEmoji'
+import { EITile } from './EITile'
 
 interface Props {
   meal: MealWithItems
@@ -18,6 +18,15 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
+/** Generate an editorial headline from meal items */
+function generateHeadline(items: MealItem[]): string {
+  if (items.length === 0) return ''
+  if (items.length === 1) return items[0].description
+  if (items.length === 2) return `${items[0].description} and ${items[1].description}`
+  const first = items.slice(0, -1).map(i => i.description).join(', ')
+  return `${first}, and ${items[items.length - 1].description}`
+}
+
 interface CalBadgeProps {
   item: MealItem
   onUpdateCalories: (itemId: string, calories: number | null) => Promise<void>
@@ -31,7 +40,6 @@ function CalBadge({ item, onUpdateCalories }: CalBadgeProps) {
   function startEditing() {
     setValue(item.calories != null ? String(item.calories) : '')
     setEditing(true)
-    // Focus on next tick after render
     setTimeout(() => inputRef.current?.focus(), 0)
   }
 
@@ -100,15 +108,8 @@ function CalBadge({ item, onUpdateCalories }: CalBadgeProps) {
 export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories, groupPosition }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [estimating, setEstimating] = useState(false)
-  const [collapsed, setCollapsed] = useState(false)
   const isAuthed = useEntriesStore((s) => s.isAuthed)
 
-  const summary = meal.items.map(i => {
-    const emoji = getFoodEmoji(i.description)
-    return emoji ? `${emoji} ${i.description}` : i.description
-  }).join('  ·  ')
-
-  // Compute calorie subtotal
   const itemsWithCal = meal.items.filter((i) => i.calories != null)
   const totalCal = itemsWithCal.reduce((sum, i) => sum + (i.calories ?? 0), 0)
   const hasPartial = itemsWithCal.length > 0 && itemsWithCal.length < meal.items.length
@@ -126,98 +127,96 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
     }
   }
 
-  const groupClass = groupPosition ? ` meal-card--group-${groupPosition}` : ''
+  const headline = generateHeadline(meal.items)
 
   return (
-    <article className={`meal-card meal-card--${meal.meal_type}${menuOpen ? ' meal-card--menu-open' : ''}${collapsed ? ' meal-card--collapsed' : ''}${groupClass}`}>
-      <div className="meal-card__accent" aria-hidden="true" />
+    <article className={`meal-card${menuOpen ? ' meal-card--menu-open' : ''}`} style={{ position: 'relative' }}>
+      {/* Kicker row */}
+      <div className="meal-card__kicker">
+        <span className="meal-card__type">— {MEAL_TYPE_LABELS[meal.meal_type]}</span>
+        <div className="meal-card__kicker-rule" />
+        <time className="meal-card__time" dateTime={meal.consumed_at}>
+          {formatTime(meal.consumed_at)}
+        </time>
+      </div>
 
-      <div className="meal-card__body">
-        <header className="meal-card__header">
-          <span className="meal-card__type">{MEAL_TYPE_LABELS[meal.meal_type]}</span>
-          <span className="meal-card__dot" aria-hidden="true">·</span>
-          <time className="meal-card__time" dateTime={meal.consumed_at}>
-            {formatTime(meal.consumed_at)}
-          </time>
+      {/* Headline */}
+      <div className="meal-card__headline">
+        <p className="meal-card__headline-text">{headline}</p>
+        <div className="meal-card__item-count">
+          {meal.items.length} item{meal.items.length === 1 ? '' : 's'}
+        </div>
+      </div>
 
-          <button
-            className="meal-card__collapse-btn"
-            onClick={() => setCollapsed(c => !c)}
-            aria-expanded={!collapsed}
-            aria-label={collapsed ? 'Expand meal' : 'Collapse meal'}
-            type="button"
-          >
-            ▾
-          </button>
+      {/* Item rows */}
+      <ul className="meal-card__items">
+        {meal.items.map((item) => (
+          <li key={item.id} className="meal-card__item">
+            <EITile name={item.description} size={30} />
+            <span className="meal-card__item-desc">{item.description}</span>
+            <CalBadge item={item} onUpdateCalories={onUpdateCalories} />
+          </li>
+        ))}
+      </ul>
 
-          <div className="meal-card__menu-wrap">
-            <button
-              className="meal-card__menu-btn"
-              onClick={() => setMenuOpen((o) => !o)}
-              aria-label="Meal options"
-              aria-expanded={menuOpen}
-            >
-              ···
-            </button>
-            {menuOpen && (
-              <>
-                <div className="meal-card__menu-backdrop" onClick={() => setMenuOpen(false)} />
-                <div className="meal-card__menu">
-                  <button
-                    className="meal-card__menu-item"
-                    onClick={() => { setMenuOpen(false); onEdit(meal) }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    className="meal-card__menu-item"
-                    onClick={() => { setMenuOpen(false); onDuplicate(meal) }}
-                  >
-                    Log again
-                  </button>
-                  <button
-                    className="meal-card__menu-item meal-card__menu-item--danger"
-                    onClick={() => { setMenuOpen(false); onDelete(meal.id) }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </header>
-
-        <p className="meal-card__summary">{summary}</p>
-
-        <ul className="meal-card__items">
-          {meal.items.map((item) => {
-            const emoji = getFoodEmoji(item.description)
-            return (
-              <li key={item.id} className="meal-card__item">
-                {emoji && <span className="meal-card__item-emoji" aria-hidden="true">{emoji}</span>}
-                <span className="meal-card__item-desc">{item.description}</span>
-                <CalBadge item={item} onUpdateCalories={onUpdateCalories} />
-              </li>
-            )
-          })}
-        </ul>
-
+      {/* Footer */}
+      <div className="meal-card__footer">
+        <span className="meal-card__footer-count">
+          {meal.items.length} item{meal.items.length === 1 ? '' : 's'}
+        </span>
         {showSubtotal && (
-          <p className="meal-card__cal-total">
-            {hasPartial ? '~' : ''}{totalCal.toLocaleString()} cal
-          </p>
+          <span className="meal-card__footer-cal">
+            ~{totalCal.toLocaleString()} kcal
+          </span>
         )}
+      </div>
 
-        {showEstimateBtn && (
-          <button
-            className="meal-card__estimate-btn"
-            onClick={handleEstimate}
-            disabled={estimating}
-            type="button"
-            aria-label="Estimate calories from USDA database"
-          >
-            ✨ {estimating ? 'Estimating…' : 'Estimate calories'}
-          </button>
+      {showEstimateBtn && (
+        <button
+          className="meal-card__estimate-btn"
+          onClick={handleEstimate}
+          disabled={estimating}
+          type="button"
+          aria-label="Estimate calories from USDA database"
+        >
+          ✨ {estimating ? 'Estimating…' : 'Estimate calories'}
+        </button>
+      )}
+
+      {/* Overflow menu */}
+      <div className="meal-card__menu-wrap">
+        <button
+          className="meal-card__menu-btn"
+          onClick={() => setMenuOpen((o) => !o)}
+          aria-label="Meal options"
+          aria-expanded={menuOpen}
+        >
+          ···
+        </button>
+        {menuOpen && (
+          <>
+            <div className="meal-card__menu-backdrop" onClick={() => setMenuOpen(false)} />
+            <div className="meal-card__menu">
+              <button
+                className="meal-card__menu-item"
+                onClick={() => { setMenuOpen(false); onEdit(meal) }}
+              >
+                Edit
+              </button>
+              <button
+                className="meal-card__menu-item"
+                onClick={() => { setMenuOpen(false); onDuplicate(meal) }}
+              >
+                Log again
+              </button>
+              <button
+                className="meal-card__menu-item meal-card__menu-item--danger"
+                onClick={() => { setMenuOpen(false); onDelete(meal.id) }}
+              >
+                Delete
+              </button>
+            </div>
+          </>
         )}
       </div>
     </article>

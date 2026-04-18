@@ -1,35 +1,45 @@
 /* ── Google Fonts ─────────────────────────────────────────────────────────
-   Lora  — warm serif for headings, wordmark, and timestamps
-   Nunito — rounded sans for body text, inputs, entries
+   Playfair Display — editorial serif for headings, wordmark
+   EB Garamond       — body serif for text, inputs, entries
    ───────────────────────────────────────────────────────────────────────── */
 
 /* ── Design tokens ───────────────────────────────────────────────────────── */
 :root {
-  /* Palette — warm parchment diary */
-  --cream:          #FAF6F0;
-  --cream-mid:      #F2EBE0;
-  --cream-dark:     #E8DDD0;
+  /* Palette — Editorial × iOS */
+  --bg:             #F5F0E6;
+  --cream:          #F5F0E6;       /* alias for bg — used widely */
+  --cream-mid:      #EDE7DA;
+  --cream-dark:     #E0D8C8;
   --paper:          #FFFFFF;
-  --ink:            #2A2118;
-  --ink-mid:        #5C4F42;
-  --ink-muted:      #9A8878;
-  --terra:          #C25A2A;   /* terracotta — primary CTA */
-  --terra-hover:    #A84623;
-  --terra-light:    #F7EBE4;   /* chip hover, outline hover */
-  --terra-border:   #E8B49A;   /* subtle terracotta borders */
-  --sage:           #4A6741;   /* secondary / success */
+  --card:           #FFFFFF;
+  --ink:            #1C1A16;
+  --ink-mid:        rgba(60, 50, 38, 0.62);
+  --ink-muted:      rgba(60, 50, 38, 0.62);
+  --ter:            rgba(60, 50, 38, 0.32);
+  --sep:            rgba(28, 26, 22, 0.09);
+  --accent:         #A32F22;       /* editorial red */
+  --accent-hover:   #8A2619;
+  --accent-light:   rgba(163, 47, 34, 0.08);
+  --ring:           #C7602F;       /* warm orange — streak/progress */
+  --sage:           #4A6741;
   --danger:         #B83232;
-  --border:         #E2D9CC;
+  --border:         rgba(28, 26, 22, 0.09);
 
-  /* Adaptive backdrop tokens — overridden in dark mode */
-  --header-bg:  rgba(250, 246, 240, 0.92);
-  --overlay-bg: rgba(42, 33, 24, 0.4);
+  /* Legacy aliases — components still reference these */
+  --terra:          var(--accent);
+  --terra-hover:    var(--accent-hover);
+  --terra-light:    var(--accent-light);
+  --terra-border:   rgba(163, 47, 34, 0.18);
 
-  /* Shadows */
-  --shadow-sm:   0 1px 3px rgba(42, 33, 24, 0.08);
-  --shadow-card: 0 2px 8px rgba(42, 33, 24, 0.08), 0 0 0 1px rgba(42, 33, 24, 0.04);
-  --shadow-md:   0 4px 16px rgba(42, 33, 24, 0.12);
-  --shadow-up:   0 -2px 12px rgba(42, 33, 24, 0.08);
+  /* Adaptive backdrop tokens */
+  --header-bg:  rgba(245, 240, 230, 0.92);
+  --overlay-bg: rgba(28, 26, 22, 0.4);
+
+  /* Shadows — editorial: lighter, subtler */
+  --shadow-sm:   0 1px 2px rgba(28, 26, 22, 0.04);
+  --shadow-card: 0 1px 2px rgba(28, 26, 22, 0.04), 0 6px 20px rgba(28, 26, 22, 0.04);
+  --shadow-md:   0 4px 16px rgba(28, 26, 22, 0.08);
+  --shadow-up:   0 -2px 12px rgba(28, 26, 22, 0.06);
 
   /* Radii */
   --radius-sm:  5px;
@@ -37,27 +47,28 @@
   --radius-lg:  16px;
   --radius-xl:  24px;
 
-  /* Input bar height — used for mobile bottom-padding calc */
+  /* Input bar height */
   --input-bar-height: 72px;
 
   /* Typography */
-  --font-serif: 'Lora', Georgia, 'Times New Roman', serif;
-  --font-sans:  'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-serif:  'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-body:   'EB Garamond', Georgia, serif;
+  --font-sans:   -apple-system, 'SF Pro Text', 'Inter', system-ui, sans-serif;
 
-  /* Meal type accent colors */
-  --meal-breakfast: #E8B84A;   /* warm yellow */
-  --meal-lunch:     #7A9B6E;   /* sage green */
-  --meal-dinner:    #C25A2A;   /* terra (same as primary) */
-  --meal-snack:     #9A8878;   /* muted ink */
-  --meal-dessert:   #C77A8A;   /* dusty rose */
-  --meal-drink:     #6B8CAE;   /* slate blue */
+  /* Meal type accent colors — all use accent in editorial design */
+  --meal-breakfast: #A32F22;
+  --meal-lunch:     #A32F22;
+  --meal-dinner:    #A32F22;
+  --meal-snack:     #A32F22;
+  --meal-dessert:   #A32F22;
+  --meal-drink:     #A32F22;
 
   /* Base */
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
   font-size: 15px;
   line-height: 1.55;
   color: var(--ink);
-  background-color: var(--cream);
+  background-color: var(--bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -85,41 +96,46 @@ body {
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Palette — Vintage Bistro */
-    --cream:        #160C0A;
-    --cream-mid:    #1E1210;
-    --cream-dark:   #2C1A14;
-    --paper:        #1E1410;
-    --ink:          #D0C8BC;   /* warm silver */
-    --ink-mid:      #989088;
-    --ink-muted:    #686058;
-    --terra:        #C07838;   /* copper — primary CTA */
-    --terra-hover:  #A86030;
-    --terra-light:  #1E1008;
-    --terra-border: #5A3018;
-    --sage:         #7A9060;   /* muted olive */
+    --bg:           #1A1712;
+    --cream:        #1A1712;
+    --cream-mid:    #231F19;
+    --cream-dark:   #2E2920;
+    --paper:        #211D17;
+    --card:         #211D17;
+    --ink:          #D4CFC4;
+    --ink-mid:      rgba(200, 190, 175, 0.65);
+    --ink-muted:    rgba(200, 190, 175, 0.50);
+    --ter:          rgba(200, 190, 175, 0.25);
+    --sep:          rgba(200, 190, 175, 0.10);
+    --accent:       #D4553F;
+    --accent-hover: #C04838;
+    --accent-light: rgba(212, 85, 63, 0.12);
+    --ring:         #D4783F;
+    --sage:         #7A9060;
     --danger:       #CC4444;
-    --border:       #2C1E18;
+    --border:       rgba(200, 190, 175, 0.10);
 
-    /* Candlelit shadows — faint champagne-gold card outline */
+    --terra:        var(--accent);
+    --terra-hover:  var(--accent-hover);
+    --terra-light:  var(--accent-light);
+    --terra-border: rgba(212, 85, 63, 0.20);
+
     --shadow-sm:   0 1px 4px rgba(0, 0, 0, 0.5);
-    --shadow-card: 0 0 0 1px rgba(212, 168, 64, 0.12), 0 4px 16px rgba(0, 0, 0, 0.7);
-    --shadow-md:   0 4px 24px rgba(0, 0, 0, 0.8);
-    --shadow-up:   0 -2px 12px rgba(0, 0, 0, 0.5);
+    --shadow-card: 0 0 0 1px rgba(200, 190, 175, 0.06), 0 4px 16px rgba(0, 0, 0, 0.5);
+    --shadow-md:   0 4px 24px rgba(0, 0, 0, 0.7);
+    --shadow-up:   0 -2px 12px rgba(0, 0, 0, 0.4);
 
-    /* Meal type accents */
-    --meal-breakfast: #D4A840;   /* champagne gold */
-    --meal-lunch:     #B87888;   /* dusty rose     */
-    --meal-dinner:    #C07838;   /* copper         */
-    --meal-snack:     #8A6848;   /* caramel-brown  */
-    --meal-dessert:   #9A7898;   /* dusty mauve    */
-    --meal-drink:     #6878A0;   /* muted slate    */
+    --meal-breakfast: #D4553F;
+    --meal-lunch:     #D4553F;
+    --meal-dinner:    #D4553F;
+    --meal-snack:     #D4553F;
+    --meal-dessert:   #D4553F;
+    --meal-drink:     #D4553F;
 
-    /* Adaptive tokens */
-    --header-bg:  rgba(22, 12, 10, 0.95);
-    --overlay-bg: rgba(0, 0, 0, 0.75);
+    --header-bg:  rgba(26, 23, 18, 0.95);
+    --overlay-bg: rgba(0, 0, 0, 0.7);
 
-    background-color: var(--cream);
+    background-color: var(--bg);
     color: var(--ink);
   }
 }

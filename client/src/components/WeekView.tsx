@@ -1,28 +1,30 @@
 import { useEffect, useState, useMemo } from 'react'
-import type { MealWithItems, MealType } from '@shared/types/database'
+import type { MealWithItems } from '@shared/types/database'
 import { useEntriesStore, getWeekBounds } from '../lib/store'
 import { MEAL_TYPE_LABELS } from '../lib/mealType'
+import { EITile } from './EITile'
 
 interface WeekViewProps {
   weekMeals: MealWithItems[]
-  weekStart: string        // YYYY-MM-DD, always a Monday
+  weekStart: string
   isLoading: boolean
   onNavigateToDay: (date: string) => void
 }
 
-const PATTERN_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
-
-function formatDayLabel(dateStr: string): string {
-  const d = new Date(`${dateStr}T12:00:00`)
-  return d.toLocaleDateString(undefined, { weekday: 'short' })  // "Mon", "Tue"
+function formatDayLetter(dateStr: string): string {
+  return new Date(`${dateStr}T12:00:00`).toLocaleDateString(undefined, { weekday: 'narrow' })
 }
 
-function formatDayHeading(dateStr: string): string {
-  const today = new Date().toLocaleDateString('sv')
-  const d = new Date(`${dateStr}T12:00:00`)
-  const weekday = d.toLocaleDateString(undefined, { weekday: 'long' })
-  const date = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-  return dateStr === today ? `Today · ${date}` : `${weekday} · ${date}`
+function formatDayNum(dateStr: string): string {
+  return new Date(`${dateStr}T12:00:00`).getDate().toString()
+}
+
+function formatDayAbbrev(dateStr: string): string {
+  return new Date(`${dateStr}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
+}
+
+function isToday(dateStr: string): boolean {
+  return dateStr === new Date().toLocaleDateString('sv')
 }
 
 export function WeekView({ weekMeals, weekStart, isLoading, onNavigateToDay }: WeekViewProps) {
@@ -50,143 +52,96 @@ export function WeekView({ weekMeals, weekStart, isLoading, onNavigateToDay }: W
     return days.map(date => ({ date, meals: map.get(date) ?? [] }))
   }, [weekMeals, weekStart])
 
-  const topItems = useMemo(() => {
-    const counts = new Map<string, { display: string; count: number }>()
-    for (const meal of weekMeals) {
-      for (const item of meal.items) {
-        const key = item.description.toLowerCase()
-        const existing = counts.get(key)
-        if (existing) existing.count++
-        else counts.set(key, { display: item.description, count: 1 })
-      }
-    }
-    return [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 5)
-  }, [weekMeals])
+  const totalMeals = weekMeals.length
+  const totalItems = weekMeals.reduce((sum, m) => sum + m.items.length, 0)
 
-  const newItems = useMemo(() => {
-    const seen = new Set<string>()
-    const result: string[] = []
-    for (const meal of weekMeals) {
-      for (const item of meal.items) {
-        const key = item.description.toLowerCase()
-        if (!seen.has(key) && !priorItems.has(key)) {
-          seen.add(key)
-          result.push(item.description)
-        }
-      }
-    }
-    return result
-  }, [weekMeals, priorItems])
-
-  const totalItems = useMemo(() =>
-    weekMeals.reduce((sum, m) => sum + m.items.length, 0),
-  [weekMeals])
-
-  const mealPattern = useMemo(() =>
-    groupedByDate.map(({ date, meals }) => ({
-      date,
-      types: PATTERN_TYPES.map(t => meals.some(m => m.meal_type === t)),
-    }))
-  , [groupedByDate])
+  // Max meals in a day (for bar chart scaling)
+  const maxMealsPerDay = Math.max(1, ...groupedByDate.map(d => d.meals.length))
 
   return (
-    <div className={`week-view${isLoading ? ' week-view--loading' : ''}`} aria-busy={isLoading}>
+    <div className={`ei-week${isLoading ? ' ei-week--loading' : ''}`} aria-busy={isLoading}>
 
-      {/* ── Stats row ── */}
-      <div className="week-stats">
+      {/* Summary line */}
+      <p className="ei-week__summary">
+        <strong>{totalMeals}</strong> meal{totalMeals === 1 ? '' : 's'}, <strong>{totalItems}</strong> item{totalItems === 1 ? '' : 's'}
+      </p>
 
-        {/* Total items */}
-        <div className="week-stat-card">
-          <span className="week-stat-card__value">{totalItems}</span>
-          <span className="week-stat-card__label">items logged</span>
-        </div>
-
-        {/* Most consumed */}
-        <div className="week-stat-card week-stat-card--wide">
-          <span className="week-stat-card__label">Most logged</span>
-          {topItems.length === 0 ? (
-            <p className="week-empty-hint">No meals this week</p>
-          ) : (
-            <ol className="week-top-items">
-              {topItems.map(({ display, count }) => (
-                <li key={display} className="week-top-items__row">
-                  <span className="week-top-items__name">{display}</span>
-                  <span className="week-top-items__count">×{count}</span>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-
-        {/* New items */}
-        <div className="week-stat-card week-stat-card--wide">
-          <span className="week-stat-card__label">New this week</span>
-          {newItems.length === 0 ? (
-            <p className="week-empty-hint">No new foods</p>
-          ) : (
-            <ul className="week-new-items">
-              {newItems.map(item => (
-                <li key={item} className="week-new-items__chip">{item}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-      </div>
-
-      {/* ── Meal pattern grid ── */}
-      <div className="meal-pattern">
-        <div className="meal-pattern__legend">
-          {PATTERN_TYPES.map(t => (
-            <span key={t} className="meal-pattern__legend-label">{MEAL_TYPE_LABELS[t][0]}</span>
-          ))}
-        </div>
-        {mealPattern.map(({ date, types }) => {
-          const label = formatDayLabel(date)
+      {/* Tonal bar chart */}
+      <div className="ei-week__chart">
+        {groupedByDate.map(({ date, meals }) => {
+          const today = isToday(date)
+          const barHeight = meals.length > 0 ? Math.max(12, (meals.length / maxMealsPerDay) * 100) : 4
           return (
-            <div key={date} className="meal-pattern__row">
-              <span className="meal-pattern__day">{label}</span>
-              {types.map((filled, i) => (
-                <span
-                  key={i}
-                  className={`meal-pattern__dot meal-pattern__dot--${PATTERN_TYPES[i]}${filled ? ' meal-pattern__dot--filled' : ''}`}
-                  title={filled ? MEAL_TYPE_LABELS[PATTERN_TYPES[i]] : ''}
-                />
-              ))}
-            </div>
+            <button
+              key={date}
+              className={`ei-week__chart-col${today ? ' ei-week__chart-col--today' : ''}`}
+              onClick={() => onNavigateToDay(date)}
+              aria-label={`${formatDayAbbrev(date)}: ${meals.length} meals`}
+            >
+              <div className="ei-week__chart-bar-wrap">
+                {meals.length > 0 ? (
+                  <div
+                    className="ei-week__chart-bar"
+                    style={{ height: `${barHeight}%` }}
+                  />
+                ) : (
+                  <div className="ei-week__chart-bar ei-week__chart-bar--empty" />
+                )}
+              </div>
+              <span className={`ei-week__chart-label${today ? ' ei-week__chart-label--today' : ''}`}>
+                {formatDayLetter(date)}
+              </span>
+            </button>
           )
         })}
       </div>
 
-      {/* ── Day-by-day list ── */}
-      <div className="week-days">
-        {groupedByDate.map(({ date, meals }) => (
-          <div key={date} className="week-day-group">
-            <button
-              className="week-day-group__header"
-              onClick={() => onNavigateToDay(date)}
-              aria-label={`Go to ${formatDayLabel(date)}`}
-            >
-              {formatDayHeading(date)}
-            </button>
-            {meals.length === 0 ? (
-              <p className="week-day-group__empty">No meals logged</p>
-            ) : (
-              <ul className="week-day-group__meals">
-                {meals.map(meal => (
-                  <li key={meal.id} className={`week-meal-row week-meal-row--${meal.meal_type}`}>
-                    <span className="week-meal-row__type">{MEAL_TYPE_LABELS[meal.meal_type]}</span>
-                    <span className="week-meal-row__items">
-                      {meal.items.map(i => i.description).join(', ')}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
+      {/* Section kicker */}
+      <div className="ei-section-kicker" style={{ margin: '0 16px' }}>
+        <span className="ei-section-kicker__text">— The Days</span>
+        <div className="ei-section-kicker__rule" />
       </div>
 
+      {/* Day list */}
+      <div className="ei-week__days">
+        {groupedByDate.map(({ date, meals }) => {
+          const today = isToday(date)
+          const allItems = meals.flatMap(m => m.items)
+          return (
+            <button
+              key={date}
+              className={`ei-week__day-row${today ? ' ei-week__day-row--today' : ''}`}
+              onClick={() => onNavigateToDay(date)}
+            >
+              <div className="ei-week__day-date">
+                <span className="ei-week__day-abbrev">{formatDayAbbrev(date)}</span>
+                <span className="ei-week__day-num">{formatDayNum(date)}</span>
+              </div>
+              <div className="ei-week__day-content">
+                {meals.length === 0 ? (
+                  <span className="ei-week__day-empty">Nothing logged.</span>
+                ) : (
+                  <>
+                    <span className="ei-week__day-desc">
+                      {meals.map(m => m.items.map(i => i.description).join(', ')).join(' · ')}
+                    </span>
+                    {allItems.length > 0 && (
+                      <div className="ei-week__day-tiles">
+                        {allItems.slice(0, 4).map((item, i) => (
+                          <EITile key={i} name={item.description} size={22} />
+                        ))}
+                        {allItems.length > 4 && (
+                          <span className="ei-week__day-more">+{allItems.length - 4}</span>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
