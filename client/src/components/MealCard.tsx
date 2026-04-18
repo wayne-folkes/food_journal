@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import type { MealItem, MealWithItems } from '@shared/types/database'
 import { MEAL_TYPE_LABELS } from '../lib/mealType'
 import { useEntriesStore } from '../lib/store'
@@ -19,12 +19,18 @@ function formatTime(iso: string): string {
 }
 
 /** Generate an editorial headline from meal items */
-function generateHeadline(items: MealItem[]): string {
-  if (items.length === 0) return ''
-  if (items.length === 1) return items[0].description
-  if (items.length === 2) return `${items[0].description} and ${items[1].description}`
-  const first = items.slice(0, -1).map(i => i.description).join(', ')
-  return `${first}, and ${items[items.length - 1].description}`
+function generateHeadline(items: MealItem[]): React.ReactNode {
+  if (items.length === 0) return null
+  const period = <span className="meal-card__headline-period">.</span>
+  if (items.length === 1) {
+    return <><em className="meal-card__headline-tail">{items[0].description}</em>{period}</>
+  }
+  if (items.length === 2) {
+    return <>{items[0].description} and <em className="meal-card__headline-tail">{items[1].description}</em>{period}</>
+  }
+  const head = items.slice(0, -1).map(i => i.description).join(', ')
+  const tail = items[items.length - 1].description
+  return <>{head}, and <em className="meal-card__headline-tail">{tail}</em>{period}</>
 }
 
 interface CalBadgeProps {
@@ -126,7 +132,7 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
     }
   }
 
-  const headline = generateHeadline(meal.items)
+  const headline = useMemo(() => generateHeadline(meal.items), [meal.items])
 
   return (
     <article className={`meal-card${menuOpen ? ' meal-card--menu-open' : ''}${groupPosition === 'first' ? ' meal-card--group-first' : groupPosition === 'middle' ? ' meal-card--group-middle' : groupPosition === 'last' ? ' meal-card--group-last' : ''}`} style={{ position: 'relative' }}>

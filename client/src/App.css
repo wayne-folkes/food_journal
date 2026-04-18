@@ -1055,6 +1055,15 @@
   margin: 0;
 }
 
+.meal-card__headline-tail {
+  font-style: italic;
+  font-weight: inherit;
+}
+.meal-card__headline-period {
+  color: var(--accent);
+  font-style: normal;
+}
+
 .meal-card__item-count {
   font-family: var(--font-sans);
   font-size: 10.5px;
@@ -1089,13 +1098,6 @@
   display: none;
 }
 
-.meal-card__item-emoji {
-  font-size: 1rem;
-  line-height: 1;
-  flex-shrink: 0;
-  width: 1.4em;
-  text-align: center;
-}
 
 .meal-card__item-desc {
   flex: 1;
@@ -1258,16 +1260,6 @@
 .meal-card__menu-item--danger { color: var(--danger); }
 .meal-card__menu-item--danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
 
-/* Meal calorie subtotal */
-.meal-card__cal-total {
-  text-align: right;
-  font-family: var(--font-sans);
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--ink-muted);
-  margin-top: 6px;
-  letter-spacing: 0.02em;
-}
 
 /* ── Edit Modal — calorie rows ───────────────────────────────────────────── */
 .edit-modal__cal-rows {
@@ -1740,35 +1732,6 @@ mark {
   background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 
-/* ── View toggle (Day | Week) ─────────────────────────────────────── */
-
-.view-toggle {
-  display: flex;
-  gap: 2px;
-  background: var(--border);
-  border-radius: 8px;
-  padding: 2px;
-  margin: 0 auto 8px;
-}
-
-.view-toggle__btn {
-  flex: 1;
-  padding: 4px 16px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ink-muted);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.view-toggle__btn--active {
-  background: var(--paper);
-  color: var(--ink);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
 
 /* ── Editorial Week View ─────────────────────────────────────────────────── */
 .ei-week {
