@@ -1,7 +1,6 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import type { MealWithItems } from '@shared/types/database'
 import { useEntriesStore, getWeekBounds } from '../lib/store'
-import { MEAL_TYPE_LABELS } from '../lib/mealType'
 import { EITile } from './EITile'
 
 interface WeekViewProps {
@@ -28,11 +27,10 @@ function isToday(dateStr: string): boolean {
 }
 
 export function WeekView({ weekMeals, weekStart, isLoading, onNavigateToDay }: WeekViewProps) {
-  const [priorItems, setPriorItems] = useState<Set<string>>(new Set())
   const { loadPriorItems } = useEntriesStore()
 
   useEffect(() => {
-    loadPriorItems(weekStart).then(setPriorItems)
+    loadPriorItems(weekStart)
   }, [weekStart, loadPriorItems])
 
   const groupedByDate = useMemo(() => {

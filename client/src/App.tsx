@@ -2,11 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { errorMessage } from '@shared/logger'
 import { supabase } from './lib/supabase'
-import { useEntriesStore, contextualRecent, todayString, getWeekBounds } from './lib/store'
+import { useEntriesStore, todayString, getWeekBounds } from './lib/store'
 import { MealComposer } from './components/MealComposer'
-import { suggestMealType } from './lib/mealType'
 import { MealLog } from './components/MealLog'
-import { RecentChips } from './components/RecentChips'
 import { EditMealModal } from './components/EditMealModal'
 import { AuthButton } from './components/AuthButton'
 import { DateNav } from './components/DateNav'
@@ -134,20 +132,6 @@ function AppInner() {
     }
   }
 
-  async function handleRelogItem(description: string) {
-    try {
-      await addMeal({
-        meal_type: suggestMealType(),
-        consumed_at: new Date().toISOString(),
-        raw_input: description,
-        items: [description],
-      })
-    } catch (err) {
-      toast.error('Failed to add entry. Please try again.')
-      log.withMetadata({ error: errorMessage(err) }).error('handleRelogItem failed')
-    }
-  }
-
   async function handleSaveEdit(
     id: string,
     updates: { meal_type: MealType; consumed_at: string; items: ChipItem[] }
@@ -233,15 +217,6 @@ function AppInner() {
   }
 
   const isViewingToday = selectedDate === todayString()
-  const currentMealType = suggestMealType()
-  const recent = useMemo(() => {
-    const loggedToday = new Set(
-      displayedMeals.flatMap(m => m.items.map(i => i.description.toLowerCase()))
-    )
-    return contextualRecent(meals, currentMealType).filter(
-      item => !loggedToday.has(item.toLowerCase())
-    )
-  }, [meals, displayedMeals, currentMealType])
   const step = viewMode === 'week' ? 7 : 1
 
   function getMastheadKicker(dateStr: string): string {
@@ -342,7 +317,7 @@ function AppInner() {
                 }
               }}
               onEstimateCalories={handleEstimateCalories}
-              onTryExample={(sentence) => {
+              onTryExample={() => {
                 setComposerOpen(true)
               }}
             />

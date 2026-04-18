@@ -105,14 +105,13 @@ function CalBadge({ item, onUpdateCalories }: CalBadgeProps) {
   )
 }
 
-export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories, groupPosition }: Props) {
+export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [estimating, setEstimating] = useState(false)
   const isAuthed = useEntriesStore((s) => s.isAuthed)
 
   const itemsWithCal = meal.items.filter((i) => i.calories != null)
   const totalCal = itemsWithCal.reduce((sum, i) => sum + (i.calories ?? 0), 0)
-  const hasPartial = itemsWithCal.length > 0 && itemsWithCal.length < meal.items.length
   const showSubtotal = itemsWithCal.length > 0
   const hasItemsNeedingCalories = meal.items.some((i) => i.calories === null)
   const showEstimateBtn = isAuthed && hasItemsNeedingCalories && onEstimateCalories != null

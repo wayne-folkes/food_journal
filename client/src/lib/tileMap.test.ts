@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { getTileSpec } from './tileMap'
-import type { TileSpec } from './tileMap'
 
 describe('getTileSpec', () => {
   it('returns known spec for exact match', () => {
