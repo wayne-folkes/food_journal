@@ -12,7 +12,6 @@ import { DateNav } from './components/DateNav'
 import { DaySummary } from './components/DaySummary'
 import { ToastProvider } from './components/Toast'
 import { SearchOverlay } from './components/SearchOverlay'
-import { AdminPanel } from './components/AdminPanel'
 import { WeekView } from './components/WeekView'
 import { lookupCalories } from './lib/caloriesLookup'
 import { offsetDate } from './lib/date'
@@ -294,7 +293,7 @@ function AppInner() {
               <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
             </svg>
           </button>
-          <AuthButton user={user} />
+          <AuthButton user={user} isAdmin={!!user?.app_metadata?.is_admin} />
         </div>
       </nav>
 
@@ -411,7 +410,6 @@ function AppInner() {
         />
       )}
 
-      {user?.app_metadata?.is_admin && <AdminPanel />}
     </div>
   )
 }
