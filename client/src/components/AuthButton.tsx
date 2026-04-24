@@ -8,9 +8,10 @@ interface Props {
     user_metadata?: { avatar_url?: string; full_name?: string }
   } | null
   isAdmin?: boolean
+  onExportPdf?: () => void
 }
 
-export function AuthButton({ user, isAdmin }: Props) {
+export function AuthButton({ user, isAdmin, onExportPdf }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [flushing, setFlushing] = useState(false)
   const toast = useToast()
@@ -97,6 +98,13 @@ export function AuthButton({ user, isAdmin }: Props) {
               {flushing ? 'Flushing…' : 'Purge cache'}
             </button>
           )}
+          <button
+            className="auth-user__menu-item"
+            role="menuitem"
+            onClick={() => { setMenuOpen(false); onExportPdf?.() }}
+          >
+            Export PDF
+          </button>
           <button
             className="auth-user__menu-item"
             role="menuitem"

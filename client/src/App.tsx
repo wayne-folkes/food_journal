@@ -12,6 +12,7 @@ import { DateNav } from './components/DateNav'
 import { DaySummary } from './components/DaySummary'
 import { ToastProvider } from './components/Toast'
 import { SearchOverlay } from './components/SearchOverlay'
+import { PdfExportModal } from './components/PdfExportModal'
 import { WeekView } from './components/WeekView'
 import { lookupCalories } from './lib/caloriesLookup'
 import { offsetDate } from './lib/date'
@@ -35,6 +36,7 @@ function AppInner() {
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day')
   const [composerOpen, setComposerOpen] = useState(false)
   const [composerInitialInput, setComposerInitialInput] = useState('')
+  const [pdfExportOpen, setPdfExportOpen] = useState(false)
   const activeUserIdRef = useRef<string | null>(null)
   const toast = useToast()
 
@@ -293,7 +295,7 @@ function AppInner() {
               <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
             </svg>
           </button>
-          <AuthButton user={user} isAdmin={!!user?.app_metadata?.is_admin} />
+          <AuthButton user={user} isAdmin={!!user?.app_metadata?.is_admin} onExportPdf={() => setPdfExportOpen(true)} />
         </div>
       </nav>
 
@@ -408,6 +410,10 @@ function AppInner() {
             setSearchOpen(false)
           }}
         />
+      )}
+
+      {pdfExportOpen && (
+        <PdfExportModal onClose={() => setPdfExportOpen(false)} />
       )}
 
     </div>
