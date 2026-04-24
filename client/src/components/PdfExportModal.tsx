@@ -57,6 +57,49 @@ export function PdfExportModal({ onClose }: Props) {
 
   const { isAuthed } = useEntriesStore()
 
+  const DATE_PRESETS = useMemo(() => {
+    const d = new Date(`${today}T12:00:00`)
+    const fmt = (date: Date) => date.toLocaleDateString('sv')
+    const mondayOf = (date: Date) => {
+      const day = date.getDay()
+      const diff = day === 0 ? -6 : 1 - day
+      const m = new Date(date)
+      m.setDate(date.getDate() + diff)
+      return m
+    }
+    const sundayOf = (monday: Date) => {
+      const s = new Date(monday)
+      s.setDate(monday.getDate() + 6)
+      return s
+    }
+
+    const thisMonday = mondayOf(d)
+    const lastMonday = new Date(thisMonday); lastMonday.setDate(thisMonday.getDate() - 7)
+    const twoWeeksAgo = new Date(thisMonday); twoWeeksAgo.setDate(thisMonday.getDate() - 14)
+    const threeWeeksAgo = new Date(thisMonday); threeWeeksAgo.setDate(thisMonday.getDate() - 21)
+
+    // Start of this calendar month
+    const monthStart = new Date(d.getFullYear(), d.getMonth(), 1)
+    const monthStartMonday = mondayOf(monthStart)
+    // End of this calendar month (or today if still in progress)
+    const monthEndRaw = new Date(d.getFullYear(), d.getMonth() + 1, 0)
+    const monthEnd = monthEndRaw > d ? d : monthEndRaw
+    const monthEndSunday = sundayOf(mondayOf(monthEnd))
+
+    // Last calendar month
+    const prevMonthEnd = new Date(d.getFullYear(), d.getMonth(), 0)
+    const prevMonthStart = new Date(prevMonthEnd.getFullYear(), prevMonthEnd.getMonth(), 1)
+
+    return [
+      { label: 'This week',     start: fmt(thisMonday),      end: fmt(sundayOf(thisMonday)) },
+      { label: 'Last week',     start: fmt(lastMonday),       end: fmt(sundayOf(lastMonday)) },
+      { label: 'Last 2 weeks',  start: fmt(twoWeeksAgo),      end: fmt(sundayOf(thisMonday)) },
+      { label: 'Last 3 weeks',  start: fmt(threeWeeksAgo),    end: fmt(sundayOf(thisMonday)) },
+      { label: 'This month',    start: fmt(monthStartMonday), end: fmt(monthEndSunday) },
+      { label: 'Last month',    start: fmt(mondayOf(prevMonthStart)), end: fmt(sundayOf(mondayOf(prevMonthEnd))) },
+    ]
+  }, [today])
+
   // Load meals for the date range directly from Supabase
   useEffect(() => {
     if (!isAuthed) return
@@ -180,6 +223,22 @@ export function PdfExportModal({ onClose }: Props) {
             {/* Date range picker */}
             <div className="ei-pdf__section">
               <div className="ei-pdf__section-label">Date range</div>
+              <div className="ei-pdf__preset-row">
+                {DATE_PRESETS.map((p) => {
+                  const active = p.start === startDate && p.end === endDate
+                  return (
+                    <button
+                      key={p.label}
+                      type="button"
+                      className={`ei-pdf__preset-btn${active ? ' ei-pdf__preset-btn--active' : ''}`}
+                      style={active ? { borderColor: accent, background: `${accent}14`, color: accent } : {}}
+                      onClick={() => { setStartDate(p.start); setEndDate(p.end) }}
+                    >
+                      {p.label}
+                    </button>
+                  )
+                })}
+              </div>
               <div className="ei-pdf__date-row">
                 <label className="ei-pdf__date-label">
                   From
@@ -203,6 +262,7 @@ export function PdfExportModal({ onClose }: Props) {
                     onChange={(e) => setEndDate(e.target.value)}
                   />
                 </label>
+              </div>
               </div>
               <div className="ei-pdf__range-stat">
                 {loading
