@@ -263,7 +263,6 @@ export function PdfExportModal({ onClose }: Props) {
                   />
                 </label>
               </div>
-              </div>
               <div className="ei-pdf__range-stat">
                 {loading
                   ? 'Loading…'
