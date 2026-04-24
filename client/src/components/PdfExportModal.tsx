@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import type { MealWithItems } from '@shared/types/database'
-import { useEntriesStore, getWeekBounds } from '../lib/store'
+import { useEntriesStore, getWeekBounds, todayString } from '../lib/store'
+import { supabase } from '../lib/supabase'
 import { PDFCover, PDFWeeklyArchive } from './PdfPages'
 import { buildTheme, ACCENT_PRESETS } from '../lib/pdfThemes'
 import type { PdfVoice, PdfTileMode } from '../lib/pdfThemes'
@@ -22,80 +23,141 @@ const TILE_MODES: { key: PdfTileMode; label: string }[] = [
   { key: 'mono',     label: 'Greyscale' },
 ]
 
+type WeekGroup = {
+  weekStart: string
+  weekRangeLabel: string
+  weekLabel: string
+  days: { date: string; meals: MealWithItems[] }[]
+}
+
+function buildWeekLabel(weekStart: string): string {
+  const d = new Date(`${weekStart}T12:00:00`)
+  const startOfYear = new Date(d.getFullYear(), 0, 1)
+  const week = Math.ceil(((d.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7)
+  return `Week ${week}`
+}
+
+function buildWeekRangeLabel(days: { date: string }[]): string {
+  if (days.length === 0) return ''
+  const first = new Date(`${days[0].date}T12:00:00`)
+  const last  = new Date(`${days[6].date}T12:00:00`)
+  const opts = { month: 'long' as const, day: 'numeric' as const }
+  return `${first.toLocaleDateString(undefined, opts)} – ${last.toLocaleDateString(undefined, { day: 'numeric', year: 'numeric' })}`
+}
+
 export function PdfExportModal({ onClose }: Props) {
+  const today = todayString()
   const [voice, setVoice] = useState<PdfVoice>('magazine')
   const [accent, setAccent] = useState('#A32F22')
   const [tileMode, setTileMode] = useState<PdfTileMode>('textured')
-  const [weekDays, setWeekDays] = useState<{ date: string; meals: MealWithItems[] }[]>([])
+  const [startDate, setStartDate] = useState(() => getWeekBounds(today).start)
+  const [endDate, setEndDate] = useState(() => getWeekBounds(today).end)
+  const [rangeMeals, setRangeMeals] = useState<MealWithItems[]>([])
+  const [loading, setLoading] = useState(false)
 
-  const { dayCache, loadPriorItems } = useEntriesStore()
+  const { isAuthed } = useEntriesStore()
 
-  // Load current week on open
+  // Load meals for the date range directly from Supabase
   useEffect(() => {
-    const today = new Date().toLocaleDateString('sv')
-    const { start } = getWeekBounds(today)
-    loadPriorItems(start)
-  }, [loadPriorItems])
+    if (!isAuthed) return
+    setLoading(true)
 
-  // Build weekDays array from dayCache whenever cache updates
-  useEffect(() => {
-    const today = new Date().toLocaleDateString('sv')
-    const { start } = getWeekBounds(today)
-    const days: { date: string; meals: MealWithItems[] }[] = []
-    const d = new Date(`${start}T12:00:00`)
-    for (let i = 0; i < 7; i++) {
-      const dateStr = d.toLocaleDateString('sv')
-      days.push({ date: dateStr, meals: dayCache[dateStr] ?? [] })
-      d.setDate(d.getDate() + 1)
+    const startISO = new Date(`${startDate}T00:00:00`).toISOString()
+    const endISO   = new Date(`${endDate}T23:59:59.999`).toISOString()
+
+    supabase
+      .from('meals')
+      .select('*, meal_items(*)')
+      .gte('consumed_at', startISO)
+      .lte('consumed_at', endISO)
+      .order('consumed_at', { ascending: true })
+      .then(({ data, error }) => {
+        if (!error && data) {
+          type Row = Omit<MealWithItems, 'items'> & { meal_items: MealWithItems['items'] }
+          setRangeMeals(
+            (data as Row[]).map(m => ({
+              ...m,
+              items: [...(m.meal_items ?? [])].sort((a, b) => a.position - b.position),
+            }))
+          )
+        }
+        setLoading(false)
+      })
+  }, [startDate, endDate, isAuthed])
+
+  // Group meals into weeks (Mon–Sun)
+  const weekGroups = useMemo((): WeekGroup[] => {
+    let ws = getWeekBounds(startDate).start
+    const rangeEnd = getWeekBounds(endDate).end
+    const groups: WeekGroup[] = []
+
+    while (ws <= rangeEnd) {
+      const days: { date: string; meals: MealWithItems[] }[] = []
+      const d = new Date(`${ws}T12:00:00`)
+      for (let i = 0; i < 7; i++) {
+        const dateStr = d.toLocaleDateString('sv')
+        days.push({
+          date: dateStr,
+          meals: rangeMeals.filter(m => new Date(m.consumed_at).toLocaleDateString('sv') === dateStr),
+        })
+        d.setDate(d.getDate() + 1)
+      }
+      groups.push({ weekStart: ws, weekRangeLabel: buildWeekRangeLabel(days), weekLabel: buildWeekLabel(ws), days })
+
+      // Advance to next Monday
+      const nextWeek = new Date(`${ws}T12:00:00`)
+      nextWeek.setDate(nextWeek.getDate() + 7)
+      ws = nextWeek.toLocaleDateString('sv')
     }
-    setWeekDays(days)
-  }, [dayCache])
+
+    return groups
+  }, [rangeMeals, startDate, endDate])
 
   const theme = useMemo(() => buildTheme(voice, accent), [voice, accent])
 
-  const mealCount = weekDays.reduce((s, d) => s + d.meals.length, 0)
-  const itemCount  = weekDays.reduce((s, d) => s + d.meals.flatMap(m => m.items).length, 0)
+  const totalMeals = weekGroups.reduce((s, g) => s + g.days.reduce((sd, d) => sd + d.meals.length, 0), 0)
+  const totalItems = weekGroups.reduce((s, g) => s + g.days.reduce((sd, d) => sd + d.meals.flatMap(m => m.items).length, 0), 0)
+  const weekCount  = weekGroups.length
 
-  // Build the range label from weekDays
-  const weekRangeLabel = useMemo(() => {
-    if (weekDays.length === 0) return ''
-    const first = new Date(`${weekDays[0].date}T12:00:00`)
-    const last  = new Date(`${weekDays[6].date}T12:00:00`)
+  // Cover: full-range date label + first week's tile strip
+  const coverDateRange = useMemo(() => {
+    if (weekGroups.length === 0) return ''
+    if (weekGroups.length === 1) return weekGroups[0].weekRangeLabel
+    const first = new Date(`${weekGroups[0].days[0].date}T12:00:00`)
+    const last  = new Date(`${weekGroups[weekGroups.length - 1].days[6].date}T12:00:00`)
     const opts = { month: 'long' as const, day: 'numeric' as const }
     return `${first.toLocaleDateString(undefined, opts)} – ${last.toLocaleDateString(undefined, { day: 'numeric', year: 'numeric' })}`
-  }, [weekDays])
+  }, [weekGroups])
 
-  const weekLabel = useMemo(() => {
-    if (weekDays.length === 0) return ''
-    const d = new Date(`${weekDays[0].date}T12:00:00`)
-    const week = Math.ceil(((d.getTime() - new Date(d.getFullYear(), 0, 1).getTime()) / 86400000 + new Date(d.getFullYear(), 0, 1).getDay() + 1) / 7)
-    return `Week ${week}`
-  }, [weekDays])
+  const coverLabel  = weekCount === 1 ? (weekGroups[0]?.weekLabel ?? '') : `${weekCount} Weeks`
+  const totalPages  = 1 + weekCount   // cover + one archive per week
 
   function handlePrint() {
     window.print()
   }
 
-  // Render the print-only pages into a portal outside the modal
-  const printPages = weekDays.length > 0 ? createPortal(
+  const printPages = weekGroups.length > 0 ? createPortal(
     <div id="pdf-print-root" className="pdf-print-root">
       <PDFCover
         theme={theme}
         tileMode={tileMode}
-        weekLabel={weekLabel}
-        dateRange={weekRangeLabel}
-        mealCount={mealCount}
-        itemCount={itemCount}
-        weekDays={weekDays}
+        weekLabel={coverLabel}
+        dateRange={coverDateRange}
+        mealCount={totalMeals}
+        itemCount={totalItems}
+        weekDays={weekGroups[0].days}
       />
-      <PDFWeeklyArchive
-        theme={theme}
-        tileMode={tileMode}
-        weekDays={weekDays}
-        weekRangeLabel={weekRangeLabel}
-        pageNumber={2}
-        totalPages={2}
-      />
+      {weekGroups.map((group, idx) => (
+        <PDFWeeklyArchive
+          key={group.weekStart}
+          theme={theme}
+          tileMode={tileMode}
+          weekDays={group.days}
+          weekRangeLabel={group.weekRangeLabel}
+          pageNumber={idx + 2}
+          totalPages={totalPages}
+        />
+      ))}
     </div>,
     document.body
   ) : null
@@ -109,20 +171,45 @@ export function PdfExportModal({ onClose }: Props) {
           <div className="ei-pdf__header">
             <button className="ei-pdf__cancel" onClick={onClose} type="button">Cancel</button>
             <span className="ei-pdf__title">Export PDF</span>
-            <button
-              className="ei-pdf__print-btn"
-              onClick={handlePrint}
-              type="button"
-            >
+            <button className="ei-pdf__print-btn" onClick={handlePrint} type="button">
               Print
             </button>
           </div>
 
           <div className="ei-pdf__body">
-            {/* Week summary */}
-            <div className="ei-pdf__week-info">
-              <span className="ei-pdf__week-label">{weekRangeLabel || 'Loading…'}</span>
-              <span className="ei-pdf__week-stat">{mealCount} meals · {itemCount} items</span>
+            {/* Date range picker */}
+            <div className="ei-pdf__section">
+              <div className="ei-pdf__section-label">Date range</div>
+              <div className="ei-pdf__date-row">
+                <label className="ei-pdf__date-label">
+                  From
+                  <input
+                    type="date"
+                    className="ei-pdf__date-input"
+                    value={startDate}
+                    max={endDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </label>
+                <span className="ei-pdf__date-sep">—</span>
+                <label className="ei-pdf__date-label">
+                  To
+                  <input
+                    type="date"
+                    className="ei-pdf__date-input"
+                    value={endDate}
+                    min={startDate}
+                    max={today}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="ei-pdf__range-stat">
+                {loading
+                  ? 'Loading…'
+                  : `${weekCount} week${weekCount !== 1 ? 's' : ''} · ${totalMeals} meal${totalMeals !== 1 ? 's' : ''} · ${totalItems} items`
+                }
+              </div>
             </div>
 
             {/* Voice selector */}
