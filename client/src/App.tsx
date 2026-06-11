@@ -311,6 +311,20 @@ function AppInner() {
         </p>
       </div>
 
+      {/* Glowing compose bar — in flow on desktop, docked to bottom on mobile */}
+      {isViewingToday && viewMode === 'day' && (
+        <div className="ei-compose-pill" onClick={() => setComposerOpen(true)}>
+          <svg className="ei-compose-pill__icon" width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M2 13.5V16h2.5L13.07 7.43 10.57 4.93 2 13.5z" fill="currentColor" opacity="0.55"/>
+            <path d="M15.41 4.59a1 1 0 000-1.42l-1.58-1.58a1 1 0 00-1.42 0L11 3l2.5 2.5 1.91-1.91z" fill="currentColor" opacity="0.55"/>
+          </svg>
+          <span className="ei-compose-pill__text">Log a meal…</span>
+          <div className="ei-compose-pill__btn">
+            <span>✎</span>
+          </div>
+        </div>
+      )}
+
       <main className="app-main">
         <DateNav
           date={selectedDate}
@@ -358,20 +372,6 @@ function AppInner() {
           </>
         )}
       </main>
-
-      {/* Floating compose pill */}
-      {isViewingToday && viewMode === 'day' && (
-        <div className="ei-compose-pill" onClick={() => setComposerOpen(true)}>
-          <svg className="ei-compose-pill__icon" width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path d="M2 13.5V16h2.5L13.07 7.43 10.57 4.93 2 13.5z" fill="currentColor" opacity="0.55"/>
-            <path d="M15.41 4.59a1 1 0 000-1.42l-1.58-1.58a1 1 0 00-1.42 0L11 3l2.5 2.5 1.91-1.91z" fill="currentColor" opacity="0.55"/>
-          </svg>
-          <span className="ei-compose-pill__text">Log a meal…</span>
-          <div className="ei-compose-pill__btn">
-            <span>✎</span>
-          </div>
-        </div>
-      )}
 
       {composerOpen && (
         <div className="ei-compose-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setComposerOpen(false); setComposerInitialInput('') } }}>
