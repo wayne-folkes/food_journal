@@ -1,4 +1,4 @@
-import { parseChip, parseMeal } from './parser'
+import { parseChip, parseMeal, parseSentence } from './parser'
 
 // Fixed reference date: 2024-06-15 at noon local time
 const REF = new Date(2024, 5, 15, 12, 0, 0, 0) // June 15 2024, 12:00:00
@@ -115,5 +115,34 @@ describe('parseMeal', () => {
   it('returns empty items array for empty input', () => {
     const { items } = parseMeal([], REF)
     expect(items).toEqual([])
+  })
+})
+
+describe('parseSentence', () => {
+  it('splits on commas and the word "and"', () => {
+    const { items } = parseSentence('salmon, brown rice and ginger tea', REF)
+    expect(items).toEqual(['salmon', 'brown rice', 'ginger tea'])
+  })
+
+  it('does not split words that merely contain "and"', () => {
+    const { items } = parseSentence('ham sandwich and coffee', REF)
+    expect(items).toEqual(['ham sandwich', 'coffee'])
+  })
+
+  it('handles Oxford comma before "and"', () => {
+    const { items } = parseSentence('oats, honey, and a cortado', REF)
+    expect(items).toEqual(['oats', 'honey', 'a cortado'])
+  })
+
+  it('extracts a time phrase from the sentence', () => {
+    const { items, consumed_at } = parseSentence('eggs and coffee at 8am', REF)
+    expect(items).toEqual(['eggs', 'coffee'])
+    expect(consumed_at.getHours()).toBe(8)
+  })
+
+  it('returns empty items for blank input', () => {
+    const { items, consumed_at } = parseSentence('   ', REF)
+    expect(items).toEqual([])
+    expect(consumed_at).toBe(REF)
   })
 })

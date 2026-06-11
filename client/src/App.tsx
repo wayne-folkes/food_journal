@@ -4,6 +4,7 @@ import { errorMessage } from '@shared/logger'
 import { supabase } from './lib/supabase'
 import { useEntriesStore, todayString, getWeekBounds } from './lib/store'
 import { MealComposer } from './components/MealComposer'
+import { QuickLogBar } from './components/QuickLogBar'
 import { MealLog } from './components/MealLog'
 import { MealDetail } from './components/MealDetail'
 import { EditMealModal } from './components/EditMealModal'
@@ -324,18 +325,15 @@ function AppInner() {
         </p>
       </div>
 
-      {/* Glowing compose bar — in flow on desktop, docked to bottom on mobile */}
+      {/* Glowing compose bar — type + Enter logs immediately; pencil opens the sheet */}
       {isViewingToday && viewMode === 'day' && (
-        <div className="ei-compose-pill" onClick={() => setComposerOpen(true)}>
-          <svg className="ei-compose-pill__icon" width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path d="M2 13.5V16h2.5L13.07 7.43 10.57 4.93 2 13.5z" fill="currentColor" opacity="0.55"/>
-            <path d="M15.41 4.59a1 1 0 000-1.42l-1.58-1.58a1 1 0 00-1.42 0L11 3l2.5 2.5 1.91-1.91z" fill="currentColor" opacity="0.55"/>
-          </svg>
-          <span className="ei-compose-pill__text">Log a meal…</span>
-          <div className="ei-compose-pill__btn">
-            <span>✎</span>
-          </div>
-        </div>
+        <QuickLogBar
+          onQuickLog={handleAddMeal}
+          onOpenComposer={(initialInput) => {
+            setComposerInitialInput(initialInput)
+            setComposerOpen(true)
+          }}
+        />
       )}
 
       <main className="app-main">
