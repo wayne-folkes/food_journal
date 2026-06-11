@@ -256,17 +256,30 @@ function AppInner() {
     const startOfYear = new Date(d.getFullYear(), 0, 0)
     const dayOfYear = Math.floor((d.getTime() - startOfYear.getTime()) / 86400000)
     const weekNum = Math.ceil(dayOfYear / 7)
+    if (viewMode === 'week') {
+      const { start, end } = getWeekBounds(dateStr)
+      const fmt = (s: string) =>
+        new Date(`${s}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      return `Week ${weekNum} · ${fmt(start)} – ${fmt(end)}`
+    }
     return `Week ${weekNum} · Day ${dayOfYear}`
   }
 
   function getMastheadTitle(dateStr: string): string {
     const today = todayString()
+    if (viewMode === 'week') {
+      return getWeekBounds(dateStr).start === getWeekBounds(today).start ? 'This week' : 'That week'
+    }
     if (dateStr === today) return 'Today'
     const d = new Date(`${dateStr}T12:00:00`)
     return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
   }
 
   function getMastheadSubtitle(dateStr: string, meals: MealWithItems[]): string {
+    if (viewMode === 'week') {
+      const count = weekMeals.length
+      return count > 0 ? `${count} meal${count === 1 ? '' : 's'} logged this week` : 'Nothing logged yet'
+    }
     const d = new Date(`${dateStr}T12:00:00`)
     const datePart = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
     const mealCount = meals.length

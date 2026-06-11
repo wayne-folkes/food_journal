@@ -1,7 +1,10 @@
 import { useEffect, useMemo } from 'react'
-import type { MealWithItems } from '@shared/types/database'
+import type { MealType, MealWithItems } from '@shared/types/database'
 import { useEntriesStore, getWeekBounds } from '../lib/store'
 import { EITile } from './EITile'
+
+/** Stacking order for chart segments — roughly chronological through the day */
+const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'drink']
 
 interface WeekViewProps {
   weekMeals: MealWithItems[]
@@ -53,8 +56,11 @@ export function WeekView({ weekMeals, weekStart, isLoading, onNavigateToDay }: W
   const totalMeals = weekMeals.length
   const totalItems = weekMeals.reduce((sum, m) => sum + m.items.length, 0)
 
-  // Max meals in a day (for bar chart scaling)
-  const maxMealsPerDay = Math.max(1, ...groupedByDate.map(d => d.meals.length))
+  // Max items in a day (for bar chart scaling — segment heights ∝ item count)
+  const maxItemsPerDay = Math.max(
+    1,
+    ...groupedByDate.map(d => d.meals.reduce((sum, m) => sum + m.items.length, 0))
+  )
 
   return (
     <div className={`ei-week${isLoading ? ' ei-week--loading' : ''}`} aria-busy={isLoading}>
@@ -64,24 +70,39 @@ export function WeekView({ weekMeals, weekStart, isLoading, onNavigateToDay }: W
         <strong>{totalMeals}</strong> meal{totalMeals === 1 ? '' : 's'}, <strong>{totalItems}</strong> item{totalItems === 1 ? '' : 's'}
       </p>
 
-      {/* Tonal bar chart */}
+      {/* Stacked bar chart — segments colored by meal type */}
       <div className="ei-week__chart">
         {groupedByDate.map(({ date, meals }) => {
           const today = isToday(date)
-          const barHeight = meals.length > 0 ? Math.max(12, (meals.length / maxMealsPerDay) * 100) : 4
+          const itemCount = meals.reduce((sum, m) => sum + m.items.length, 0)
+          const colHeight = itemCount > 0 ? Math.max(14, (itemCount / maxItemsPerDay) * 100) : 0
+          const countByType = new Map<MealType, number>()
+          for (const m of meals) {
+            countByType.set(m.meal_type, (countByType.get(m.meal_type) ?? 0) + m.items.length)
+          }
+          const segments = MEAL_ORDER.filter(t => countByType.has(t)).map(t => ({
+            type: t,
+            count: countByType.get(t)!,
+          }))
           return (
             <button
               key={date}
               className={`ei-week__chart-col${today ? ' ei-week__chart-col--today' : ''}`}
               onClick={() => onNavigateToDay(date)}
-              aria-label={`${formatDayAbbrev(date)}: ${meals.length} meals`}
+              aria-label={`${formatDayAbbrev(date)}: ${meals.length} meals, ${itemCount} items`}
             >
               <div className="ei-week__chart-bar-wrap">
-                {meals.length > 0 ? (
-                  <div
-                    className="ei-week__chart-bar"
-                    style={{ height: `${barHeight}%` }}
-                  />
+                {segments.length > 0 ? (
+                  <div className="ei-week__chart-stack" style={{ height: `${colHeight}%` }}>
+                    {segments.map(seg => (
+                      <div
+                        key={seg.type}
+                        className="ei-week__chart-seg"
+                        data-meal-type={seg.type}
+                        style={{ flexGrow: seg.count }}
+                      />
+                    ))}
+                  </div>
                 ) : (
                   <div className="ei-week__chart-bar ei-week__chart-bar--empty" />
                 )}
@@ -136,6 +157,11 @@ export function WeekView({ weekMeals, weekStart, isLoading, onNavigateToDay }: W
                   </>
                 )}
               </div>
+              {meals.length > 0 && (
+                <span className="ei-week__day-meta">
+                  {meals.length} meal{meals.length === 1 ? '' : 's'} · {allItems.length} item{allItems.length === 1 ? '' : 's'}
+                </span>
+              )}
             </button>
           )
         })}
