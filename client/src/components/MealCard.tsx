@@ -136,7 +136,11 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
   const headline = useMemo(() => generateHeadline(meal.items), [meal.items])
 
   return (
-    <article className={`meal-card${isFirst ? ' meal-card--lede' : ''}${menuOpen ? ' meal-card--menu-open' : ''}${groupPosition === 'first' ? ' meal-card--group-first' : groupPosition === 'middle' ? ' meal-card--group-middle' : groupPosition === 'last' ? ' meal-card--group-last' : ''}`} style={{ position: 'relative' }}>
+    <article
+      className={`meal-card${isFirst ? ' meal-card--lede' : ''}${menuOpen ? ' meal-card--menu-open' : ''}${groupPosition === 'first' ? ' meal-card--group-first' : groupPosition === 'middle' ? ' meal-card--group-middle' : groupPosition === 'last' ? ' meal-card--group-last' : ''}`}
+      data-meal-type={meal.meal_type}
+      style={{ position: 'relative' }}
+    >
       {/* Kicker row */}
       <div className="meal-card__kicker">
         <span className="meal-card__type">— {MEAL_TYPE_LABELS[meal.meal_type]}</span>

@@ -1,69 +1,71 @@
-@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Space+Grotesk:wght@400..700&display=swap');
 
 /* ── Google Fonts ─────────────────────────────────────────────────────────
-   Playfair Display — editorial serif for headings, wordmark
-   EB Garamond       — body serif for text, inputs, entries
+   Space Grotesk     — display headings (Arcade Glow redesign)
+   EB Garamond       — body serif for text, inputs, entries (legacy)
+   Playfair Display — editorial serif (legacy fallback)
    ───────────────────────────────────────────────────────────────────────── */
 
-/* ── Design tokens ───────────────────────────────────────────────────────── */
+/* ── Design tokens — Arcade Glow (dark mode) ─────────────────────────────── */
 :root {
-  /* Palette — Editorial × iOS */
-  --bg:             #F5F0E6;
-  --cream:          #F5F0E6;       /* alias for bg — used widely */
-  --cream-mid:      #EDE7DA;
-  --cream-dark:     #E0D8C8;
-  --paper:          #FFFFFF;
-  --card:           #FFFFFF;
-  --ink:            #1C1A16;
-  --ink-mid:        rgba(60, 50, 38, 0.62);
-  --ink-muted:      rgba(60, 50, 38, 0.62);
-  --ter:            rgba(60, 50, 38, 0.32);
-  --sep:            rgba(28, 26, 22, 0.09);
-  --accent:         #A32F22;       /* editorial red */
-  --accent-hover:   #8A2619;
-  --accent-light:   rgba(163, 47, 34, 0.08);
-  --ring:           #C7602F;       /* warm orange — streak/progress */
-  --sage:           #4A6741;
-  --danger:         #B83232;
-  --border:         rgba(28, 26, 22, 0.09);
+  /* Palette — Arcade Glow */
+  --bg:             #0F0E16;       /* deep indigo base */
+  --cream:          #0F0E16;       /* alias for bg */
+  --cream-mid:      #1A1826;       /* cards */
+  --cream-dark:     #1C1A2A;       /* hover/darker cards */
+  --paper:          #1A1826;       /* sheets/modals */
+  --card:           #1A1826;
+  --ink:            #F2EFFA;       /* primary text */
+  --ink-mid:        rgba(242, 239, 250, 0.7);
+  --ink-muted:      rgba(242, 239, 250, 0.55);
+  --ter:            rgba(242, 239, 250, 0.4);
+  --sep:            rgba(255, 255, 255, 0.08);
+  --accent:         #3DDC97;       /* mint green (tweakable) */
+  --accent-hover:   #2ECE85;
+  --accent-light:   rgba(61, 220, 151, 0.12);
+  --ring:           #3DDC97;
+  --sage:           #3DDC97;
+  --danger:         #FF6B5E;       /* coral */
+  --border:         rgba(255, 255, 255, 0.08);
 
   /* Legacy aliases — components still reference these */
   --terra:          var(--accent);
   --terra-hover:    var(--accent-hover);
   --terra-light:    var(--accent-light);
-  --terra-border:   rgba(163, 47, 34, 0.18);
+  --terra-border:   rgba(61, 220, 151, 0.24);
 
   /* Adaptive backdrop tokens */
-  --header-bg:  rgba(245, 240, 230, 0.92);
-  --overlay-bg: rgba(28, 26, 22, 0.4);
+  --header-bg:  rgba(15, 14, 22, 0.95);
+  --overlay-bg: rgba(10, 9, 16, 0.62);
 
-  /* Shadows — editorial: lighter, subtler */
-  --shadow-sm:   0 1px 2px rgba(28, 26, 22, 0.04);
-  --shadow-card: 0 1px 2px rgba(28, 26, 22, 0.04), 0 6px 20px rgba(28, 26, 22, 0.04);
-  --shadow-md:   0 4px 16px rgba(28, 26, 22, 0.08);
-  --shadow-up:   0 -2px 12px rgba(28, 26, 22, 0.06);
+  /* Shadows — arcade: glowing, neon */
+  --shadow-sm:   0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.35), 0 0 24px rgba(61, 220, 151, 0.07);
+  --shadow-md:   0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-up:   0 -2px 12px rgba(0, 0, 0, 0.3);
 
-  /* Radii */
-  --radius-sm:  5px;
-  --radius-md:  10px;
-  --radius-lg:  16px;
-  --radius-xl:  24px;
+  /* Radii — arcade: slightly larger */
+  --radius-sm:  13px;
+  --radius-md:  13px;
+  --radius-lg:  22px;
+  --radius-xl:  26px;
 
   /* Input bar height */
-  --input-bar-height: 72px;
+  --input-bar-height: 64px;
 
   /* Typography */
-  --font-serif:  'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-serif:  'Space Grotesk', -apple-system, 'SF Pro Text', system-ui, sans-serif;
   --font-body:   'EB Garamond', Georgia, serif;
   --font-sans:   -apple-system, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', -apple-system, 'SF Pro Text', system-ui, sans-serif;
 
-  /* Meal type accent colors — all use accent in editorial design */
-  --meal-breakfast: #A32F22;
-  --meal-lunch:     #A32F22;
-  --meal-dinner:    #A32F22;
-  --meal-snack:     #A32F22;
-  --meal-dessert:   #A32F22;
-  --meal-drink:     #A32F22;
+  /* Meal type neon colors — Arcade Glow */
+  --meal-breakfast: #FFC53D;  /* amber */
+  --meal-lunch:     #A3E635;  /* lime */
+  --meal-dinner:    #8B7CFF;  /* violet */
+  --meal-snack:     #FF7AA2;  /* pink */
+  --meal-dessert:   #FF9F6B;  /* orange */
+  --meal-drink:     #4DD8E6;  /* cyan */
 
   /* Base */
   font-family: var(--font-body);
@@ -94,50 +96,4 @@ body {
   min-height: 100svh;
   display: flex;
   flex-direction: column;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg:           #1A1712;
-    --cream:        #1A1712;
-    --cream-mid:    #231F19;
-    --cream-dark:   #2E2920;
-    --paper:        #211D17;
-    --card:         #211D17;
-    --ink:          #D4CFC4;
-    --ink-mid:      rgba(200, 190, 175, 0.65);
-    --ink-muted:    rgba(200, 190, 175, 0.50);
-    --ter:          rgba(200, 190, 175, 0.25);
-    --sep:          rgba(200, 190, 175, 0.10);
-    --accent:       #D4553F;
-    --accent-hover: #C04838;
-    --accent-light: rgba(212, 85, 63, 0.12);
-    --ring:         #D4783F;
-    --sage:         #7A9060;
-    --danger:       #CC4444;
-    --border:       rgba(200, 190, 175, 0.10);
-
-    --terra:        var(--accent);
-    --terra-hover:  var(--accent-hover);
-    --terra-light:  var(--accent-light);
-    --terra-border: rgba(212, 85, 63, 0.20);
-
-    --shadow-sm:   0 1px 4px rgba(0, 0, 0, 0.5);
-    --shadow-card: 0 0 0 1px rgba(200, 190, 175, 0.06), 0 4px 16px rgba(0, 0, 0, 0.5);
-    --shadow-md:   0 4px 24px rgba(0, 0, 0, 0.7);
-    --shadow-up:   0 -2px 12px rgba(0, 0, 0, 0.4);
-
-    --meal-breakfast: #D4553F;
-    --meal-lunch:     #D4553F;
-    --meal-dinner:    #D4553F;
-    --meal-snack:     #D4553F;
-    --meal-dessert:   #D4553F;
-    --meal-drink:     #D4553F;
-
-    --header-bg:  rgba(26, 23, 18, 0.95);
-    --overlay-bg: rgba(0, 0, 0, 0.7);
-
-    background-color: var(--bg);
-    color: var(--ink);
-  }
 }
