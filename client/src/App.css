@@ -126,7 +126,7 @@
 /* ── Glowing Compose Bar (Top Fixed) ──────────────────────────────────────── */
 .ei-compose-pill {
   position: fixed;
-  top: calc(18px + var(--topbar-height, 50px));
+  top: 18px;
   left: 16px;
   right: 16px;
   max-width: 568px;
@@ -150,6 +150,11 @@
 .ei-compose-pill:hover {
   border-color: rgba(61, 220, 151, 0.55);
   box-shadow: 0 0 28px rgba(61, 220, 151, 0.3);
+}
+
+/* Add padding to push content below compose bar */
+.app-main {
+  padding-top: 120px !important;
 }
 
 .ei-compose-pill__icon {
