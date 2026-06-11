@@ -84,7 +84,7 @@ describe('SearchOverlay', () => {
     })
 
     await waitFor(() => {
-      expect(document.querySelector('.meal-card__item')?.textContent).toBe('Coffee')
+      expect(document.querySelector('.search-result__items')?.textContent).toBe('Coffee')
     })
 
     await act(async () => {
@@ -93,7 +93,7 @@ describe('SearchOverlay', () => {
     })
 
     await waitFor(() => {
-      expect(document.querySelector('.meal-card__item')?.textContent).toBe('Coffee')
+      expect(document.querySelector('.search-result__items')?.textContent).toBe('Coffee')
       expect(document.body.textContent).not.toContain('Cookies')
     })
   })
