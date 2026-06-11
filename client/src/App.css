@@ -25,7 +25,6 @@
 .ei-nav__back {
   color: var(--accent, var(--terra));
   font-family: var(--font-body);
-  font-style: italic;
   font-size: 16px;
   display: flex;
   align-items: center;
@@ -284,7 +283,6 @@
   font-family: var(--font-serif);
   font-size: 18px;
   font-weight: 600;
-  font-style: italic;
   color: var(--ink);
   letter-spacing: -0.3px;
 }
@@ -585,7 +583,6 @@
   cursor: pointer;
   font-family: var(--font-body);
   font-size: 15px;
-  font-style: italic;
   color: var(--accent, var(--terra));
   padding: 4px 0;
   font-weight: 500;
@@ -619,7 +616,6 @@
   cursor: pointer;
   font-family: var(--font-body);
   font-size: 14px;
-  font-style: italic;
   color: var(--ink-muted);
   padding: 4px 0;
 }
@@ -671,11 +667,9 @@
   font-family: var(--font-body);
   font-size: 20px;
   line-height: 1.35;
-  font-style: italic;
   color: var(--ink);
 }
 .ei-composer__input-area .chip-input__field::placeholder {
-  font-style: italic;
   color: var(--ink-muted);
   opacity: 0.6;
 }
@@ -683,7 +677,6 @@
 .ei-composer__input-area .chip-input__chip {
   font-family: var(--font-body);
   font-size: 15px;
-  font-style: italic;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   border-color: color-mix(in srgb, var(--accent) 25%, transparent);
   color: var(--accent, var(--terra));
@@ -692,7 +685,6 @@
 .ei-composer__hint {
   font-family: var(--font-body);
   font-size: 13px;
-  font-style: italic;
   color: var(--ink-muted);
   margin: 6px 0 0;
   opacity: 0.7;
@@ -741,7 +733,6 @@
   flex: 1;
   font-family: var(--font-body);
   font-size: 16px;
-  font-style: italic;
   color: var(--ink);
 }
 
@@ -937,7 +928,6 @@
   font-family: var(--font-serif);
   font-size: 22px;
   font-weight: 500;
-  font-style: italic;
   color: var(--ink);
   margin: 6px 0 0;
   letter-spacing: -0.3px;
@@ -981,7 +971,6 @@
 .day-summary__stat--muted .day-summary__stat-value {
   font-family: var(--font-body);
   font-size: 14px;
-  font-style: italic;
   color: var(--ink-muted);
 }
 
@@ -1007,7 +996,6 @@
 
 .date-nav__label {
   font-family: var(--font-serif);
-  font-style: italic;
   font-size: 0.95rem;
   font-weight: 500;
   color: var(--ink);
@@ -1131,7 +1119,6 @@
 .ei-empty__section-mark {
   font-family: var(--font-body);
   font-size: 22px;
-  font-style: italic;
   color: var(--accent, var(--terra));
   line-height: 1;
 }
@@ -1140,7 +1127,6 @@
   font-family: var(--font-serif);
   font-size: 32px;
   font-weight: 700;
-  font-style: italic;
   color: var(--ink);
   margin: 0 0 10px;
   letter-spacing: -0.5px;
@@ -1202,7 +1188,6 @@
 .ei-empty__try-num {
   font-family: var(--font-serif);
   font-size: 16px;
-  font-style: italic;
   color: var(--accent, var(--terra));
   flex-shrink: 0;
   width: 20px;
@@ -1212,7 +1197,6 @@
   flex: 1;
   font-family: var(--font-body);
   font-size: 15px;
-  font-style: italic;
   color: var(--ink);
 }
 
@@ -1322,7 +1306,6 @@
 .meal-card__time {
   font-family: var(--font-body);
   font-size: 13px;
-  font-style: italic;
   color: var(--ink-muted);
 }
 
@@ -1342,8 +1325,8 @@
 }
 
 .meal-card__headline-tail {
-  font-style: italic;
   font-weight: inherit;
+  font-style: normal;
 }
 .meal-card__headline-period {
   color: var(--accent);
@@ -2102,7 +2085,6 @@ mark {
 .ei-week__summary {
   font-family: var(--font-body);
   font-size: 15px;
-  font-style: italic;
   color: var(--ink-muted);
   padding: 0 16px;
   margin: 0;
@@ -2233,7 +2215,6 @@ mark {
 }
 .ei-week__day-row--today .ei-week__day-num {
   color: var(--accent, var(--terra));
-  font-style: italic;
 }
 
 .ei-week__day-content {
@@ -2248,7 +2229,6 @@ mark {
 .ei-week__day-desc {
   font-family: var(--font-body);
   font-size: 15px;
-  font-style: italic;
   color: var(--ink);
   line-height: 1.35;
   display: -webkit-box;
@@ -2260,7 +2240,6 @@ mark {
 .ei-week__day-empty {
   font-family: var(--font-body);
   font-size: 14px;
-  font-style: italic;
   color: var(--ink-muted);
 }
 
