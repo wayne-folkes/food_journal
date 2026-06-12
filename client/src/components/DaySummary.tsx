@@ -17,23 +17,21 @@ export function DaySummary({ meals }: Props) {
   return (
     <div className="day-summary">
       <span className="day-summary__kicker">— Today</span>
-      <p className="day-summary__headline">
-        {meals.length} meal{meals.length === 1 ? '' : 's'}, {itemCount} item{itemCount === 1 ? '' : 's'}
-        <span className="day-summary__period">.</span>
-      </p>
       <div className="day-summary__stats">
         <div className="day-summary__stat">
-          <span className="day-summary__stat-value">{meals.length}</span>
+          <span className="day-summary__stat-value" data-meal-type="dinner">{meals.length}</span>
           <span className="day-summary__stat-label">Meals</span>
         </div>
-        {showCal && (
-          <div className="day-summary__stat day-summary__stat--muted">
-            <span className="day-summary__stat-value">
-              {hasPartial ? '~' : ''}{totalCal.toLocaleString()} kcal
-            </span>
-            <span className="day-summary__stat-label">Calories</span>
-          </div>
-        )}
+        <div className="day-summary__stat">
+          <span className="day-summary__stat-value" data-meal-type="lunch">{itemCount}</span>
+          <span className="day-summary__stat-label">Items</span>
+        </div>
+        <div className="day-summary__stat">
+          <span className="day-summary__stat-value" data-meal-type="breakfast">
+            {showCal ? `${hasPartial ? '~' : ''}${totalCal.toLocaleString()}` : '—'}
+          </span>
+          <span className="day-summary__stat-label">{showCal ? '~kcal so far' : 'kcal'}</span>
+        </div>
       </div>
     </div>
   )

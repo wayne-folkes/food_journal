@@ -99,6 +99,19 @@ function AppInner() {
     }
   }, [authResolved, viewMode, selectedDate, loadWeek])
 
+  // ⌘K / Ctrl+K opens the search palette
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        track('search_opened', {})
+        setSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   // For anonymous users, filter meals to the selected date
   const displayedMeals = useMemo(
     () =>
@@ -293,21 +306,22 @@ function AppInner() {
   return (
     <div className="app">
       <nav className="ei-nav">
-        <span className="ei-nav__back" aria-hidden="true">
-          <svg width="10" height="16" viewBox="0 0 10 16" fill="none">
-            <path d="M8 1L2 8l6 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+        <span className="ei-nav__wordmark">
+          <span className="ei-nav__dot" aria-hidden="true" />
+          Food Journal
         </span>
         <div className="ei-nav__right">
           <button
-            className="ei-nav__icon-btn"
+            className="ei-nav__search"
             aria-label="Search meals"
             onClick={() => { track('search_opened', {}); setSearchOpen(true) }}
           >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.6"/>
               <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
             </svg>
+            <span className="ei-nav__search-label">Search meals</span>
+            <kbd className="ei-nav__search-kbd">⌘K</kbd>
           </button>
           <AuthButton user={user} isAdmin={!!user?.app_metadata?.is_admin} onExportPdf={() => setPdfExportOpen(true)} />
         </div>
