@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 @main
@@ -13,5 +14,6 @@ struct FoodJournalApp: App {
                     AppSupabase.client.auth.handle(url)
                 }
         }
+        .modelContainer(for: Meal.self)
     }
 }
