@@ -9,8 +9,8 @@ import Supabase
 /// revisiting a date doesn't refetch (`dayCache` on the web).
 @MainActor
 enum MealsRepository {
-    private static var loadedDayKeys = Set<String>()
-    private static var loadedWeekKeys = Set<String>()
+    static var loadedDayKeys = Set<String>()
+    static var loadedWeekKeys = Set<String>()
 
     static var isAuthed: Bool { AppSupabase.client.auth.currentSession != nil }
 

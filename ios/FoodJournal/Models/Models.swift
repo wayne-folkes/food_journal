@@ -14,6 +14,10 @@ final class Meal {
     var createdAt: Date
     var updatedAt: Date
 
+    /// True when this meal was created locally and has not yet been written to
+    /// Supabase (authed user was offline, or guest meal awaiting sign-in sync).
+    var pendingSync: Bool = false
+
     @Relationship(deleteRule: .cascade, inverse: \MealItem.meal)
     var items: [MealItem] = []
 

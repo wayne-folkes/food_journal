@@ -5,6 +5,7 @@ import SwiftUI
 /// state, and wipes local data when the user signs out.
 struct ContentView: View {
     @Environment(AuthManager.self) private var authManager
+    @Environment(ItemHistoryStore.self) private var historyStore
     @Environment(\.modelContext) private var modelContext
 
     var body: some View {
@@ -17,11 +18,22 @@ struct ContentView: View {
         }
         .preferredColorScheme(.dark)
         .onChange(of: authManager.session?.user.id) { oldValue, newValue in
-            // Sign-out: clear the local mirror of the remote account's data.
             if oldValue != nil, newValue == nil {
+                // Sign-out: wipe local mirror
                 try? modelContext.delete(model: Meal.self)
                 MealsRepository.clearCache()
+            } else if oldValue == nil, let uid = newValue {
+                // Sign-in: sync guest meals then load item history
+                Task {
+                    await MealsRepository.syncGuestMealsAfterSignIn(
+                        newUserId: uid.uuidString, context: modelContext
+                    )
+                    await historyStore.load(context: modelContext)
+                }
             }
+        }
+        .task {
+            await historyStore.load(context: modelContext)
         }
     }
 }
@@ -40,6 +52,7 @@ struct AppRootView: View {
     @State private var viewMode: ViewMode = .day
     @State private var selectedDate: Date = .now
     @State private var showSearch = false
+    @State private var showComposer = false
 
     var body: some View {
         ZStack {
@@ -69,6 +82,9 @@ struct AppRootView: View {
                 selectedDate = day
                 viewMode = .day
             }
+        }
+        .sheet(isPresented: $showComposer) {
+            MealComposerView(initialDate: selectedDate) {}
         }
     }
 

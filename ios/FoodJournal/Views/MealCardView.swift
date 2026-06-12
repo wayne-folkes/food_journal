@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Arcade Glow meal card: dark card, neon border/glow tinted by meal type,
-/// solid type pill, item rows with trailing calories.
+/// Arcade Glow meal card with swipe actions for edit and delete.
 struct MealCardView: View {
     let meal: Meal
+    let onEdit: () -> Void
+    let onDelete: () -> Void
 
     private var typeColor: Color { meal.mealType.color }
 
@@ -52,6 +53,17 @@ struct MealCardView: View {
                 .strokeBorder(typeColor.opacity(0.35), lineWidth: 1)
         )
         .shadow(color: typeColor.opacity(0.16), radius: 14, y: 4)
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive, action: onDelete) {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .swipeActions(edge: .leading) {
+            Button(action: onEdit) {
+                Label("Edit", systemImage: "pencil")
+            }
+            .tint(Color.appAccent)
+        }
     }
 
     private var totalCalories: Int {
