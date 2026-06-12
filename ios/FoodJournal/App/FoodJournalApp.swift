@@ -2,13 +2,15 @@ import SwiftUI
 
 @main
 struct FoodJournalApp: App {
+    @State private var authManager = AuthManager()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
-                // OAuth deep-link callback (foodjournal://auth/callback).
-                // Wired in iOS Phase 2 (Auth); stubbed here so the scheme round-trips.
+                .environment(authManager)
                 .onOpenURL { url in
-                    print("Received deep link: \(url)")
+                    // Handles foodjournal://auth/callback from Google OAuth redirect.
+                    AppSupabase.client.auth.handle(url)
                 }
         }
     }
