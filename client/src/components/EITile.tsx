@@ -12,14 +12,15 @@ interface EITileProps {
   fluid?: boolean
 }
 
-function getPatternBackground(
-  hue: number,
-  sat: number,
-  l: number,
-  pattern: TilePattern,
-): string {
-  const bg = `hsl(${hue} ${sat}% ${l}%)`
-  const fg = `hsl(${hue} ${sat}% ${Math.max(0, l - 14)}%)`
+// Arcade Glow tile recipe (tuned for dark backgrounds): fixed saturation /
+// lightness so tiles pop uniformly — variety comes from hue + pattern only.
+const TILE_SAT = 58
+const TILE_L = 60
+const PATTERN_INK = 'rgba(0,0,0,0.22)'
+
+function getPatternBackground(hue: number, pattern: TilePattern): string {
+  const bg = `hsl(${hue} ${TILE_SAT}% ${TILE_L}%)`
+  const fg = PATTERN_INK
 
   switch (pattern) {
     case 'stripe':
@@ -44,10 +45,10 @@ export function EITile({ tile, name, size = 30, fluid = false }: EITileProps) {
       style={{
         width: fluid ? '100%' : size,
         height: fluid ? '100%' : size,
-        borderRadius: fluid ? 14 : 4,
+        borderRadius: fluid ? 14 : 8,
         flexShrink: 0,
-        background: getPatternBackground(spec.hue, spec.sat, spec.l, spec.pattern),
-        border: '0.5px solid rgba(0,0,0,0.12)',
+        background: getPatternBackground(spec.hue, spec.pattern),
+        border: '1px solid rgba(255,255,255,0.14)',
       }}
       aria-hidden="true"
     />
