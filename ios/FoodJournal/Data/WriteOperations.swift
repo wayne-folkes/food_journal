@@ -56,14 +56,20 @@ extension MealsRepository {
         for item in items { historyStore.prepend(item.description) }
 
         // Attempt remote create now; failures leave pendingSync = true for later flush
+        let finalMeal: Meal
         if userId != nil {
-            await pushSingleMeal(meal, context: context)
+            finalMeal = await pushSingleMeal(meal, context: context)
+        } else {
+            finalMeal = meal
         }
+
+        // Estimate calories in the background — Foundation Models updates SwiftData + Supabase
+        Task { await CaloriesService.estimateIfNeeded(for: finalMeal, context: context) }
 
         // Invalidate day cache so next loadDay re-fetches
         loadedDayKeys.remove(consumedAt.dayKey)
 
-        return meal
+        return finalMeal
     }
 
     // MARK: Update
@@ -98,7 +104,11 @@ extension MealsRepository {
         }
         try context.save()
 
-        guard AppSupabase.client.auth.currentSession != nil else { return }
+        guard AppSupabase.client.auth.currentSession != nil else {
+            // Guest: estimate immediately after local save
+            Task { await CaloriesService.estimateIfNeeded(for: meal, context: context) }
+            return
+        }
 
         // Encode items for the RPC
         struct RpcItem: Encodable {
@@ -145,6 +155,9 @@ extension MealsRepository {
 
         loadedDayKeys.remove(oldDate.dayKey)
         loadedDayKeys.remove(consumedAt.dayKey)
+
+        // Estimate after RPC so CaloriesService targets the fresh server items by position
+        Task { await CaloriesService.estimateIfNeeded(for: meal, context: context) }
     }
 
     // MARK: Delete
@@ -178,8 +191,10 @@ extension MealsRepository {
     // MARK: - Offline flush
 
     /// Pushes a single newly-created meal to Supabase and swaps the local temp
-    /// UUID for the server-assigned one on success.
-    private static func pushSingleMeal(_ meal: Meal, context: ModelContext) async {
+    /// UUID for the server-assigned one on success. Returns the canonical meal
+    /// (server-returned on success, unchanged local meal on failure).
+    @discardableResult
+    private static func pushSingleMeal(_ meal: Meal, context: ModelContext) async -> Meal {
         struct RpcItem: Encodable {
             let description: String
             let position: Int
@@ -238,8 +253,10 @@ extension MealsRepository {
             serverMeal.pendingSync = false
             context.insert(serverMeal)
             try? context.save()
+            return serverMeal
         } catch {
             // Keep pendingSync = true; flushPendingSync will retry later
+            return meal
         }
     }
 
