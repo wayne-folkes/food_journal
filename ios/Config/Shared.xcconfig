@@ -1,0 +1,7 @@
+// Shared.xcconfig — settings common to every build configuration.
+// Secret values (Supabase URL + anon key) live in Secrets.xcconfig, which is
+// gitignored. Copy Secrets.example.xcconfig → Secrets.xcconfig and fill it in.
+// The values are substituted into Info.plist at build time as
+// $(SUPABASE_URL) / $(SUPABASE_ANON_KEY) and read at runtime via Bundle.
+
+#include "Secrets.xcconfig"
