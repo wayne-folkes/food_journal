@@ -88,13 +88,14 @@ export function MealLog({ meals, isLoading, selectedDate, onEdit, onDelete, onDu
       {groups.length === 0 ? (
         <div className="ei-empty">
           <div className="ei-empty__ornament">
-            <div className="ei-empty__rule-row">
-              <div className="ei-empty__rule" />
-              <span className="ei-empty__section-mark">§</span>
-              <div className="ei-empty__rule" />
+            <div className="ei-empty__glyph" aria-hidden="true">
+              <svg width="26" height="26" viewBox="0 0 18 18" fill="none">
+                <path d="M2 13.5V16h2.5L13.07 7.43 10.57 4.93 2 13.5z" fill="currentColor"/>
+                <path d="M15.41 4.59a1 1 0 000-1.42l-1.58-1.58a1 1 0 00-1.42 0L11 3l2.5 2.5 1.91-1.91z" fill="currentColor"/>
+              </svg>
             </div>
-            <h2 className="ei-empty__title">A blank page.</h2>
-            <p className="ei-empty__body">Start by writing what you had for breakfast, lunch, or a quick snack.</p>
+            <h2 className="ei-empty__title">Nothing logged yet.</h2>
+            <p className="ei-empty__body">Type what you ate in the bar above — a sentence is enough.</p>
           </div>
           <div className="ei-empty__try">
             <span className="ei-empty__kicker">— Try one</span>
