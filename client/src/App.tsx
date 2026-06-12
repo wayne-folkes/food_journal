@@ -350,6 +350,13 @@ function AppInner() {
         />
       )}
 
+      {/* Anonymous-mode notice — meals are device-only until sign-in */}
+      {authResolved && !isAuthed && isViewingToday && viewMode === 'day' && (
+        <p className="ei-signedout-banner">
+          Meals stay on this device. <span>Sign in to sync, search, and estimate calories.</span>
+        </p>
+      )}
+
       <main className="app-main">
         <DateNav
           date={selectedDate}

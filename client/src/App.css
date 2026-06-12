@@ -11,6 +11,24 @@
   background: var(--cream);
 }
 
+/* ── Signed-out banner ────────────────────────────────────────────────────── */
+.ei-signedout-banner {
+  max-width: 568px;
+  margin: 12px auto 0;
+  width: calc(100% - 32px);
+  border: 1px dashed rgba(61, 220, 151, 0.4);
+  border-radius: 13px;
+  background: rgba(61, 220, 151, 0.05);
+  padding: 11px 16px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.4;
+}
+.ei-signedout-banner span {
+  color: var(--ink-muted);
+}
+
 /* ── Topbar ───────────────────────────────────────────────────────────────── */
 .ei-nav {
   display: flex;
