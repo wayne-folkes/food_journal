@@ -1,5 +1,3 @@
-import AuthenticationServices
-import CryptoKit
 import Foundation
 import Observation
 import Supabase
@@ -29,21 +27,6 @@ final class AuthManager {
 
     // MARK: - Sign in
 
-    func handleAppleSignIn(authorization: ASAuthorization, nonce: String) async throws {
-        guard
-            let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-            let tokenData = credential.identityToken,
-            let idToken = String(data: tokenData, encoding: .utf8)
-        else {
-            throw AuthManagerError.invalidAppleCredential
-        }
-        try await AppSupabase.client.auth.signInWithIdToken(credentials: .init(
-            provider: .apple,
-            idToken: idToken,
-            nonce: nonce
-        ))
-    }
-
     func signInWithGoogle() async throws {
         // supabase-swift opens an ASWebAuthenticationSession and handles PKCE internally.
         try await AppSupabase.client.auth.signInWithOAuth(
@@ -64,10 +47,3 @@ final class AuthManager {
     }
 }
 
-enum AuthManagerError: LocalizedError {
-    case invalidAppleCredential
-
-    var errorDescription: String? {
-        "Could not complete Apple Sign In. Please try again."
-    }
-}
