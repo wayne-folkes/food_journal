@@ -1012,32 +1012,41 @@
   outline: none;
 }
 
-/* ── Recent chips ────────────────────────────────────────────────────────── */
+/* ── Recent chips (tilted stickers) ──────────────────────────────────────── */
 .recent-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  width: calc(100% - 32px);
+  max-width: 568px;
+  margin: 14px auto 0;
 }
 
-.chip {
-  background: var(--cream-mid);
-  color: var(--ink-mid);
-  border: 1.5px solid transparent;
-  border-radius: 999px;
-  min-height: 34px;
+.recent-chip {
   display: inline-flex;
   align-items: center;
-  padding: 0 14px;
+  gap: 7px;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--sep);
+  border-radius: 999px;
+  min-height: 34px;
+  padding: 4px 13px 4px 6px;
   font-family: var(--font-sans);
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  rotate: var(--tilt, 0deg);
+  transition: border-color 0.15s, rotate 0.15s, transform 0.15s;
   user-select: none;
   -webkit-user-select: none;
 }
-.chip:hover { background: var(--terra-light); border-color: var(--terra); color: var(--terra); }
-.chip:active { background: var(--terra-light); border-color: var(--terra-hover); }
+.recent-chip:hover {
+  border-color: rgba(61, 220, 151, 0.5);
+  rotate: 0deg;
+  transform: translateY(-1px);
+}
+.recent-chip:active { transform: scale(0.97); }
 
 /* ── Day Summary Card ────────────────────────────────────────────────────── */
 .day-summary {

@@ -6,6 +6,9 @@ import { parseSentence } from '../lib/parser'
 interface Props {
   onQuickLog: (payload: { mealType: MealType; items: string[]; consumed_at: string; rawInput: string }) => void
   onOpenComposer: (initialInput: string) => void
+  /** Controlled compose text — lets recent chips append to the bar */
+  value: string
+  onChange: (value: string) => void
 }
 
 function formatTime(d: Date): string {
@@ -17,8 +20,7 @@ function formatTime(d: Date): string {
  * log a meal immediately — meal type is auto-suggested from the time of day
  * (tap the chip to cycle/override). The pencil opens the full compose sheet.
  */
-export function QuickLogBar({ onQuickLog, onOpenComposer }: Props) {
-  const [text, setText] = useState('')
+export function QuickLogBar({ onQuickLog, onOpenComposer, value: text, onChange: setText }: Props) {
   const [typeOverride, setTypeOverride] = useState<MealType | null>(null)
   const [now, setNow] = useState(() => new Date())
 

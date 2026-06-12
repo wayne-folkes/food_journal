@@ -5,6 +5,7 @@ import { supabase } from './lib/supabase'
 import { useEntriesStore, todayString, getWeekBounds } from './lib/store'
 import { MealComposer } from './components/MealComposer'
 import { QuickLogBar } from './components/QuickLogBar'
+import { RecentChips } from './components/RecentChips'
 import { MealLog } from './components/MealLog'
 import { MealDetail } from './components/MealDetail'
 import { EditMealModal } from './components/EditMealModal'
@@ -26,7 +27,7 @@ import type { ChipItem } from './lib/store'
 import './App.css'
 
 function AppInner() {
-  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, updateItemCalories, loadWeek, weekMeals, weekLoading, loadItemHistory } =
+  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, updateItemCalories, loadWeek, weekMeals, weekLoading, loadItemHistory, itemHistory } =
     useEntriesStore()
   const [user, setUser] = useState<User | null>(null)
   const [authResolved, setAuthResolved] = useState(false)
@@ -37,6 +38,7 @@ function AppInner() {
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day')
   const [composerOpen, setComposerOpen] = useState(false)
   const [composerInitialInput, setComposerInitialInput] = useState('')
+  const [composeText, setComposeText] = useState('')
   const [pdfExportOpen, setPdfExportOpen] = useState(false)
   const activeUserIdRef = useRef<string | null>(null)
   const toast = useToast()
@@ -342,11 +344,21 @@ function AppInner() {
       {/* Glowing compose bar — type + Enter logs immediately; pencil opens the sheet */}
       {isViewingToday && viewMode === 'day' && (
         <QuickLogBar
-          onQuickLog={handleAddMeal}
+          value={composeText}
+          onChange={setComposeText}
+          onQuickLog={(payload) => { handleAddMeal(payload); setComposeText('') }}
           onOpenComposer={(initialInput) => {
             setComposerInitialInput(initialInput)
             setComposerOpen(true)
           }}
+        />
+      )}
+
+      {/* Recent items — tap a sticker to append it to the compose bar */}
+      {isViewingToday && viewMode === 'day' && isAuthed && itemHistory.length > 0 && (
+        <RecentChips
+          items={itemHistory.slice(0, 8)}
+          onSelect={(item) => setComposeText((t) => (t.trim() ? `${t.trim()}, ${item}` : item))}
         />
       )}
 
