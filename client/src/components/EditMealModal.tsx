@@ -3,6 +3,7 @@ import type { MealWithItems, MealType } from '@shared/types/database'
 import type { ChipItem } from '../lib/store'
 import { MealTypePills } from './MealTypePills'
 import { ChipInput } from './ChipInput'
+import { EITile } from './EITile'
 import { parseChip } from '../lib/parser'
 
 interface Props {
@@ -119,6 +120,7 @@ export function EditMealModal({ meal, onSave, onCancel }: Props) {
               <div className="edit-modal__cal-rows">
                 {chips.map((chip, i) => (
                   <div key={i} className="edit-modal__cal-row">
+                    <EITile name={chip.description} size={26} />
                     <span className="edit-modal__cal-row-desc">{chip.description}</span>
                     <input
                       className="edit-modal__cal-input"
