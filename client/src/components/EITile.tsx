@@ -8,6 +8,8 @@ interface EITileProps {
   name?: string
   /** Size in px (default 30) */
   size?: number
+  /** Fill the parent instead of a fixed square (e.g. detail-sheet tile strip) */
+  fluid?: boolean
 }
 
 function getPatternBackground(
@@ -34,15 +36,15 @@ function getPatternBackground(
   }
 }
 
-export function EITile({ tile, name, size = 30 }: EITileProps) {
+export function EITile({ tile, name, size = 30, fluid = false }: EITileProps) {
   const spec = tile ?? (name ? getTileSpec(name) : { hue: 40, sat: 20, l: 70, pattern: 'solid' as TilePattern })
 
   return (
     <div
       style={{
-        width: size,
-        height: size,
-        borderRadius: 4,
+        width: fluid ? '100%' : size,
+        height: fluid ? '100%' : size,
+        borderRadius: fluid ? 14 : 4,
         flexShrink: 0,
         background: getPatternBackground(spec.hue, spec.sat, spec.l, spec.pattern),
         border: '0.5px solid rgba(0,0,0,0.12)',

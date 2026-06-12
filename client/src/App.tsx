@@ -402,6 +402,7 @@ function AppInner() {
           onClose={() => setSelectedMeal(null)}
           onEdit={(meal) => { setSelectedMeal(null); setEditingMeal(meal) }}
           onDelete={(id) => { setSelectedMeal(null); handleDelete(id) }}
+          onDuplicate={(meal) => { setSelectedMeal(null); handleDuplicate(meal) }}
         />
       )}
 

@@ -2537,12 +2537,13 @@ mark {
   }
 }
 
-/* ── Meal detail overlay ────────────────────────────────────────────── */
+/* ── Meal detail sheet (Arcade) ─────────────────────────────────────── */
 .ei-meal-detail {
-  background: var(--card);
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-  padding: 12px 20px 36px;
-  padding-bottom: calc(36px + env(safe-area-inset-bottom));
+  background: #1C1A2A;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 26px 26px 0 0;
+  padding: 12px 20px 28px;
+  padding-bottom: calc(28px + env(safe-area-inset-bottom));
   max-height: 88svh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -2550,11 +2551,17 @@ mark {
   display: flex;
   flex-direction: column;
   gap: 0;
-  box-shadow: var(--shadow-up);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
   width: 100%;
-  max-width: 640px;
+  max-width: 480px;
   margin: 0 auto;
   animation: sheet-up 0.3s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@media (min-width: 640px) {
+  .ei-meal-detail {
+    border-radius: 26px;
+  }
 }
 .ei-meal-detail__handle {
   width: 36px;
@@ -2568,7 +2575,7 @@ mark {
   position: absolute;
   top: 16px;
   right: 16px;
-  background: var(--cream-mid);
+  background: rgba(255, 255, 255, 0.07);
   border: none;
   border-radius: 50%;
   width: 28px;
@@ -2581,37 +2588,57 @@ mark {
   cursor: pointer;
   padding: 0;
 }
+.ei-meal-detail__close:hover { color: var(--ink); }
 .ei-meal-detail__kicker {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: 10px;
+  margin-bottom: 10px;
 }
-.ei-meal-detail__type {
+.ei-meal-detail__pill {
   font-family: var(--font-sans);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 1.6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
   text-transform: uppercase;
-  color: var(--accent);
+  border-radius: 999px;
+  padding: 4px 12px;
+  color: #0F0E16;
   white-space: nowrap;
 }
-.ei-meal-detail__kicker-rule {
-  flex: 1;
-  height: 1px;
-  background: var(--sep);
-}
+.ei-meal-detail__pill[data-meal-type="breakfast"] { background: var(--meal-breakfast); }
+.ei-meal-detail__pill[data-meal-type="lunch"]     { background: var(--meal-lunch); }
+.ei-meal-detail__pill[data-meal-type="dinner"]    { background: var(--meal-dinner); }
+.ei-meal-detail__pill[data-meal-type="snack"]     { background: var(--meal-snack); }
+.ei-meal-detail__pill[data-meal-type="dessert"]   { background: var(--meal-dessert); }
+.ei-meal-detail__pill[data-meal-type="drink"]     { background: var(--meal-drink); }
+
 .ei-meal-detail__time {
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-muted);
   white-space: nowrap;
 }
 .ei-meal-detail__date {
-  font-family: var(--font-body);
-  font-size: 13px;
-  color: var(--ink-muted);
-  margin-bottom: 20px;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.6px;
+  color: var(--ink);
+  margin: 0 0 16px;
+  line-height: 1.1;
+}
+
+/* Tile strip — first cell 2fr via inline grid-template-columns */
+.ei-meal-detail__strip {
+  display: grid;
+  gap: 8px;
+  height: 88px;
+  margin-bottom: 18px;
+}
+.ei-meal-detail__strip-cell {
+  min-width: 0;
+  height: 100%;
 }
 .ei-meal-detail__items {
   list-style: none;
@@ -2646,8 +2673,12 @@ mark {
 }
 .ei-meal-detail__item-cal {
   font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  border: 1px solid rgba(61, 220, 151, 0.3);
+  border-radius: 999px;
+  padding: 3px 9px;
   white-space: nowrap;
 }
 .ei-meal-detail__total {
@@ -2667,35 +2698,55 @@ mark {
   color: var(--ink-muted);
 }
 .ei-meal-detail__total-value {
-  font-family: var(--font-sans);
-  font-size: 16px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
   color: var(--ink);
 }
+.ei-meal-detail__total-value[data-meal-type="breakfast"] { color: var(--meal-breakfast); }
+.ei-meal-detail__total-value[data-meal-type="lunch"]     { color: var(--meal-lunch); }
+.ei-meal-detail__total-value[data-meal-type="dinner"]    { color: var(--meal-dinner); }
+.ei-meal-detail__total-value[data-meal-type="snack"]     { color: var(--meal-snack); }
+.ei-meal-detail__total-value[data-meal-type="dessert"]   { color: var(--meal-dessert); }
+.ei-meal-detail__total-value[data-meal-type="drink"]     { color: var(--meal-drink); }
+
 .ei-meal-detail__actions {
   display: flex;
   gap: 10px;
 }
 .ei-meal-detail__action-btn {
   flex: 1;
-  padding: 12px 16px;
-  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  border-radius: 13px;
   border: none;
   font-family: var(--font-sans);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 .ei-meal-detail__action-btn--edit {
   background: var(--accent);
-  color: #fff;
+  color: #0F0E16;
+  box-shadow: 0 0 16px rgba(61, 220, 151, 0.25);
 }
 .ei-meal-detail__action-btn--edit:hover {
   background: var(--accent-hover);
+  box-shadow: 0 0 20px rgba(61, 220, 151, 0.4);
+}
+.ei-meal-detail__action-btn--again {
+  background: transparent;
+  border: 1.5px solid var(--sep);
+  color: var(--ink-mid);
+}
+.ei-meal-detail__action-btn--again:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
 }
 .ei-meal-detail__action-btn--delete {
-  background: var(--cream-mid);
+  background: transparent;
+  border: 1.5px solid color-mix(in srgb, var(--danger) 55%, transparent);
   color: var(--danger);
 }
 .ei-meal-detail__action-btn--delete:hover {
