@@ -71,7 +71,6 @@ function CalBadge({ item, onUpdateCalories }: CalBadgeProps) {
   if (editing) {
     return (
       <input
-        // eslint-disable-next-line jsx-a11y/no-autofocus
         autoFocus
         className="meal-card__cal-input"
         type="number"

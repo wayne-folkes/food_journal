@@ -45,6 +45,10 @@ function buildWeekRangeLabel(days: { date: string }[]): string {
   return `${first.toLocaleDateString(undefined, opts)} – ${last.toLocaleDateString(undefined, { day: 'numeric', year: 'numeric' })}`
 }
 
+function makeRangeKey(start: string, end: string): string {
+  return `${start}:${end}`
+}
+
 export function PdfExportModal({ onClose }: Props) {
   const today = todayString()
   const [voice, setVoice] = useState<PdfVoice>('magazine')
@@ -53,9 +57,12 @@ export function PdfExportModal({ onClose }: Props) {
   const [startDate, setStartDate] = useState(() => getWeekBounds(today).start)
   const [endDate, setEndDate] = useState(() => getWeekBounds(today).end)
   const [rangeMeals, setRangeMeals] = useState<MealWithItems[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loadedRangeKey, setLoadedRangeKey] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const { isAuthed } = useEntriesStore()
+  const currentRangeKey = useMemo(() => makeRangeKey(startDate, endDate), [startDate, endDate])
+  const loading = isAuthed && loadedRangeKey !== currentRangeKey
 
   const DATE_PRESETS = useMemo(() => {
     const d = new Date(`${today}T12:00:00`)
@@ -103,7 +110,8 @@ export function PdfExportModal({ onClose }: Props) {
   // Load meals for the date range directly from Supabase
   useEffect(() => {
     if (!isAuthed) return
-    setLoading(true)
+    let canceled = false
+    const rangeKey = makeRangeKey(startDate, endDate)
 
     const startISO = new Date(`${startDate}T00:00:00`).toISOString()
     const endISO   = new Date(`${endDate}T23:59:59.999`).toISOString()
@@ -115,6 +123,8 @@ export function PdfExportModal({ onClose }: Props) {
       .lte('consumed_at', endISO)
       .order('consumed_at', { ascending: true })
       .then(({ data, error }) => {
+        if (canceled) return
+
         if (!error && data) {
           type Row = Omit<MealWithItems, 'items'> & { meal_items: MealWithItems['items'] }
           setRangeMeals(
@@ -123,9 +133,18 @@ export function PdfExportModal({ onClose }: Props) {
               items: [...(m.meal_items ?? [])].sort((a, b) => a.position - b.position),
             }))
           )
+          setLoadError(null)
+        } else {
+          setRangeMeals([])
+          setLoadError(error?.message ?? 'Could not load meals for this range. Please try again.')
         }
-        setLoading(false)
+
+        setLoadedRangeKey(rangeKey)
       })
+
+    return () => {
+      canceled = true
+    }
   }, [startDate, endDate, isAuthed])
 
   // Group meals into weeks (Mon–Sun)
@@ -266,6 +285,8 @@ export function PdfExportModal({ onClose }: Props) {
               <div className="ei-pdf__range-stat">
                 {loading
                   ? 'Loading…'
+                  : loadError
+                    ? loadError
                   : `${weekCount} week${weekCount !== 1 ? 's' : ''} · ${totalMeals} meal${totalMeals !== 1 ? 's' : ''} · ${totalItems} items`
                 }
               </div>
