@@ -81,8 +81,20 @@ enum MealsRepository {
                 meal.mealTypeRaw = dto.mealType.rawValue
                 meal.rawInput = dto.rawInput
                 meal.updatedAt = dto.updatedAt
+                // Capture locally-estimated calories before deleting items — server
+                // may not have them yet if CaloriesService is still patching Supabase.
+                var localCalByPosition: [Int: Double] = [:]
+                for item in meal.items {
+                    if let cal = item.calories { localCalByPosition[item.position] = cal }
+                }
                 for item in meal.items { context.delete(item) }
-                meal.items = dto.mealItems.map(MealItem.init(from:))
+                meal.items = dto.mealItems.map { itemDTO in
+                    let item = MealItem(from: itemDTO)
+                    if item.calories == nil, let saved = localCalByPosition[itemDTO.position] {
+                        item.calories = saved
+                    }
+                    return item
+                }
             } else {
                 let meal = Meal(
                     id: dto.id,

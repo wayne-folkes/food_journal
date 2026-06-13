@@ -29,37 +29,58 @@ struct DayView: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+            List {
+                Section {
                     masthead
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 0, trailing: 16))
+                    
                     dateNav
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                    
                     DaySummaryView(meals: meals)
-
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                }
+                
+                Section {
                     if meals.isEmpty {
                         EmptyDayView()
                             .frame(maxWidth: .infinity)
                             .padding(.top, 40)
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets())
                     } else {
-                        VStack(spacing: 14) {
-                            ForEach(meals) { meal in
-                                MealCardView(
-                                    meal: meal,
-                                    onEdit: { editingMeal = meal },
-                                    onDelete: { initiateDelete(meal) }
-                                )
-                            }
+                        ForEach(meals) { meal in
+                            MealCardView(
+                                meal: meal,
+                                onEdit: { editingMeal = meal },
+                                onDelete: { initiateDelete(meal) }
+                            )
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
+                            .listRowSeparator(.hidden)
                         }
                     }
-
+                    
                     if let loadError {
                         Text(loadError)
                             .font(.caption)
                             .foregroundStyle(.red.opacity(0.8))
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                     }
+                    
+                    // Extra space for FAB + undo
+                    Color.clear
+                        .frame(height: 100)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets())
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 100) // room for FAB + undo
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .scrollIndicators(.hidden)
             .refreshable { await sync(force: true) }
             .task(id: date.dayKey) { await sync(force: false) }
@@ -189,6 +210,9 @@ struct DayView: View {
                 .disabled(date.isToday)
                 .opacity(date.isToday ? 0.3 : 1)
         }
+        // In a List row, multiple default-styled buttons aren't independently
+        // tappable — a tap routes to the wrong one. Borderless fixes that.
+        .buttonStyle(.borderless)
     }
 
     private func navButton(systemName: String, label: String, action: @escaping () -> Void) -> some View {

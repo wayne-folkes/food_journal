@@ -53,6 +53,17 @@ struct MealCardView: View {
                 .strokeBorder(typeColor.opacity(0.35), lineWidth: 1)
         )
         .shadow(color: typeColor.opacity(0.16), radius: 14, y: 4)
+        .contextMenu {
+            Button(action: onEdit) {
+                Label("Edit", systemImage: "pencil")
+            }
+            
+            Divider()
+            
+            Button(role: .destructive, action: onDelete) {
+                Label("Delete", systemImage: "trash")
+            }
+        }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive, action: onDelete) {
                 Label("Delete", systemImage: "trash")

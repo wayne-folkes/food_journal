@@ -150,7 +150,7 @@ extension MealsRepository {
             meal.pendingSync = false
             try context.save()
         } catch {
-            // pendingSync = true — flushPendingSync will retry
+            print("❌ updateMeal: RPC failed — \(error)")
         }
 
         loadedDayKeys.remove(oldDate.dayKey)

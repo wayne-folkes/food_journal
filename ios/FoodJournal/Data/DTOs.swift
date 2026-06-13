@@ -22,7 +22,26 @@ struct MealDTO: Decodable, Identifiable, Sendable {
         case rawInput = "raw_input"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        // PostgREST selects embed the relation under the table name "meal_items";
+        // the custom RPC functions use "items" to match the web app's MealWithItems shape.
         case mealItems = "meal_items"
+        case itemsAlias = "items"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        userId = try c.decodeIfPresent(String.self, forKey: .userId)
+        consumedAt = try c.decode(Date.self, forKey: .consumedAt)
+        mealType = try c.decode(MealType.self, forKey: .mealType)
+        rawInput = try c.decode(String.self, forKey: .rawInput)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+        if let items = try c.decodeIfPresent([MealItemDTO].self, forKey: .mealItems) {
+            mealItems = items
+        } else {
+            mealItems = try c.decode([MealItemDTO].self, forKey: .itemsAlias)
+        }
     }
 }
 
