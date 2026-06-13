@@ -54,6 +54,7 @@ export function PdfExportModal({ onClose }: Props) {
   const [endDate, setEndDate] = useState(() => getWeekBounds(today).end)
   const [rangeMeals, setRangeMeals] = useState<MealWithItems[]>([])
   const [loadedRangeKey, setLoadedRangeKey] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const { isAuthed } = useEntriesStore()
   const currentRangeKey = useMemo(() => `${startDate}:${endDate}`, [startDate, endDate])
@@ -128,8 +129,9 @@ export function PdfExportModal({ onClose }: Props) {
               items: [...(m.meal_items ?? [])].sort((a, b) => a.position - b.position),
             }))
           )
+          setLoadError(null)
         } else {
-          setRangeMeals([])
+          setLoadError('Could not load meals for this range.')
         }
 
         setLoadedRangeKey(rangeKey)
@@ -278,6 +280,8 @@ export function PdfExportModal({ onClose }: Props) {
               <div className="ei-pdf__range-stat">
                 {loading
                   ? 'Loading…'
+                  : loadError
+                    ? loadError
                   : `${weekCount} week${weekCount !== 1 ? 's' : ''} · ${totalMeals} meal${totalMeals !== 1 ? 's' : ''} · ${totalItems} items`
                 }
               </div>
