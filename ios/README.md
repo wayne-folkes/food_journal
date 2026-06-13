@@ -1,16 +1,14 @@
 # Food Journal — iOS
 
 Native iOS app sharing the same Supabase backend and Vercel `/api` endpoints as
-the web client. See [`../IOS_PLAN.md`](../IOS_PLAN.md) for the full roadmap.
-
-**Status:** Phase 1 (Scaffold). The app builds and launches to a placeholder
-screen; auth, data, and UI land in later phases.
+the web client.
 
 ## Requirements
 
-- Xcode 17+ (iOS 17 deployment target)
+- Xcode 17+ with iOS 26 SDK (beta)
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) — `brew install xcodegen`
-- An iOS 17+ simulator runtime (Xcode → Settings → Components)
+- An iOS 26 simulator runtime (Xcode → Settings → Components)
+- Apple Intelligence enabled on device or simulator for on-device calorie estimation
 
 ## Setup
 
@@ -36,10 +34,10 @@ open FoodJournal.xcodeproj
 xcodegen generate
 xcodebuild -resolvePackageDependencies -project FoodJournal.xcodeproj -scheme FoodJournal
 
-# Build for a simulator (requires an installed iOS runtime):
+# Build for a simulator:
 xcodebuild build \
   -project FoodJournal.xcodeproj -scheme FoodJournal \
-  -destination 'platform=iOS Simulator,name=iPhone 16'
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 
 # Compile-check without a simulator (no runtime needed):
 xcodebuild build \
@@ -57,16 +55,39 @@ ios/
 │   ├── Secrets.example.xcconfig # committed template
 │   └── Secrets.xcconfig         # gitignored — your real values
 ├── FoodJournal/
-│   ├── App/                    # FoodJournalApp, ContentView
-│   ├── Data/                   # SupabaseClientProvider (singleton + config)
-│   └── Resources/              # Info.plist, Assets.xcassets
+│   ├── App/                    # FoodJournalApp, ContentView (tab bar)
+│   ├── Auth/                   # AuthManager (Google OAuth), SignInView
+│   ├── Data/
+│   │   ├── MealsRepository.swift      # SwiftData sync (read path)
+│   │   ├── WriteOperations.swift      # Create / edit / delete RPCs
+│   │   ├── CaloriesService.swift      # On-device estimation via Foundation Models
+│   │   ├── DTOs.swift                 # Supabase wire types (MealDTO, MealItemDTO)
+│   │   ├── ItemHistoryStore.swift     # Recent item descriptions for autocomplete
+│   │   └── SupabaseClientProvider.swift
+│   ├── Models/
+│   │   ├── Models.swift               # SwiftData @Model classes (Meal, MealItem)
+│   │   ├── MealType.swift             # MealType enum + display helpers
+│   │   └── DateHelpers.swift          # Date extension utilities
+│   ├── Theme/
+│   │   └── Colors.swift               # Arcade-glow semantic color palette
+│   ├── Views/
+│   │   ├── DayView.swift              # Day view: summary tiles + meal cards
+│   │   ├── WeekView.swift             # Week view: stacked bar chart + day rows
+│   │   ├── MealCardView.swift         # Per-meal card with items + calorie chips
+│   │   ├── DaySummaryView.swift       # Calorie / EI summary tiles
+│   │   ├── MealComposerView.swift     # Compose new meal (chip input)
+│   │   ├── EditMealView.swift         # Edit existing meal
+│   │   └── SearchView.swift           # Full-text search
+│   └── Resources/
+│       ├── Info.plist
+│       └── Assets.xcassets            # App icon (1024×1024 PNG)
 └── FoodJournalTests/
+    └── SupabaseConfigTests.swift
 ```
 
 ## Notes
 
-- The Supabase URL + anon key flow from `Config/Secrets.xcconfig` →
-  Info.plist (`$(SUPABASE_URL)` substitution) → `Bundle.main` at runtime
-  (`SupabaseConfig` in `Data/SupabaseClientProvider.swift`).
-- OAuth deep link: `foodjournal://auth/callback` (registered in Info.plist;
-  handler stubbed in `FoodJournalApp.onOpenURL`, wired up in Phase 2).
+- Supabase credentials flow: `Config/Secrets.xcconfig` → Info.plist (`$(SUPABASE_URL)` substitution) → `Bundle.main` at runtime (`SupabaseConfig` in `SupabaseClientProvider.swift`).
+- OAuth deep link: `foodjournal://auth/callback` — registered in Info.plist and handled in `FoodJournalApp.onOpenURL`.
+- Calorie estimation uses `FoundationModels` (`LanguageModelSession`) with no system instructions — health/nutrition framing triggers content refusals on Apple's on-device model. The service retries batch estimation twice, then falls back to per-item estimation.
+- The `.xcodeproj` is not committed. Always run `xcodegen generate` after cloning or editing `project.yml`.
