@@ -111,6 +111,7 @@ struct AppRootView: View {
                     .frame(width: 38, height: 38)
                     .background(Circle().fill(Color.appCard))
             }
+            .accessibilityLabel("Search meals")
 
             Menu {
                 if let email = authManager.session?.user.email {
@@ -126,6 +127,7 @@ struct AppRootView: View {
                     .frame(width: 38, height: 38)
                     .background(Circle().fill(Color.appCard))
             }
+            .accessibilityLabel("Account")
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)

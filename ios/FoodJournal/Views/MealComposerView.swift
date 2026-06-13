@@ -18,6 +18,8 @@ struct MealComposerView: View {
     @State private var consumedAt: Date
     @State private var isSaving = false
     @State private var saveError: String?
+    @State private var chipTrigger = 0
+    @State private var saveTrigger = 0
 
     init(initialDate: Date = .now, onSave: @escaping () -> Void) {
         self.initialDate = initialDate
@@ -62,6 +64,8 @@ struct MealComposerView: View {
         }
         .preferredColorScheme(.dark)
         .onAppear { inputFocused = true }
+        .sensoryFeedback(.impact(weight: .light), trigger: chipTrigger)
+        .sensoryFeedback(.success, trigger: saveTrigger)
     }
 
     // MARK: - Meal type
@@ -143,6 +147,7 @@ struct MealComposerView: View {
                             .font(.title2)
                             .foregroundStyle(Color.appAccent)
                     }
+                    .accessibilityLabel("Add item")
                 }
             }
 
@@ -200,6 +205,7 @@ struct MealComposerView: View {
                                 .font(.caption2.weight(.bold))
                                 .foregroundStyle(Color.appInk.opacity(0.5))
                         }
+                        .accessibilityLabel("Remove \(item)")
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
@@ -260,6 +266,7 @@ struct MealComposerView: View {
         }
         withAnimation { items.append(trimmed) }
         inputText = ""
+        chipTrigger += 1
     }
 
     private func save() async {
@@ -281,6 +288,7 @@ struct MealComposerView: View {
                 context: modelContext,
                 historyStore: historyStore
             )
+            saveTrigger += 1
             onSave()
             dismiss()
         } catch {

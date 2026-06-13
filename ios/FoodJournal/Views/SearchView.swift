@@ -78,6 +78,7 @@ struct SearchView: View {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(Color.appInk.opacity(0.3))
                 }
+                .accessibilityLabel("Clear search")
             }
         }
         .padding(.horizontal, 14)

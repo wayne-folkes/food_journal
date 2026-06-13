@@ -8,6 +8,8 @@ struct DayView: View {
     @State private var editingMeal: Meal?
     @State private var undoSnapshot: MealSnapshot?
     @State private var undoTask: Task<Void, Never>?
+    @State private var deleteTrigger = 0
+    @State private var undoTrigger = 0
 
     let date: Date
     let onDateChange: (Date) -> Void
@@ -73,6 +75,7 @@ struct DayView: View {
                     .background(Circle().fill(Color.appAccent))
                     .shadow(color: Color.appAccent.opacity(0.55), radius: 16, y: 4)
             }
+            .accessibilityLabel("Log meal")
             .padding(.trailing, 24)
             .padding(.bottom, 32)
         }
@@ -96,6 +99,8 @@ struct DayView: View {
                 Task { await sync(force: true) }
             }
         }
+        .sensoryFeedback(.warning, trigger: deleteTrigger)
+        .sensoryFeedback(.impact(weight: .medium), trigger: undoTrigger)
     }
 
     // MARK: - Delete + undo
@@ -104,6 +109,7 @@ struct DayView: View {
         undoTask?.cancel()
         guard let snapshot = try? MealsRepository.deleteMealLocally(meal, context: modelContext) else { return }
         undoSnapshot = snapshot
+        deleteTrigger += 1
 
         undoTask = Task {
             try? await Task.sleep(for: .seconds(3))
@@ -117,6 +123,7 @@ struct DayView: View {
         undoTask?.cancel()
         guard let snapshot = undoSnapshot else { return }
         try? MealsRepository.restoreMeal(from: snapshot, context: modelContext)
+        undoTrigger += 1
         withAnimation { undoSnapshot = nil }
     }
 
@@ -157,7 +164,7 @@ struct DayView: View {
     private var masthead: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(date.isToday ? "Today" : date.formatted(.dateTime.weekday(.wide)))
-                .font(.system(size: 38, weight: .bold, design: .rounded))
+                .font(.system(.largeTitle, design: .rounded, weight: .bold))
                 .foregroundStyle(Color.appInk)
             Text(date.formatted(.dateTime.month(.wide).day().year()))
                 .font(.subheadline)
@@ -168,7 +175,7 @@ struct DayView: View {
 
     private var dateNav: some View {
         HStack(spacing: 12) {
-            navButton(systemName: "chevron.left") { onDateChange(date.previousDay) }
+            navButton(systemName: "chevron.left", label: "Previous day") { onDateChange(date.previousDay) }
 
             if !date.isToday {
                 Button("Today") { onDateChange(.now) }
@@ -178,13 +185,13 @@ struct DayView: View {
 
             Spacer()
 
-            navButton(systemName: "chevron.right") { onDateChange(date.nextDay) }
+            navButton(systemName: "chevron.right", label: "Next day") { onDateChange(date.nextDay) }
                 .disabled(date.isToday)
                 .opacity(date.isToday ? 0.3 : 1)
         }
     }
 
-    private func navButton(systemName: String, action: @escaping () -> Void) -> some View {
+    private func navButton(systemName: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.body.weight(.semibold))
@@ -192,6 +199,7 @@ struct DayView: View {
                 .frame(width: 38, height: 38)
                 .background(Circle().fill(Color.appCard))
         }
+        .accessibilityLabel(label)
     }
 }
 

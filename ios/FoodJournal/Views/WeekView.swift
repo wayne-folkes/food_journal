@@ -75,7 +75,7 @@ struct WeekView: View {
     private var masthead: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("This week")
-                .font(.system(size: 38, weight: .bold, design: .rounded))
+                .font(.system(.largeTitle, design: .rounded, weight: .bold))
                 .foregroundStyle(Color.appInk)
             Text(weekRangeLabel)
                 .font(.subheadline)
@@ -93,7 +93,7 @@ struct WeekView: View {
 
     private var weekNav: some View {
         HStack(spacing: 12) {
-            navButton(systemName: "chevron.left") {
+            navButton(systemName: "chevron.left", label: "Previous week") {
                 onWeekChange(Calendar.current.date(byAdding: .day, value: -7, to: anchorDate)!)
             }
 
@@ -105,7 +105,7 @@ struct WeekView: View {
 
             Spacer()
 
-            navButton(systemName: "chevron.right") {
+            navButton(systemName: "chevron.right", label: "Next week") {
                 onWeekChange(Calendar.current.date(byAdding: .day, value: 7, to: anchorDate)!)
             }
             .disabled(anchorDate.weekRange.contains(.now))
@@ -113,7 +113,7 @@ struct WeekView: View {
         }
     }
 
-    private func navButton(systemName: String, action: @escaping () -> Void) -> some View {
+    private func navButton(systemName: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.body.weight(.semibold))
@@ -121,6 +121,7 @@ struct WeekView: View {
                 .frame(width: 38, height: 38)
                 .background(Circle().fill(Color.appCard))
         }
+        .accessibilityLabel(label)
     }
 
     // MARK: - Chart
@@ -145,6 +146,7 @@ struct WeekView: View {
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
                 .onTapGesture { onSelectDay(day) }
+                .accessibilityLabel("\(day.formatted(.dateTime.weekday(.wide))), \(summaryLine(for: meals(on: day)))")
             }
         }
         .padding(16)

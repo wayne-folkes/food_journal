@@ -17,6 +17,8 @@ struct EditMealView: View {
     @State private var consumedAt: Date
     @State private var isSaving = false
     @State private var saveError: String?
+    @State private var chipTrigger = 0
+    @State private var saveTrigger = 0
 
     init(meal: Meal, onSave: @escaping () -> Void) {
         self.meal = meal
@@ -56,6 +58,8 @@ struct EditMealView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .sensoryFeedback(.impact(weight: .light), trigger: chipTrigger)
+        .sensoryFeedback(.success, trigger: saveTrigger)
     }
 
     // MARK: - Meal type
@@ -136,6 +140,7 @@ struct EditMealView: View {
                             .font(.title2)
                             .foregroundStyle(Color.appAccent)
                     }
+                    .accessibilityLabel("Add item")
                 }
             }
         }
@@ -159,6 +164,7 @@ struct EditMealView: View {
                                 .font(.caption2.weight(.bold))
                                 .foregroundStyle(Color.appInk.opacity(0.5))
                         }
+                        .accessibilityLabel("Remove \(item)")
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
@@ -219,6 +225,7 @@ struct EditMealView: View {
         }
         withAnimation { items.append(trimmed) }
         inputText = ""
+        chipTrigger += 1
     }
 
     private func save() async {
@@ -239,6 +246,7 @@ struct EditMealView: View {
                 consumedAt: consumedAt,
                 context: modelContext
             )
+            saveTrigger += 1
             onSave()
             dismiss()
         } catch {

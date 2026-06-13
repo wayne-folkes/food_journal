@@ -30,7 +30,7 @@ struct DaySummaryView: View {
     private func tile(value: String, label: String, color: Color) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .font(.system(.title, design: .rounded, weight: .bold))
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
@@ -44,5 +44,6 @@ struct DaySummaryView: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(Color.appCard)
         )
+        .accessibilityElement(children: .combine)
     }
 }
