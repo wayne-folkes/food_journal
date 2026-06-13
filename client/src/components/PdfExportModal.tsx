@@ -56,7 +56,7 @@ export function PdfExportModal({ onClose }: Props) {
   const [loadedRangeKey, setLoadedRangeKey] = useState<string | null>(null)
 
   const { isAuthed } = useEntriesStore()
-  const currentRangeKey = `${startDate}:${endDate}`
+  const currentRangeKey = useMemo(() => `${startDate}:${endDate}`, [startDate, endDate])
   const loading = isAuthed && loadedRangeKey !== currentRangeKey
 
   const DATE_PRESETS = useMemo(() => {
@@ -106,6 +106,7 @@ export function PdfExportModal({ onClose }: Props) {
   useEffect(() => {
     if (!isAuthed) return
     let cancelled = false
+    const rangeKey = `${startDate}:${endDate}`
 
     const startISO = new Date(`${startDate}T00:00:00`).toISOString()
     const endISO   = new Date(`${endDate}T23:59:59.999`).toISOString()
@@ -131,13 +132,13 @@ export function PdfExportModal({ onClose }: Props) {
           setRangeMeals([])
         }
 
-        setLoadedRangeKey(currentRangeKey)
+        setLoadedRangeKey(rangeKey)
       })
 
     return () => {
       cancelled = true
     }
-  }, [startDate, endDate, currentRangeKey, isAuthed])
+  }, [startDate, endDate, isAuthed])
 
   // Group meals into weeks (Mon–Sun)
   const weekGroups = useMemo((): WeekGroup[] => {
