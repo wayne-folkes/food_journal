@@ -24,3 +24,4 @@ test-results/
 
 # Claude Code agent artifacts
 .claude/worktrees/
+.claude/skills/
