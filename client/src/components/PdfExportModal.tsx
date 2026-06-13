@@ -53,9 +53,11 @@ export function PdfExportModal({ onClose }: Props) {
   const [startDate, setStartDate] = useState(() => getWeekBounds(today).start)
   const [endDate, setEndDate] = useState(() => getWeekBounds(today).end)
   const [rangeMeals, setRangeMeals] = useState<MealWithItems[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loadedRangeKey, setLoadedRangeKey] = useState<string | null>(null)
 
   const { isAuthed } = useEntriesStore()
+  const currentRangeKey = `${startDate}:${endDate}`
+  const loading = isAuthed && loadedRangeKey !== currentRangeKey
 
   const DATE_PRESETS = useMemo(() => {
     const d = new Date(`${today}T12:00:00`)
@@ -103,7 +105,7 @@ export function PdfExportModal({ onClose }: Props) {
   // Load meals for the date range directly from Supabase
   useEffect(() => {
     if (!isAuthed) return
-    setLoading(true)
+    let cancelled = false
 
     const startISO = new Date(`${startDate}T00:00:00`).toISOString()
     const endISO   = new Date(`${endDate}T23:59:59.999`).toISOString()
@@ -115,6 +117,8 @@ export function PdfExportModal({ onClose }: Props) {
       .lte('consumed_at', endISO)
       .order('consumed_at', { ascending: true })
       .then(({ data, error }) => {
+        if (cancelled) return
+
         if (!error && data) {
           type Row = Omit<MealWithItems, 'items'> & { meal_items: MealWithItems['items'] }
           setRangeMeals(
@@ -123,10 +127,17 @@ export function PdfExportModal({ onClose }: Props) {
               items: [...(m.meal_items ?? [])].sort((a, b) => a.position - b.position),
             }))
           )
+        } else {
+          setRangeMeals([])
         }
-        setLoading(false)
+
+        setLoadedRangeKey(currentRangeKey)
       })
-  }, [startDate, endDate, isAuthed])
+
+    return () => {
+      cancelled = true
+    }
+  }, [startDate, endDate, currentRangeKey, isAuthed])
 
   // Group meals into weeks (Mon–Sun)
   const weekGroups = useMemo((): WeekGroup[] => {
