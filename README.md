@@ -1,37 +1,49 @@
 # Food Journal
 
-A meal logging web app. Log meals with chip-style input, auto-estimated calories, and weekly stats.
+A meal logging app for web and iOS. Log meals as a quick sentence or chip input, get auto-estimated calories, and review daily and weekly stats. The web client and the native iOS app share one Supabase backend.
 
 Live at **[food.folkes.dev](https://food.folkes.dev)**
 
 ## Screenshots
 
+### Web
+
 <table>
   <tr>
-    <td align="center"><strong>Home</strong></td>
-    <td align="center"><strong>Day View</strong></td>
+    <td align="center"><strong>Day</strong></td>
+    <td align="center"><strong>Week</strong></td>
+    <td align="center"><strong>Compose</strong></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/01-home.png" width="200" alt="Home screen showing the meal composer with meal type pills and empty log" /></td>
-    <td><img src="docs/screenshots/02-day-view.png" width="200" alt="Day view with two logged meals and recent item chips" /></td>
+    <td><img src="docs/screenshots/web-01-day.png" width="220" alt="Web day view: summary tiles and a meal card with per-item icons" /></td>
+    <td><img src="docs/screenshots/web-02-week.png" width="220" alt="Web week view: stacked bar chart by meal type and day rows" /></td>
+    <td><img src="docs/screenshots/web-03-compose.png" width="220" alt="Web compose sheet with meal-type pills and sentence input" /></td>
+  </tr>
+</table>
+
+### iOS
+
+<table>
+  <tr>
+    <td align="center"><strong>Day</strong></td>
+    <td align="center"><strong>Week</strong></td>
+    <td align="center"><strong>Compose</strong></td>
   </tr>
   <tr>
-    <td align="center"><strong>Week View</strong></td>
-    <td align="center"><strong>Search</strong></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/04-week-view.png" width="200" alt="Week view showing item count, most logged items, and new this week chips" /></td>
-    <td><img src="docs/screenshots/05-search.png" width="200" alt="Search overlay with highlighted keyword match in results" /></td>
+    <td><img src="docs/screenshots/ios-01-day.png" width="220" alt="iOS day view: summary tiles and color-coded meal cards" /></td>
+    <td><img src="docs/screenshots/ios-02-week.png" width="220" alt="iOS week view: stacked bar chart by meal type and day rows" /></td>
+    <td><img src="docs/screenshots/ios-03-compose.png" width="220" alt="iOS compose sheet with meal-type pills and chip input" /></td>
   </tr>
 </table>
 
 ## Stack
 
-- **Client**: React 19 + Vite + TypeScript, vanilla CSS
+- **Web client**: React 19 + Vite + TypeScript, vanilla CSS
+- **iOS app**: SwiftUI + SwiftData, on-device calorie estimation via Apple Foundation Models (iOS 26+)
 - **Auth + DB**: Supabase (Google OAuth, Postgres + RLS)
 - **State**: Zustand with localStorage (anonymous) ↔ Supabase (signed in)
 - **API functions**: Vercel serverless (Node.js) — USDA calorie lookup
-- **Calorie data**: USDA FoodData Central API (free, cached in `food_lookup` table)
+- **Calorie data**: USDA FoodData Central API (web), Apple Foundation Models (iOS) — cached in `food_lookup` table
 
 ## Setup
 
