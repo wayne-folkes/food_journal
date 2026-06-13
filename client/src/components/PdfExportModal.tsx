@@ -136,7 +136,7 @@ export function PdfExportModal({ onClose }: Props) {
           setLoadError(null)
         } else {
           setRangeMeals([])
-          setLoadError('Could not load meals for this range. Please try again.')
+          setLoadError(error?.message ?? 'Could not load meals for this range. Please try again.')
         }
 
         setLoadedRangeKey(rangeKey)
