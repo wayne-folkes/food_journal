@@ -45,6 +45,10 @@ function buildWeekRangeLabel(days: { date: string }[]): string {
   return `${first.toLocaleDateString(undefined, opts)} – ${last.toLocaleDateString(undefined, { day: 'numeric', year: 'numeric' })}`
 }
 
+function makeRangeKey(start: string, end: string): string {
+  return `${start}:${end}`
+}
+
 export function PdfExportModal({ onClose }: Props) {
   const today = todayString()
   const [voice, setVoice] = useState<PdfVoice>('magazine')
@@ -57,7 +61,7 @@ export function PdfExportModal({ onClose }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const { isAuthed } = useEntriesStore()
-  const currentRangeKey = useMemo(() => `${startDate}:${endDate}`, [startDate, endDate])
+  const currentRangeKey = useMemo(() => makeRangeKey(startDate, endDate), [startDate, endDate])
   const loading = isAuthed && loadedRangeKey !== currentRangeKey
 
   const DATE_PRESETS = useMemo(() => {
@@ -106,8 +110,8 @@ export function PdfExportModal({ onClose }: Props) {
   // Load meals for the date range directly from Supabase
   useEffect(() => {
     if (!isAuthed) return
-    let cancelled = false
-    const rangeKey = `${startDate}:${endDate}`
+    let canceled = false
+    const rangeKey = makeRangeKey(startDate, endDate)
 
     const startISO = new Date(`${startDate}T00:00:00`).toISOString()
     const endISO   = new Date(`${endDate}T23:59:59.999`).toISOString()
@@ -119,7 +123,7 @@ export function PdfExportModal({ onClose }: Props) {
       .lte('consumed_at', endISO)
       .order('consumed_at', { ascending: true })
       .then(({ data, error }) => {
-        if (cancelled) return
+        if (canceled) return
 
         if (!error && data) {
           type Row = Omit<MealWithItems, 'items'> & { meal_items: MealWithItems['items'] }
@@ -132,14 +136,14 @@ export function PdfExportModal({ onClose }: Props) {
           setLoadError(null)
         } else {
           setRangeMeals([])
-          setLoadError('Could not load meals for this range.')
+          setLoadError('Could not load meals for this range. Please try again.')
         }
 
         setLoadedRangeKey(rangeKey)
       })
 
     return () => {
-      cancelled = true
+      canceled = true
     }
   }, [startDate, endDate, isAuthed])
 
