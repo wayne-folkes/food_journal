@@ -131,6 +131,7 @@ export function PdfExportModal({ onClose }: Props) {
           )
           setLoadError(null)
         } else {
+          setRangeMeals([])
           setLoadError('Could not load meals for this range.')
         }
 
