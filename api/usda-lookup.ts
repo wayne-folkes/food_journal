@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import type { LookupItem, LookupResult } from '../shared/usda-lookup'
 import { errorMessage } from '../shared/logger'
 import { buildLookupCacheRows } from './usda-cache'
+import { aiEstimateEnabled, estimateCaloriesWithAi } from './ai-estimate'
 import { log as rootLog } from './logger'
 
 async function pLimit<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
@@ -237,6 +238,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       results.push(result)
+    }
+
+    // 9. AI fallback for anything still without calories (cache-null or USDA miss).
+    // Not written to food_lookup: model guesses must not pollute the USDA cache.
+    const unresolved = results.filter((r) => r.calories === null)
+    if (unresolved.length > 0 && aiEstimateEnabled()) {
+      try {
+        const estimates = await estimateCaloriesWithAi(unresolved)
+        for (const r of unresolved) {
+          const calories = estimates.get(r.id)
+          if (calories !== undefined) {
+            r.calories = calories
+            r.source = 'ai'
+          }
+        }
+      } catch (err) {
+        // Best-effort: USDA results are still returned
+        log.withMetadata({ error: errorMessage(err) }).warn('AI calorie estimate failed')
+      }
     }
 
     return res.status(200).json({ results })

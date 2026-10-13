@@ -7,5 +7,5 @@ export interface LookupResult {
   id: string
   description: string
   calories: number | null
-  source: 'cache' | 'usda' | 'not_found'
+  source: 'cache' | 'usda' | 'ai' | 'not_found'
 }
