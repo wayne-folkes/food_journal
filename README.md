@@ -124,6 +124,14 @@ The `/api/usda-lookup` serverless function needs these set in your Vercel projec
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase Dashboard → Project Settings → API (service_role) |
 | `USDA_API_KEY` | Sign up free at [fdc.nal.usda.gov/api-key-signup](https://fdc.nal.usda.gov/api-key-signup) |
 
+**Optional — AI calorie fallback.** When USDA has no match for an item, `/api/usda-lookup` can ask an Amazon Bedrock model (GLM-5 by default) for an estimate; those results come back with `source: "ai"` and are not cached. It stays off until `AWS_ROLE_ARN` is set.
+
+| Variable | Purpose |
+|---|---|
+| `AWS_ROLE_ARN` | IAM role Vercel assumes via OIDC (needs `bedrock:InvokeModel` on the model). Enables the fallback. |
+| `CALORIE_AI_MODEL` | Bedrock model ID (default `zai.glm-5`) |
+| `CALORIE_AI_AWS_REGION` | Bedrock region (default `us-east-1`) |
+
 ### 5. Run the dev server
 
 ```bash

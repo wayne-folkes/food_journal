@@ -16,7 +16,7 @@ import { ToastProvider } from './components/Toast'
 import { SearchOverlay } from './components/SearchOverlay'
 import { PdfExportModal } from './components/PdfExportModal'
 import { WeekView } from './components/WeekView'
-import { lookupCalories } from './lib/caloriesLookup'
+import { lookupCalories, calorieSourceLabel } from './lib/caloriesLookup'
 import { offsetDate } from './lib/date'
 import { useToast } from './lib/toast'
 import { track } from './lib/analytics'
@@ -167,7 +167,7 @@ function AppInner() {
                 }
               })
               const found = results.filter((result) => result.calories !== null).length
-              if (found > 0) toast.success(`Got calorie estimate${found === 1 ? '' : 's'} for ${found} item${found === 1 ? '' : 's'} from USDA`)
+              if (found > 0) toast.success(`Got calorie estimate${found === 1 ? '' : 's'} for ${found} item${found === 1 ? '' : 's'} from ${calorieSourceLabel(results)}`)
             })
             .catch(() => {
               // silently fail — calorie lookup is best-effort
@@ -257,7 +257,7 @@ function AppInner() {
         if (r.calories !== null) await updateItemCalories(r.id, r.calories)
       }
       const found = results.filter((r) => r.calories !== null).length
-      if (found > 0) toast.success(`Got calorie estimate${found === 1 ? '' : 's'} for ${found} item${found === 1 ? '' : 's'} from USDA`)
+      if (found > 0) toast.success(`Got calorie estimate${found === 1 ? '' : 's'} for ${found} item${found === 1 ? '' : 's'} from ${calorieSourceLabel(results)}`)
       else toast.error('No calorie data found for these items')
     } catch {
       toast.error('Failed to estimate calories')

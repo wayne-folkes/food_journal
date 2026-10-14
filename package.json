@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1151.0",
     "@loglayer/transport-pino": "^3.0.2",
     "@supabase/supabase-js": "^2.50.0",
+    "@vercel/functions": "^3.10.0",
     "@vercel/node": "^5.1.16",
     "loglayer": "^9.1.0",
     "pino": "^10.3.1"
