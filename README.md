@@ -128,8 +128,8 @@ The `/api/usda-lookup` serverless function needs these set in your Vercel projec
 
 | Variable | Purpose |
 |---|---|
-| `AWS_ROLE_ARN` | IAM role Vercel assumes via OIDC (needs `bedrock:InvokeModel` on the model). Enables the fallback. |
-| `CALORIE_AI_MODEL` | Bedrock model ID (default `zai.glm-5`) |
+| `AWS_ROLE_ARN` | IAM role Vercel assumes via OIDC (needs `bedrock:InvokeModel` on the model). Enables the fallback. Use the `vercel_role_arn` output of `terraform/`. |
+| `CALORIE_AI_MODEL` | Bedrock model ID (default `zai.glm-5`). Must also be listed in `bedrock_model_ids` in `terraform/variables.tf`. |
 | `CALORIE_AI_AWS_REGION` | Bedrock region (default `us-east-1`) |
 
 ### 5. Run the dev server
