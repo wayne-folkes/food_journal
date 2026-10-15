@@ -10,6 +10,8 @@ interface EITileProps {
   size?: number
   /** Fill the parent instead of a fixed square (e.g. detail-sheet tile strip) */
   fluid?: boolean
+  /** Liquid Glass look: circular, slightly brighter. Default is the soft square. */
+  round?: boolean
 }
 
 // Arcade Glow tile recipe (tuned for dark backgrounds): fixed saturation /
@@ -18,8 +20,11 @@ const TILE_SAT = 58
 const TILE_L = 60
 const PATTERN_INK = 'rgba(0,0,0,0.22)'
 
-function getPatternBackground(hue: number, pattern: TilePattern): string {
-  const bg = `hsl(${hue} ${TILE_SAT}% ${TILE_L}%)`
+const ROUND_SAT = 62
+const ROUND_L = 64
+
+function getPatternBackground(hue: number, pattern: TilePattern, round: boolean): string {
+  const bg = round ? `hsl(${hue} ${ROUND_SAT}% ${ROUND_L}%)` : `hsl(${hue} ${TILE_SAT}% ${TILE_L}%)`
   const fg = PATTERN_INK
 
   switch (pattern) {
@@ -37,7 +42,7 @@ function getPatternBackground(hue: number, pattern: TilePattern): string {
   }
 }
 
-export function EITile({ tile, name, size = 30, fluid = false }: EITileProps) {
+export function EITile({ tile, name, size = 30, fluid = false, round = false }: EITileProps) {
   const spec = tile ?? (name ? getTileSpec(name) : { hue: 40, sat: 20, l: 70, pattern: 'solid' as TilePattern })
 
   return (
@@ -45,9 +50,9 @@ export function EITile({ tile, name, size = 30, fluid = false }: EITileProps) {
       style={{
         width: fluid ? '100%' : size,
         height: fluid ? '100%' : size,
-        borderRadius: fluid ? 14 : 8,
+        borderRadius: fluid ? 14 : round ? '50%' : 8,
         flexShrink: 0,
-        background: getPatternBackground(spec.hue, spec.pattern),
+        background: getPatternBackground(spec.hue, spec.pattern, round),
         border: '1px solid rgba(255,255,255,0.14)',
       }}
       aria-hidden="true"

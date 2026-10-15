@@ -48,7 +48,7 @@ function renderCard(propsOverride: Record<string, unknown> = {}) {
 describe('MealCard', () => {
   it('renders meal type and item description', () => {
     renderCard()
-    expect(screen.getByText('— Breakfast')).toBeInTheDocument()
+    expect(screen.getByText('Breakfast')).toBeInTheDocument()
     expect(screen.getAllByText('Eggs and toast').length).toBeGreaterThan(0)
   })
 

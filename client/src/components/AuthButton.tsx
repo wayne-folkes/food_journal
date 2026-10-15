@@ -53,8 +53,12 @@ export function AuthButton({ user, isAdmin, onExportPdf }: Props) {
 
   if (!user) {
     return (
-      <button className="btn btn--outline" onClick={signIn}>
-        Sign in with Google
+      <button className="gl-nb gl-nb--auth" onClick={signIn} aria-label="Sign in with Google">
+        <span className="gl-nb__label">Sign in</span>
+        <svg className="gl-nb__icon" width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <circle cx="10" cy="7" r="3.2" stroke="currentColor" strokeWidth="1.6" />
+          <path d="M3.8 16.5c.8-3 3.2-4.6 6.2-4.6s5.4 1.6 6.2 4.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
       </button>
     )
   }

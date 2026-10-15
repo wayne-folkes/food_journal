@@ -1,10 +1,8 @@
-import { useEffect, useMemo } from 'react'
-import type { MealType, MealWithItems } from '@shared/types/database'
-import { useEntriesStore, getWeekBounds } from '../lib/store'
-import { EITile } from './EITile'
-
-/** Stacking order for chart segments — roughly chronological through the day */
-const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'drink']
+import { useMemo } from 'react'
+import type { MealWithItems } from '@shared/types/database'
+import { getWeekBounds, todayString } from '../lib/store'
+import { MEAL_TYPE_LABELS, MEAL_TYPE_ORDER } from '../lib/mealType'
+import { useTween } from '../lib/useTween'
 
 interface WeekViewProps {
   weekMeals: MealWithItems[]
@@ -13,158 +11,103 @@ interface WeekViewProps {
   onNavigateToDay: (date: string) => void
 }
 
-function formatDayLetter(dateStr: string): string {
-  return new Date(`${dateStr}T12:00:00`).toLocaleDateString(undefined, { weekday: 'narrow' })
-}
+const localDate = (iso: string) => new Date(iso).toLocaleDateString('sv')
+const at = (dateStr: string) => new Date(`${dateStr}T12:00:00`)
+const fmtShort = (dateStr: string) => at(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
-function formatDayNum(dateStr: string): string {
-  return new Date(`${dateStr}T12:00:00`).getDate().toString()
-}
+/** The busiest-day floor keeps a quiet week from looking full. */
+const MIN_SCALE_ITEMS = 8
 
-function formatDayAbbrev(dateStr: string): string {
-  return new Date(`${dateStr}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
-}
-
-function isToday(dateStr: string): boolean {
-  return dateStr === new Date().toLocaleDateString('sv')
-}
-
+/** Seven glass tubes, each filled with that day's meals in meal-type colors. */
 export function WeekView({ weekMeals, weekStart, isLoading, onNavigateToDay }: WeekViewProps) {
-  const { loadPriorItems } = useEntriesStore()
-
-  useEffect(() => {
-    loadPriorItems(weekStart)
-  }, [weekStart, loadPriorItems])
-
-  const groupedByDate = useMemo(() => {
+  const days = useMemo(() => {
     const { start } = getWeekBounds(weekStart)
-    const days: string[] = []
-    const d = new Date(`${start}T12:00:00`)
+    const byDate = new Map<string, MealWithItems[]>()
+    const list: string[] = []
+    const d = at(start)
     for (let i = 0; i < 7; i++) {
-      days.push(d.toLocaleDateString('sv'))
+      const key = d.toLocaleDateString('sv')
+      list.push(key)
+      byDate.set(key, [])
       d.setDate(d.getDate() + 1)
     }
-    const map = new Map<string, MealWithItems[]>()
-    for (const day of days) map.set(day, [])
-    for (const meal of weekMeals) {
-      const date = new Date(meal.consumed_at).toLocaleDateString('sv')
-      map.get(date)?.push(meal)
-    }
-    return days.map(date => ({ date, meals: map.get(date) ?? [] }))
+    for (const meal of weekMeals) byDate.get(localDate(meal.consumed_at))?.push(meal)
+    return list.map((date) => {
+      const meals = (byDate.get(date) ?? []).sort(
+        (a, b) => new Date(a.consumed_at).getTime() - new Date(b.consumed_at).getTime(),
+      )
+      return { date, meals, count: meals.reduce((n, m) => n + m.items.length, 0) }
+    })
   }, [weekMeals, weekStart])
 
-  const totalMeals = weekMeals.length
-  const totalItems = weekMeals.reduce((sum, m) => sum + m.items.length, 0)
-
-  // Max items in a day (for bar chart scaling — segment heights ∝ item count)
-  const maxItemsPerDay = Math.max(
-    1,
-    ...groupedByDate.map(d => d.meals.reduce((sum, m) => sum + m.items.length, 0))
-  )
+  const today = todayString()
+  const max = Math.max(MIN_SCALE_ITEMS, ...days.map((d) => d.count))
+  const totalItems = days.reduce((n, d) => n + d.count, 0)
+  const totalMeals = days.reduce((n, d) => n + d.meals.length, 0)
+  const itemsShown = useTween(totalItems, 900)
 
   return (
-    <div className={`ei-week${isLoading ? ' ei-week--loading' : ''}`} aria-busy={isLoading}>
+    <div className="gl-wk" aria-busy={isLoading}>
+      <span className="gl-kick">
+        <i />
+        {fmtShort(days[0].date)} – {fmtShort(days[6].date)}
+      </span>
+      <h1 className="gl-h1">
+        {days.some((d) => d.date === today) ? 'This week' : `Week of ${fmtShort(days[0].date)}`}
+      </h1>
+      <span className="gl-sub">
+        <b>{Math.round(itemsShown)}</b> {totalItems === 1 ? 'item' : 'items'} across <b>{totalMeals}</b>{' '}
+        {totalMeals === 1 ? 'meal' : 'meals'}
+      </span>
 
-      {/* Summary line */}
-      <p className="ei-week__summary">
-        <strong>{totalMeals}</strong> meal{totalMeals === 1 ? '' : 's'}, <strong>{totalItems}</strong> item{totalItems === 1 ? '' : 's'}
-      </p>
-
-      {/* Stacked bar chart — segments colored by meal type */}
-      <div className="ei-week__chart">
-        {groupedByDate.map(({ date, meals }) => {
-          const today = isToday(date)
-          const itemCount = meals.reduce((sum, m) => sum + m.items.length, 0)
-          const colHeight = itemCount > 0 ? Math.max(14, (itemCount / maxItemsPerDay) * 100) : 0
-          const countByType = new Map<MealType, number>()
-          for (const m of meals) {
-            countByType.set(m.meal_type, (countByType.get(m.meal_type) ?? 0) + m.items.length)
-          }
-          const segments = MEAL_ORDER.filter(t => countByType.has(t)).map(t => ({
-            type: t,
-            count: countByType.get(t)!,
-          }))
+      <div className={`gl-tubes${isLoading ? ' gl-tubes--loading' : ''}`}>
+        {days.map(({ date, meals, count }, i) => {
+          const d = at(date)
+          const weekday = d.toLocaleDateString(undefined, { weekday: 'short' })
+          const narrow = d.toLocaleDateString(undefined, { weekday: 'narrow' })
           return (
             <button
               key={date}
-              className={`ei-week__chart-col${today ? ' ei-week__chart-col--today' : ''}`}
+              className={`gl-tc${date === today ? ' gl-tc--today' : ''}`}
               onClick={() => onNavigateToDay(date)}
-              aria-label={`${formatDayAbbrev(date)}: ${meals.length} meals, ${itemCount} items`}
+              aria-label={`${weekday} ${d.getDate()}: ${meals.length} meals, ${count} items`}
             >
-              <div className="ei-week__chart-bar-wrap">
-                {segments.length > 0 ? (
-                  <div className="ei-week__chart-stack" style={{ height: `${colHeight}%` }}>
-                    {segments.map(seg => (
-                      <div
-                        key={seg.type}
-                        className="ei-week__chart-seg"
-                        data-meal-type={seg.type}
-                        style={{ flexGrow: seg.count }}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="ei-week__chart-bar ei-week__chart-bar--empty" />
+              <div className="gl-tube gl-glass">
+                {count > 0 && (
+                  <span className="gl-tn" style={{ animationDelay: `${0.6 + i * 0.08}s` }}>{count}</span>
                 )}
+                <div
+                  className="gl-fill"
+                  style={{
+                    '--ratio': count / max,
+                    height: count ? undefined : 0,
+                    animationDelay: `${0.25 + i * 0.08}s`,
+                  } as React.CSSProperties}
+                >
+                  {meals.map((m) => (
+                    <div
+                      key={m.id}
+                      style={{ flex: m.items.length, background: `var(--meal-${m.meal_type})` }}
+                    />
+                  ))}
+                </div>
               </div>
-              <span className={`ei-week__chart-label${today ? ' ei-week__chart-label--today' : ''}`}>
-                {formatDayLetter(date)}
+              <span className="gl-tl">
+                <span className="gl-tl__long">{weekday}</span>
+                <span className="gl-tl__short">{narrow}</span> {d.getDate()}
               </span>
             </button>
           )
         })}
       </div>
 
-      {/* Section kicker */}
-      <div className="ei-section-kicker" style={{ margin: '0 16px' }}>
-        <span className="ei-section-kicker__text">— The Days</span>
-        <div className="ei-section-kicker__rule" />
-      </div>
-
-      {/* Day list */}
-      <div className="ei-week__days">
-        {groupedByDate.map(({ date, meals }) => {
-          const today = isToday(date)
-          const allItems = meals.flatMap(m => m.items)
-          return (
-            <button
-              key={date}
-              className={`ei-week__day-row${today ? ' ei-week__day-row--today' : ''}`}
-              onClick={() => onNavigateToDay(date)}
-            >
-              <div className="ei-week__day-date">
-                <span className="ei-week__day-abbrev">{formatDayAbbrev(date)}</span>
-                <span className="ei-week__day-num">{formatDayNum(date)}</span>
-              </div>
-              <div className="ei-week__day-content">
-                {meals.length === 0 ? (
-                  <span className="ei-week__day-empty">Nothing logged.</span>
-                ) : (
-                  <>
-                    <span className="ei-week__day-desc">
-                      {meals.map(m => m.items.map(i => i.description).join(', ')).join(' · ')}
-                    </span>
-                    {allItems.length > 0 && (
-                      <div className="ei-week__day-tiles">
-                        {allItems.slice(0, 4).map((item, i) => (
-                          <EITile key={i} name={item.description} size={22} />
-                        ))}
-                        {allItems.length > 4 && (
-                          <span className="ei-week__day-more">+{allItems.length - 4}</span>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-              {meals.length > 0 && (
-                <span className="ei-week__day-meta">
-                  {meals.length} meal{meals.length === 1 ? '' : 's'} · {allItems.length} item{allItems.length === 1 ? '' : 's'}
-                </span>
-              )}
-            </button>
-          )
-        })}
+      <div className="gl-legend">
+        {MEAL_TYPE_ORDER.map((t) => (
+          <span key={t}>
+            <i style={{ background: `var(--meal-${t})` }} />
+            {MEAL_TYPE_LABELS[t]}
+          </span>
+        ))}
       </div>
     </div>
   )

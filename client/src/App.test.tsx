@@ -103,12 +103,11 @@ vi.mock('./lib/supabase', () => ({
   },
 }))
 
-vi.mock('./components/MealComposer', () => ({ MealComposer: () => null }))
 vi.mock('./components/MealLog', () => ({ MealLog: () => null }))
 vi.mock('./components/EditMealModal', () => ({ EditMealModal: () => null }))
 vi.mock('./components/AuthButton', () => ({ AuthButton: () => null }))
-vi.mock('./components/DateNav', () => ({ DateNav: () => null }))
-vi.mock('./components/DaySummary', () => ({ DaySummary: () => null }))
+vi.mock('./components/TopBar', () => ({ TopBar: () => null }))
+vi.mock('./components/Compose', () => ({ Compose: () => null }))
 vi.mock('./components/SearchOverlay', () => ({ SearchOverlay: () => null }))
 vi.mock('./components/AdminPanel', () => ({ AdminPanel: () => null }))
 vi.mock('./components/WeekView', () => ({ WeekView: () => null }))

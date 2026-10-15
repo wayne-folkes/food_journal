@@ -38,15 +38,15 @@ export function parseChip(
 }
 
 /**
- * Parses a free-text sentence into a ParsedMeal, splitting items on commas
- * and the standalone word "and".
+ * Parses a free-text sentence into a ParsedMeal, splitting items on commas,
+ * "+", newlines and the standalone word "and".
  *
  *   "salmon, brown rice and ginger tea" → ["salmon", "brown rice", "ginger tea"]
  *   "ham sandwich and coffee at 9am"    → ["ham sandwich", "coffee"] @ 9:00
  */
 export function parseSentence(raw: string, referenceDate = new Date()): ParsedMeal {
   const pieces = raw
-    .split(/,|\band\b/i)
+    .split(/,|\n|\+|\band\b/i)
     .map((s) => s.trim())
     .filter(Boolean)
   return parseMeal(pieces, referenceDate)

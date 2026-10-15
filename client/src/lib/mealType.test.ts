@@ -12,23 +12,25 @@ describe('suggestMealType', () => {
   it('suggests breakfast at 08:00', () => expect(suggestMealType(at(8, 0))).toBe('breakfast'))
   it('suggests breakfast at 10:29', () => expect(suggestMealType(at(10, 29))).toBe('breakfast'))
 
-  // Lunch: 10:30 – 14:29
+  // Lunch: 10:30 – 14:59
   it('suggests lunch at 10:30', () => expect(suggestMealType(at(10, 30))).toBe('lunch'))
   it('suggests lunch at 12:00', () => expect(suggestMealType(at(12, 0))).toBe('lunch'))
   it('suggests lunch at 14:29', () => expect(suggestMealType(at(14, 29))).toBe('lunch'))
+  it('suggests lunch at 14:59', () => expect(suggestMealType(at(14, 59))).toBe('lunch'))
 
-  // Snack: 14:30 – 16:59
-  it('suggests snack at 14:30', () => expect(suggestMealType(at(14, 30))).toBe('snack'))
+  // Snack: 15:00 – 17:29
   it('suggests snack at 15:00', () => expect(suggestMealType(at(15, 0))).toBe('snack'))
   it('suggests snack at 16:59', () => expect(suggestMealType(at(16, 59))).toBe('snack'))
+  it('suggests snack at 17:29', () => expect(suggestMealType(at(17, 29))).toBe('snack'))
 
-  // Dinner: 17:00 – 20:59
-  it('suggests dinner at 17:00', () => expect(suggestMealType(at(17, 0))).toBe('dinner'))
+  // Dinner: 17:30 – 21:29
+  it('suggests dinner at 17:30', () => expect(suggestMealType(at(17, 30))).toBe('dinner'))
   it('suggests dinner at 19:00', () => expect(suggestMealType(at(19, 0))).toBe('dinner'))
   it('suggests dinner at 20:59', () => expect(suggestMealType(at(20, 59))).toBe('dinner'))
+  it('suggests dinner at 21:29', () => expect(suggestMealType(at(21, 29))).toBe('dinner'))
 
-  // Snack: 21:00 – 03:59
-  it('suggests snack at 21:00', () => expect(suggestMealType(at(21, 0))).toBe('snack'))
+  // Snack: 21:30 – 03:59
+  it('suggests snack at 21:30', () => expect(suggestMealType(at(21, 30))).toBe('snack'))
   it('suggests snack at 23:00', () => expect(suggestMealType(at(23, 0))).toBe('snack'))
   it('suggests snack at 01:00', () => expect(suggestMealType(at(1, 0))).toBe('snack'))
   it('suggests snack at 03:59', () => expect(suggestMealType(at(3, 59))).toBe('snack'))

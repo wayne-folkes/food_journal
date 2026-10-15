@@ -624,3 +624,56 @@ describe('useEntriesStore.addMeal', () => {
     ])
   })
 })
+
+describe('useEntriesStore.loadDay', () => {
+  function queryReturning(rows: unknown[], gate?: Promise<void>) {
+    const result = async () => { if (gate) await gate; return { data: rows, error: null } }
+    const chain = {
+      select: vi.fn(() => chain),
+      gte: vi.fn(() => chain),
+      lte: vi.fn(() => chain),
+      order: vi.fn(() => result()),
+    }
+    return chain
+  }
+
+  beforeEach(() => {
+    mockSupabase.from.mockReset()
+    useEntriesStore.setState({ meals: [], dayCache: {}, isAuthed: true, isLoading: false })
+  })
+
+  it('drops a superseded response so an older day cannot overwrite a newer one', async () => {
+    let releaseSlow!: () => void
+    const slowGate = new Promise<void>((resolve) => { releaseSlow = resolve })
+    const row = (id: string) => ({ ...makeStoredMeal({ id, description: id, consumedAt: '2026-04-15T09:00:00.000Z', userId: 'u' }), meal_items: [] })
+
+    mockSupabase.from
+      .mockReturnValueOnce(queryReturning([row('old-day')], slowGate))
+      .mockReturnValueOnce(queryReturning([row('new-day')]))
+
+    const first = useEntriesStore.getState().loadDay('2026-04-14')
+    const second = useEntriesStore.getState().loadDay('2026-04-15')
+    await second
+    releaseSlow()
+    await first
+
+    expect(useEntriesStore.getState().meals.map((m) => m.id)).toEqual(['new-day'])
+    expect(useEntriesStore.getState().isLoading).toBe(false)
+  })
+
+  it('clears isLoading when a cached day supersedes an in-flight load', async () => {
+    let releaseSlow!: () => void
+    const slowGate = new Promise<void>((resolve) => { releaseSlow = resolve })
+    mockSupabase.from.mockReturnValueOnce(queryReturning([], slowGate))
+    const cachedMeal = makeStoredMeal({ id: 'cached', description: 'cached', consumedAt: '2026-04-16T09:00:00.000Z', userId: 'u' })
+    useEntriesStore.setState({ dayCache: { '2026-04-16': [cachedMeal] } })
+
+    const slow = useEntriesStore.getState().loadDay('2026-04-15')
+    await useEntriesStore.getState().loadDay('2026-04-16')
+    releaseSlow()
+    await slow
+
+    expect(useEntriesStore.getState().meals.map((m) => m.id)).toEqual(['cached'])
+    expect(useEntriesStore.getState().isLoading).toBe(false)
+  })
+})
