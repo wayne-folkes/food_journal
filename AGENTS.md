@@ -98,8 +98,9 @@ That means:
 
 - Follow existing commit message style (see `git log` — conventional
   prefix like `feat:` / `fix:` / `refactor:` / `chore:`)
-- Always include the `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>`
-  trailer on agent-authored commits
+- Always include a `Co-Authored-By: Claude <current model> <noreply@anthropic.com>`
+  trailer on agent-authored commits, naming the model actually doing the work
+  (e.g. `Claude Sonnet 5.5`) — don't copy an old version from earlier commits
 - Only commit when the user asks you to
 
 ## Files to read before significant changes

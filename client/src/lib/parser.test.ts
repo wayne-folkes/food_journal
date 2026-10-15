@@ -134,6 +134,11 @@ describe('parseSentence', () => {
     expect(items).toEqual(['oats', 'honey', 'a cortado'])
   })
 
+  it('splits on "+" and newlines', () => {
+    const { items } = parseSentence('toast + jam\nbutter', REF)
+    expect(items).toEqual(['toast', 'jam', 'butter'])
+  })
+
   it('extracts a time phrase from the sentence', () => {
     const { items, consumed_at } = parseSentence('eggs and coffee at 8am', REF)
     expect(items).toEqual(['eggs', 'coffee'])

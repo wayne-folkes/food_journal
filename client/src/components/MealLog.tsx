@@ -1,140 +1,170 @@
-import { useMemo } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 import type { MealWithItems } from '@shared/types/database'
+import { EASE_SETTLE, ZOOM_MS, fadeOutCard, flipMeals, flyBubbles, prefersReducedMotion, snapshotMeals, type Flight } from '../lib/glassMotion'
 import { MealCard } from './MealCard'
 
+/** A meal created this recently that we did not log ourselves counts as "arrived". */
+const FRESH_WINDOW_MS = 20_000
+/** Tolerance between this device's clock and the server's created_at. */
+const FLIGHT_CLOCK_SKEW_MS = 30_000
+
 interface Props {
+  /** Meals for the selected day, any order. */
   meals: MealWithItems[]
   isLoading: boolean
-  selectedDate: string
+  /** App root: coordinate space for flights and home of the flight layer. */
+  rootRef: RefObject<HTMLElement | null>
+  /** The submission whose bubbles are about to glide into their new card. */
+  flight: Flight | null
+  onFlightDone: (flight: Flight) => void
+  /** A meal just landed or arrived — the sky blooms in its color. */
+  onFresh: (meal: MealWithItems) => void
   onEdit: (meal: MealWithItems) => void
-  onDelete: (id: string) => void
+  /** Resolves true once the meal is gone, false if the delete failed. */
+  onDelete: (id: string) => Promise<boolean>
   onDuplicate: (meal: MealWithItems) => void
   onUpdateCalories: (itemId: string, calories: number | null) => Promise<void>
   onEstimateCalories?: (meal: MealWithItems) => Promise<void>
   onSelect?: (meal: MealWithItems) => void
-  onTryExample?: (sentence: string) => void
-}
-
-/** Group meals logged within `windowMinutes` of each other into clusters. */
-function groupMealsByTime(meals: MealWithItems[], windowMinutes = 10): MealWithItems[][] {
-  if (meals.length === 0) return []
-  const groups: MealWithItems[][] = []
-  let current: MealWithItems[] = [meals[0]]
-
-  for (let i = 1; i < meals.length; i++) {
-    const prev = new Date(meals[i - 1].consumed_at).getTime()
-    const curr = new Date(meals[i].consumed_at).getTime()
-    const diffMin = (curr - prev) / 60_000
-    if (diffMin <= windowMinutes) {
-      current.push(meals[i])
-    } else {
-      groups.push(current)
-      current = [meals[i]]
-    }
-  }
-  groups.push(current)
-  return groups
 }
 
 function LoadingSkeleton() {
   return (
-    <section className="meal-log meal-log--skeleton">
+    <div className="gl-list" aria-busy="true">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="skeleton-row">
+        <div key={i} className="gl-skel gl-glass">
           <div className="skeleton-pulse skeleton-pulse--time" />
           <div className="skeleton-pulse skeleton-pulse--desc" />
         </div>
       ))}
-    </section>
+    </div>
   )
 }
 
-function formatDateHeading(dateStr: string): string {
-  const today = new Date().toLocaleDateString('sv')
-  if (dateStr === today) return "Today's Log"
-  const d = new Date(`${dateStr}T12:00:00`)
-  return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+function sameItems(meal: MealWithItems, items: string[]): boolean {
+  return meal.items.length === items.length && meal.items.every((it, i) => it.description === items[i])
 }
 
-const cardProps = (
-  meal: MealWithItems,
-  handlers: Pick<Props, 'onEdit' | 'onDelete' | 'onDuplicate' | 'onUpdateCalories' | 'onEstimateCalories' | 'onSelect'>
-) => ({
-  meal,
-  onEdit: handlers.onEdit,
-  onDelete: handlers.onDelete,
-  onDuplicate: handlers.onDuplicate,
-  onUpdateCalories: handlers.onUpdateCalories,
-  onEstimateCalories: handlers.onEstimateCalories,
-  onSelect: handlers.onSelect,
-})
+/** The day's meal cards, newest first, with the glide / FLIP / fade motion. */
+export function MealLog({
+  meals, isLoading, rootRef, flight, onFlightDone, onFresh,
+  onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories, onSelect,
+}: Props) {
+  const sorted = useMemo(
+    () => [...meals].sort((a, b) => new Date(b.consumed_at).getTime() - new Date(a.consumed_at).getTime()),
+    [meals],
+  )
 
-export function MealLog({ meals, isLoading, selectedDate, onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories, onSelect, onTryExample }: Props) {
-  const handlers = { onEdit, onDelete, onDuplicate, onUpdateCalories, onEstimateCalories, onSelect }
+  // The saved meal that matches the submission: new on screen, same items.
+  const landingId = useMemo(() => {
+    if (!flight) return null
+    const byContent = sorted.find((m) => (
+      !flight.beforeIds.has(m.id)
+      && sameItems(m, flight.items)
+      && new Date(m.created_at).getTime() >= flight.startedAt - FLIGHT_CLOCK_SKEW_MS
+    ))
+    if (byContent) return byContent.id
+    // Server answered but its timestamps/text disagree with ours: trust the id.
+    return flight.savedId && sorted.some((m) => m.id === flight.savedId) ? flight.savedId : null
+  }, [flight, sorted])
 
-  const groups = useMemo(() => {
-    const sorted = [...meals].sort(
-      (a, b) => new Date(a.consumed_at).getTime() - new Date(b.consumed_at).getTime()
-    )
-    return groupMealsByTime(sorted)
-  }, [meals])
+  const seenRef = useRef(new Set<string>())
+  const flownRef = useRef<string | null>(null)
+  const pendingFlipRef = useRef<{ id: string; before: Record<string, DOMRect> } | null>(null)
+
+  // Landing: reflow the list and glide the bubbles into the new card.
+  useLayoutEffect(() => {
+    if (!flight || !landingId || flownRef.current === landingId) return
+    flownRef.current = landingId
+    seenRef.current.add(landingId)
+    const meal = sorted.find((m) => m.id === landingId)
+    if (meal) onFresh(meal)
+
+    const root = rootRef.current
+    if (!root) { onFlightDone(flight); return }
+    const run = () => {
+      flipMeals(root, flight.before)
+      void flyBubbles(root, landingId, flight.srcs).then(() => onFlightDone(flight))
+    }
+    // No cleanup on purpose: this effect re-runs when `sorted` changes (e.g. a
+    // calorie update), and cancelling here would strand the hidden item rows.
+    if (flight.waitForZoom && !prefersReducedMotion()) window.setTimeout(run, ZOOM_MS)
+    else run()
+  }, [flight, landingId, sorted, rootRef, onFlightDone, onFresh])
+
+  // Arrivals we did not log ourselves (undo, log again, another device).
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    const seen = seenRef.current
+    const arrived: MealWithItems[] = []
+    for (const m of sorted) {
+      if (seen.has(m.id)) continue
+      seen.add(m.id)
+      if (m.id === landingId) continue
+      if (Date.now() - new Date(m.created_at).getTime() < FRESH_WINDOW_MS) arrived.push(m)
+    }
+    if (arrived.length === 0) return
+    arrived.forEach((m) => {
+      onFresh(m)
+      if (prefersReducedMotion()) return
+      root?.querySelector<HTMLElement>(`[data-meal="${CSS.escape(m.id)}"]`)?.animate(
+        [{ opacity: 0, transform: 'translateY(-10px) scale(.98)' }, { opacity: 1, transform: 'none' }],
+        { duration: 600, easing: EASE_SETTLE },
+      )
+    })
+  }, [sorted, landingId, rootRef, onFresh])
+
+  // Deleted cards: remaining cards slide into the gap.
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    const pending = pendingFlipRef.current
+    // Wait for the deleted card to actually leave the list (other updates,
+    // e.g. a calorie edit, must not consume the reflow).
+    if (!root || !pending || sorted.some((m) => m.id === pending.id)) return
+    pendingFlipRef.current = null
+    flipMeals(root, pending.before)
+  }, [sorted, rootRef])
+
+  const requestDelete = useCallback(async (id: string) => {
+    const root = rootRef.current
+    const el = root?.querySelector<HTMLElement>(`[data-meal="${CSS.escape(id)}"]`) ?? null
+    const before = root ? snapshotMeals(root) : null
+    const fade = el ? fadeOutCard(el) : null
+    await fade?.finished
+    pendingFlipRef.current = before ? { id, before } : null
+    const ok = await onDelete(id)
+    if (!ok) {
+      pendingFlipRef.current = null
+      fade?.cancel()
+    }
+  }, [onDelete, rootRef])
 
   if (isLoading) return <LoadingSkeleton />
 
-  return (
-    <section className="meal-log">
-      <h2 className="meal-log__heading">{formatDateHeading(selectedDate)}</h2>
+  if (sorted.length === 0) {
+    return (
+      <div className="gl-empty gl-glass">
+        <b>A clean slate.</b>
+        Log your first meal and it will appear here.
+      </div>
+    )
+  }
 
-      {groups.length === 0 ? (
-        <div className="ei-empty">
-          <div className="ei-empty__ornament">
-            <div className="ei-empty__glyph" aria-hidden="true">
-              <svg width="26" height="26" viewBox="0 0 18 18" fill="none">
-                <path d="M2 13.5V16h2.5L13.07 7.43 10.57 4.93 2 13.5z" fill="currentColor"/>
-                <path d="M15.41 4.59a1 1 0 000-1.42l-1.58-1.58a1 1 0 00-1.42 0L11 3l2.5 2.5 1.91-1.91z" fill="currentColor"/>
-              </svg>
-            </div>
-            <h2 className="ei-empty__title">Nothing logged yet.</h2>
-            <p className="ei-empty__body">Type what you ate in the bar above — a sentence is enough.</p>
-          </div>
-          <div className="ei-empty__try">
-            <span className="ei-empty__kicker">— Try one</span>
-            <div className="ei-empty__try-card">
-              {[
-                'Oats, honey, and a cortado',
-                'Chicken caesar, croutons, water',
-                'An apple and some almonds',
-              ].map((sentence, i) => (
-                <button key={i} className="ei-empty__try-row" type="button" onClick={() => onTryExample?.(sentence)}>
-                  <span className="ei-empty__try-num">{i + 1}.</span>
-                  <span className="ei-empty__try-text">{sentence}</span>
-                  <span className="ei-empty__try-chevron" aria-hidden="true">›</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : (
-        (() => {
-          const firstCardId = groups[0][0].id
-          return groups.map((group) =>
-            group.length === 1 ? (
-              <MealCard key={group[0].id} {...cardProps(group[0], handlers)} isFirst={group[0].id === firstCardId} />
-            ) : (
-              <div key={group[0].id} className="meal-group">
-                {group.map((meal, idx) => (
-                  <MealCard
-                    key={meal.id}
-                    {...cardProps(meal, handlers)}
-                    isFirst={meal.id === firstCardId}
-                    groupPosition={idx === 0 ? 'first' : idx === group.length - 1 ? 'last' : 'middle'}
-                  />
-                ))}
-              </div>
-            )
-          )
-        })()
-      )}
-    </section>
+  return (
+    <div className="gl-list">
+      {sorted.map((meal) => (
+        <MealCard
+          key={meal.id}
+          meal={meal}
+          fx={meal.id === landingId ? 'landing' : null}
+          onEdit={onEdit}
+          onDelete={requestDelete}
+          onDuplicate={onDuplicate}
+          onUpdateCalories={onUpdateCalories}
+          onEstimateCalories={onEstimateCalories}
+          onSelect={onSelect}
+        />
+      ))}
+    </div>
   )
 }

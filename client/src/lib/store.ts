@@ -68,6 +68,9 @@ interface MealsState {
   loadItemHistory: () => Promise<void>
 }
 
+/** Monotonic id of the latest loadDay call — superseded responses are dropped. */
+let loadDaySeq = 0
+
 /** Returns today's date string in YYYY-MM-DD (local time). */
 export function todayString(): string {
   return new Date().toLocaleDateString('sv')
@@ -362,10 +365,13 @@ export const useEntriesStore = create<MealsState>()(
         const { isAuthed } = get()
         if (!isAuthed) return // anon: already in localStorage
 
+        // Rapid navigation: only the newest request may write `meals`
+        const seq = ++loadDaySeq
+
         // P3: check day-level cache before hitting Supabase
         const cached = get().dayCache[date]
         if (cached) {
-          set({ meals: cached })
+          set({ meals: cached, isLoading: false })
           return
         }
 
@@ -385,6 +391,8 @@ export const useEntriesStore = create<MealsState>()(
 
           // S8: re-check auth after await — drop result if user signed out mid-flight
           if (!get().isAuthed) return
+          // A newer loadDay started while this one was in flight
+          if (seq !== loadDaySeq) return
 
           // Supabase returns the relation as `meal_items` (the table name).
           // Map it to `items` to match our MealWithItems shape.
@@ -398,7 +406,7 @@ export const useEntriesStore = create<MealsState>()(
           // P3: store in cache and update meals atomically
           set({ meals, dayCache: { ...get().dayCache, [date]: meals } })
         } finally {
-          set({ isLoading: false })
+          if (seq === loadDaySeq) set({ isLoading: false })
         }
       },
 

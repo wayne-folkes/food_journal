@@ -5,20 +5,15 @@ interface Props {
   onSelect: (item: string) => void
 }
 
+/** Recently logged items — tap one to append it to the compose input. */
 export function RecentChips({ items, onSelect }: Props) {
   if (items.length === 0) return null
 
   return (
-    <div className="recent-chips">
-      {items.map((item, i) => (
-        <button
-          key={item}
-          className="recent-chip"
-          /* Alternate the tilt so the row reads as scattered stickers */
-          style={{ '--tilt': i % 2 === 0 ? '-1.1deg' : '0.9deg' } as React.CSSProperties}
-          onClick={() => onSelect(item)}
-        >
-          <EITile name={item} size={18} />
+    <div className="gl-recent" aria-label="Recent items">
+      {items.map((item) => (
+        <button key={item} type="button" className="gl-recent__chip" onClick={() => onSelect(item)}>
+          <EITile name={item} size={18} round />
           {item}
         </button>
       ))}
