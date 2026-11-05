@@ -2,8 +2,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import type { LookupItem, LookupResult } from '../shared/usda-lookup'
 import { errorMessage } from '../shared/logger'
-import { buildLookupCacheRows } from './usda-cache'
+import { buildLookupCacheRows, dedupeCacheRows, dropFailedLegacyRefreshes, isCacheHit } from './usda-cache'
 import { aiEstimateEnabled, estimateCaloriesWithAi } from './ai-estimate'
+import { extractUsdaNutrients, type UsdaFoodNutrient } from './usda-nutrients'
 import { log as rootLog } from './logger'
 
 async function pLimit<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
@@ -35,9 +36,14 @@ const supabaseAnon = createClient(
 interface CachedLookupRow {
   description_key: string
   calories_per_100g: number | null
+  protein_per_100g: number | null
+  fiber_per_100g: number | null
+  source: 'usda' | 'not_found'
 }
 
-async function fetchFromUsda(description: string): Promise<{ calories: number | null; fdcId: number | null }> {
+async function fetchFromUsda(
+  description: string
+): Promise<{ calories: number | null; protein_g: number | null; fiber_g: number | null; fdcId: number | null }> {
   const response = await fetch('https://api.nal.usda.gov/fdc/v1/foods/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Api-Key': USDA_API_KEY },
@@ -55,15 +61,7 @@ async function fetchFromUsda(description: string): Promise<{ calories: number | 
       fdcId: number
       description: string
       dataType?: string
-      foodNutrients?: Array<{
-        nutrientNumber?: string
-        number?: string
-        nutrientName?: string
-        name?: string
-        value?: number
-        amount?: number
-        unitName?: string
-      }>
+      foodNutrients?: UsdaFoodNutrient[]
     }>
   }
 
@@ -92,15 +90,9 @@ async function fetchFromUsda(description: string): Promise<{ calories: number | 
     ? [...foods].sort((a, b) => scoreFood(b) - scoreFood(a))[0]
     : undefined
 
-  // Find energy nutrient — search endpoint uses nutrientNumber/value; details endpoint uses number/amount
-  const energyNutrient = food?.foodNutrients?.find(n =>
-    String(n.nutrientNumber ?? n.number) === '208' ||
-    ((n.nutrientName ?? n.name) === 'Energy' && (n.unitName ?? '').toUpperCase() === 'KCAL')
-  )
-  const rawAmount = energyNutrient?.value ?? energyNutrient?.amount
-  const calories = rawAmount != null ? Math.round(rawAmount) : null
+  const { calories, protein_g, fiber_g } = extractUsdaNutrients(food?.foodNutrients)
 
-  return { calories, fdcId: food?.fdcId ?? null }
+  return { calories, protein_g, fiber_g, fdcId: food?.fdcId ?? null }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -156,28 +148,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const keys = items.map(i => i.description.toLowerCase().trim())
     const { data: cached } = await supabaseAdmin
       .from('food_lookup')
-      .select('description_key, calories_per_100g')
+      .select('description_key, calories_per_100g, protein_per_100g, fiber_per_100g, source')
       .in('description_key', keys)
 
     const cacheMap = new Map(
-      ((cached ?? []) as CachedLookupRow[]).map((row) => [row.description_key, row.calories_per_100g] as const)
+      ((cached ?? []) as CachedLookupRow[]).map((row) => [row.description_key, row] as const)
     )
 
     // Separate hits from misses
     const hits: LookupResult[] = []
     const misses: LookupItem[] = []
+    // Stale pre-macro USDA rows being refreshed; a failed refresh must never downgrade them
+    const legacyRows = new Map<string, CachedLookupRow>()
 
     for (const item of items) {
       const key = item.description.toLowerCase().trim()
-      if (cacheMap.has(key)) {
+      const row = cacheMap.get(key)
+      if (row && isCacheHit(row)) {
         hits.push({
           id: item.id,
           description: item.description,
-          calories: cacheMap.get(key) ?? null,
+          calories: row.calories_per_100g ?? null,
+          protein_g: row.protein_per_100g ?? null,
+          fiber_g: row.fiber_per_100g ?? null,
           source: 'cache'
         })
       } else {
         misses.push(item)
+        if (row) legacyRows.set(key, row)
       }
     }
 
@@ -185,12 +183,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const missResults = await pLimit(
       misses.map((item) => async (): Promise<{ result: LookupResult; fdcId: number | null }> => {
         try {
-          const { calories, fdcId } = await fetchFromUsda(item.description)
+          const { calories, protein_g, fiber_g, fdcId } = await fetchFromUsda(item.description)
           return {
             result: {
               id: item.id,
               description: item.description,
               calories,
+              protein_g,
+              fiber_g,
               source: calories !== null ? 'usda' : 'not_found'
             },
             fdcId
@@ -202,6 +202,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               id: item.id,
               description: item.description,
               calories: null,
+              protein_g: null,
+              fiber_g: null,
               source: 'not_found'
             },
             fdcId: null
@@ -212,7 +214,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     )
 
     // 7. Cache write for new results (upsert all misses, including not_found)
-    const upsertRows = buildLookupCacheRows(misses, missResults)
+    const upsertRows = dedupeCacheRows(
+      dropFailedLegacyRefreshes(buildLookupCacheRows(misses, missResults), new Set(legacyRows.keys()))
+    )
 
     if (upsertRows.length > 0) {
       const { error: upsertError } = await supabaseAdmin
@@ -223,6 +227,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         log.withMetadata({ error: errorMessage(upsertError) }).warn('cache upsert failed')
       }
     }
+
+    // A failed refresh of a legacy row (USDA error / no energy value) falls back to
+    // what the cache already had, instead of dropping to not_found or the AI guess.
+    misses.forEach((item, index) => {
+      const row = legacyRows.get(item.description.toLowerCase().trim())
+      if (row && missResults[index].result.source !== 'usda') {
+        missResults[index].result = {
+          ...missResults[index].result,
+          calories: row.calories_per_100g ?? null,
+          protein_g: null,
+          fiber_g: null,
+          source: 'cache'
+        }
+      }
+    })
 
     // 8. Return { results: LookupResult[] } preserving original order
     const hitResultMap = new Map(hits.map((result) => [result.id, result]))
@@ -247,9 +266,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try {
         const estimates = await estimateCaloriesWithAi(unresolved)
         for (const r of unresolved) {
-          const calories = estimates.get(r.id)
-          if (calories !== undefined) {
-            r.calories = calories
+          const estimate = estimates.get(r.id)
+          if (estimate !== undefined) {
+            r.calories = estimate.calories
+            r.protein_g = estimate.protein_g
+            r.fiber_g = estimate.fiber_g
             r.source = 'ai'
           }
         }

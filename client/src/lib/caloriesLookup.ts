@@ -24,7 +24,7 @@ export async function lookupCalories(items: LookupItem[]): Promise<LookupResult[
 }
 
 export function calorieSourceLabel(results: LookupResult[]): string {
-  const found = results.filter((r) => r.calories !== null)
+  const found = results.filter((r) => r.calories != null || r.protein_g != null || r.fiber_g != null)
   const hasAi = found.some((r) => r.source === 'ai')
   const hasDb = found.some((r) => r.source !== 'ai')
   if (hasAi && hasDb) return 'USDA and AI'

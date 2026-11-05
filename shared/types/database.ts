@@ -60,6 +60,10 @@ export type Database = {
           created_at: string
           calories: number | null
           qty: string | null
+          /** Estimated protein in grams, 1 decimal. */
+          protein_g: number | null
+          /** Estimated dietary fiber in grams, 1 decimal. */
+          fiber_g: number | null
         }
         Insert: {
           id?: string
@@ -70,6 +74,8 @@ export type Database = {
           created_at?: string
           calories?: number | null
           qty?: string | null
+          protein_g?: number | null
+          fiber_g?: number | null
         }
         Update: {
           description?: string
@@ -77,6 +83,8 @@ export type Database = {
           consumed_at?: string
           calories?: number | null
           qty?: string | null
+          protein_g?: number | null
+          fiber_g?: number | null
         }
         Relationships: [
           {
@@ -92,6 +100,8 @@ export type Database = {
           description_key: string
           description: string
           calories_per_100g: number | null
+          protein_per_100g: number | null
+          fiber_per_100g: number | null
           source: string
           usda_fdc_id: number | null
           created_at: string
@@ -100,6 +110,8 @@ export type Database = {
           description_key: string
           description: string
           calories_per_100g?: number | null
+          protein_per_100g?: number | null
+          fiber_per_100g?: number | null
           source?: string
           usda_fdc_id?: number | null
           created_at?: string
@@ -107,6 +119,8 @@ export type Database = {
         Update: {
           description?: string
           calories_per_100g?: number | null
+          protein_per_100g?: number | null
+          fiber_per_100g?: number | null
           source?: string
           usda_fdc_id?: number | null
           created_at?: string

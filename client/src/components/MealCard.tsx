@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { MealItem, MealWithItems } from '@shared/types/database'
 import { MEAL_TYPE_LABELS } from '../lib/mealType'
 import { useEntriesStore } from '../lib/store'
+import { formatGrams, itemNeedsEstimate, sumNutrients } from '../lib/nutrients'
 import { EITile } from './EITile'
 
 interface Props {
@@ -18,6 +19,14 @@ interface Props {
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+}
+
+/** "12 g protein · 3 g fiber" — only the parts that exist; '' when neither. */
+function itemNutrientLine(item: MealItem): string {
+  const parts: string[] = []
+  if (item.protein_g != null) parts.push(`${formatGrams(item.protein_g)} protein`)
+  if (item.fiber_g != null) parts.push(`${formatGrams(item.fiber_g)} fiber`)
+  return parts.join(' · ')
 }
 
 interface CalBadgeProps {
@@ -101,11 +110,11 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
   const [estimating, setEstimating] = useState(false)
   const isAuthed = useEntriesStore((s) => s.isAuthed)
 
-  const itemsWithCal = meal.items.filter((i) => i.calories != null)
-  const totalCal = itemsWithCal.reduce((sum, i) => sum + (i.calories ?? 0), 0)
-  const hasPartial = itemsWithCal.length > 0 && itemsWithCal.length < meal.items.length
-  const hasItemsNeedingCalories = meal.items.some((i) => i.calories === null)
-  const showEstimateBtn = isAuthed && hasItemsNeedingCalories && onEstimateCalories != null
+  const totals = sumNutrients(meal.items)
+  const hasAnyCal = meal.items.some((i) => i.calories != null)
+  const hasAnyProtein = meal.items.some((i) => i.protein_g != null)
+  const hasAnyFiber = meal.items.some((i) => i.fiber_g != null)
+  const showEstimateBtn = isAuthed && meal.items.some(itemNeedsEstimate) && onEstimateCalories != null
 
   async function handleEstimate() {
     if (!onEstimateCalories) return
@@ -148,9 +157,9 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
         <time className="meal-card__time" dateTime={meal.consumed_at}>
           {formatTime(meal.consumed_at)}
         </time>
-        {itemsWithCal.length > 0 && (
+        {hasAnyCal && (
           <span className="meal-card__kcal">
-            {hasPartial ? '~' : ''}{totalCal.toLocaleString()} kcal
+            {totals.caloriesPartial ? '~' : ''}{totals.calories.toLocaleString()} kcal
           </span>
         )}
 
@@ -203,16 +212,31 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
 
       {/* Item rows */}
       <ul className="meal-card__items">
-        {meal.items.map((item) => (
-          <li key={item.id} className="meal-card__item">
-            <span className="meal-card__land" data-land="">
-              <EITile name={item.description} size={28} round />
-              <span className="meal-card__item-desc">{item.description}</span>
-            </span>
-            <CalBadge item={item} onUpdateCalories={onUpdateCalories} />
-          </li>
-        ))}
+        {meal.items.map((item) => {
+          const nutrientLine = itemNutrientLine(item)
+          return (
+            <li key={item.id} className="meal-card__item">
+              <span className="meal-card__land" data-land="">
+                <EITile name={item.description} size={28} round />
+                <span className="meal-card__item-desc">{item.description}</span>
+              </span>
+              <CalBadge item={item} onUpdateCalories={onUpdateCalories} />
+              {nutrientLine && <span className="meal-card__nutrients">{nutrientLine}</span>}
+            </li>
+          )
+        })}
       </ul>
+
+      {(hasAnyProtein || hasAnyFiber) && (
+        <p className="meal-card__totals">
+          {hasAnyProtein && (
+            <span>Protein {totals.proteinPartial ? '~' : ''}{formatGrams(totals.protein_g)}</span>
+          )}
+          {hasAnyFiber && (
+            <span>Fiber {totals.fiberPartial ? '~' : ''}{formatGrams(totals.fiber_g)}</span>
+          )}
+        </p>
+      )}
 
       {showEstimateBtn && (
         <button
@@ -220,9 +244,9 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
           onClick={handleEstimate}
           disabled={estimating}
           type="button"
-          aria-label="Estimate calories from USDA database"
+          aria-label="Estimate calories, protein and fiber"
         >
-          ✨ {estimating ? 'Estimating…' : 'Estimate calories'}
+          ✨ {estimating ? 'Estimating…' : 'Estimate nutrition'}
         </button>
       )}
     </article>

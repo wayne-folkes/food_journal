@@ -38,6 +38,8 @@ function makeMeal(description: string, consumedAt = '2026-04-15T09:00:00.000Z'):
         consumed_at: consumedAt,
         created_at: consumedAt,
         calories: null,
+        protein_g: null,
+        fiber_g: null,
         qty: null,
       },
     ],

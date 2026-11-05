@@ -17,6 +17,7 @@ import { PdfExportModal } from './components/PdfExportModal'
 import { WeekView } from './components/WeekView'
 import { lookupCalories, calorieSourceLabel } from './lib/caloriesLookup'
 import { offsetDate } from './lib/date'
+import { itemNeedsEstimate, nutrientPatch } from './lib/nutrients'
 import { useToast } from './lib/toast'
 import { track } from './lib/analytics'
 import { log } from './lib/logger'
@@ -25,7 +26,8 @@ import { useMediaQuery, MOBILE_QUERY } from './lib/useMediaQuery'
 import { useTween } from './lib/useTween'
 import { captureBubbles, discardBubbles, parkBubbles, snapshotMeals, type Flight } from './lib/glassMotion'
 
-import type { MealWithItems, MealType } from '@shared/types/database'
+import type { MealItem, MealWithItems, MealType } from '@shared/types/database'
+import type { LookupResult } from '@shared/usda-lookup'
 import type { ChipItem } from './lib/store'
 import './App.css'
 import './glass.css'
@@ -35,8 +37,20 @@ const BLOOM_MS = 2_700
 
 const localDate = (iso: string) => new Date(iso).toLocaleDateString('sv')
 
+/** True when a lookup produced at least one nutrient value. */
+const hasNutrition = (r: LookupResult) => r.calories != null || r.protein_g != null || r.fiber_g != null
+
+/** The item as it is in the store right now (falls back to the given copy). */
+function currentItem(fallback: MealItem): MealItem {
+  for (const meal of useEntriesStore.getState().meals) {
+    const found = meal.items.find((i) => i.id === fallback.id)
+    if (found) return found
+  }
+  return fallback
+}
+
 function AppInner() {
-  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, updateItemCalories, loadWeek, weekMeals, weekLoading, loadItemHistory, itemHistory } =
+  const { meals, isAuthed, isLoading, setAuthed, loadDay, addMeal, editMeal, deleteMeal, updateItemCalories, updateItemNutrients, loadWeek, weekMeals, weekLoading, loadItemHistory, itemHistory } =
     useEntriesStore()
   const [user, setUser] = useState<User | null>(null)
   const [authResolved, setAuthResolved] = useState(false)
@@ -138,6 +152,22 @@ function AppInner() {
   const dayIsLoading = !authResolved || isLoading
   const weekIsLoading = !authResolved || weekLoading
 
+  /** Fill only the still-empty nutrient fields of each item from its lookup result. */
+  /** Fills only the missing fields; returns how many items actually changed. */
+  async function applyNutrition(items: MealItem[], results: LookupResult[]): Promise<number> {
+    let patched = 0
+    for (const r of results) {
+      const item = items.find((i) => i.id === r.id)
+      if (!item) continue
+      const patch = nutrientPatch(currentItem(item), r)
+      if (Object.keys(patch).length > 0) {
+        await updateItemNutrients(r.id, patch)
+        patched++
+      }
+    }
+    return patched
+  }
+
   async function handleAddMeal(payload: ComposePayload): Promise<MealWithItems | null> {
     try {
       const savedMeal = await addMeal({
@@ -154,25 +184,20 @@ function AppInner() {
       })
 
       if (isAuthed) {
-        const itemsNeedingCalories = savedMeal.items.filter((item) => item.calories === null)
-        if (itemsNeedingCalories.length > 0) {
+        const itemsNeedingEstimate = savedMeal.items.filter(itemNeedsEstimate)
+        if (itemsNeedingEstimate.length > 0) {
           track('calorie_estimate_requested', {
-            item_count: itemsNeedingCalories.length,
+            item_count: itemsNeedingEstimate.length,
             trigger: 'auto',
           })
           // fire and forget — non-blocking
-          lookupCalories(itemsNeedingCalories.map((item) => ({ id: item.id, description: item.description })))
-            .then((results) => {
-              results.forEach((result) => {
-                if (result.calories !== null) {
-                  updateItemCalories(result.id, result.calories)
-                }
-              })
-              const found = results.filter((result) => result.calories !== null).length
-              if (found > 0) toast.success(`Got calorie estimate${found === 1 ? '' : 's'} for ${found} item${found === 1 ? '' : 's'} from ${calorieSourceLabel(results)}`)
+          lookupCalories(itemsNeedingEstimate.map((item) => ({ id: item.id, description: item.description })))
+            .then(async (results) => {
+              const found = await applyNutrition(itemsNeedingEstimate, results)
+              if (found > 0) toast.success(`Got nutrition estimate${found === 1 ? '' : 's'} for ${found} item${found === 1 ? '' : 's'} from ${calorieSourceLabel(results)}`)
             })
             .catch(() => {
-              // silently fail — calorie lookup is best-effort
+              // silently fail — nutrition lookup is best-effort
             })
         }
       }
@@ -290,24 +315,21 @@ function AppInner() {
   }
 
   async function handleEstimateCalories(meal: MealWithItems) {
-    const itemsNeedingCalories = meal.items.filter((i) => i.calories === null)
-    if (itemsNeedingCalories.length === 0) return
+    const itemsNeedingEstimate = meal.items.filter(itemNeedsEstimate)
+    if (itemsNeedingEstimate.length === 0) return
     track('calorie_estimate_requested', {
-      item_count: itemsNeedingCalories.length,
+      item_count: itemsNeedingEstimate.length,
       trigger: 'manual',
     })
     try {
       const results = await lookupCalories(
-        itemsNeedingCalories.map((i) => ({ id: i.id, description: i.description }))
+        itemsNeedingEstimate.map((i) => ({ id: i.id, description: i.description }))
       )
-      for (const r of results) {
-        if (r.calories !== null) await updateItemCalories(r.id, r.calories)
-      }
-      const found = results.filter((r) => r.calories !== null).length
-      if (found > 0) toast.success(`Got calorie estimate${found === 1 ? '' : 's'} for ${found} item${found === 1 ? '' : 's'} from ${calorieSourceLabel(results)}`)
-      else toast.error('No calorie data found for these items')
+      const found = await applyNutrition(itemsNeedingEstimate, results)
+      if (found > 0) toast.success(`Got nutrition estimate${found === 1 ? '' : 's'} for ${found} item${found === 1 ? '' : 's'} from ${calorieSourceLabel(results)}`)
+      else if (!results.some(hasNutrition)) toast.error('No nutrition data found for these items')
     } catch {
-      toast.error('Failed to estimate calories')
+      toast.error('Failed to estimate nutrition')
     }
   }
 

@@ -544,7 +544,7 @@
 .meal-card__menu-item--danger { color: var(--danger); }
 
 .meal-card__items { position: relative; list-style: none; }
-.meal-card__item { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.meal-card__item { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; padding: 8px 0; }
 .meal-card__item + .meal-card__item { border-top: 1px solid var(--line); }
 .meal-card__land {
   display: flex;
@@ -556,6 +556,31 @@
   transition: opacity 0.25s ease-out;
 }
 .meal-card__item-desc { overflow: hidden; text-overflow: ellipsis; }
+
+/* Per-item protein / fiber — a muted second line under the tile + name
+   (40px = 28px tile + 12px gap, so it lines up with the description). */
+.meal-card__nutrients {
+  flex: 0 0 100%;
+  margin-top: -2px;
+  padding-left: 40px;
+  color: var(--mute);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Meal-level protein / fiber totals, under the item list */
+.meal-card__totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  margin: 4px 0 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  color: var(--mute);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.meal-card__totals span + span::before { content: '·'; margin-right: 6px; }
 
 .meal-card__cal-badge {
   flex-shrink: 0;
