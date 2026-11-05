@@ -56,6 +56,8 @@ function makeStoredMeal({
         consumed_at: consumedAt,
         created_at: consumedAt,
         calories: null,
+        protein_g: null,
+        fiber_g: null,
         qty: null,
       },
     ],
@@ -108,6 +110,8 @@ describe('useEntriesStore.addMeal', () => {
           consumed_at: '2026-04-15T10:00:00.000Z',
           created_at: '2026-04-15T10:00:00.000Z',
           calories: null,
+          protein_g: null,
+          fiber_g: null,
           qty: null,
         },
       ],
@@ -134,6 +138,8 @@ describe('useEntriesStore.addMeal', () => {
           position: 0,
           consumed_at: '2026-04-15T10:00:00.000Z',
           calories: null,
+          protein_g: null,
+          fiber_g: null,
         },
       ],
     })
@@ -176,6 +182,8 @@ describe('useEntriesStore.addMeal', () => {
           consumed_at: '2026-04-15T10:00:00.000Z',
           created_at: '2026-04-15T10:00:00.000Z',
           calories: null,
+          protein_g: null,
+          fiber_g: null,
           qty: null,
         },
       ],
@@ -195,6 +203,8 @@ describe('useEntriesStore.addMeal', () => {
           consumed_at: '2026-04-15T11:00:00.000Z',
           created_at: '2026-04-15T11:00:00.000Z',
           calories: 5,
+          protein_g: null,
+          fiber_g: null,
           qty: null,
         },
       ],
@@ -206,7 +216,7 @@ describe('useEntriesStore.addMeal', () => {
     await useEntriesStore.getState().editMeal('meal-1', {
       meal_type: 'breakfast',
       consumed_at: '2026-04-15T11:00:00.000Z',
-      items: [{ description: 'espresso', calories: 5 }],
+      items: [{ id: 'item-1', description: 'espresso', calories: 5, protein_g: 0.1, fiber_g: 0 }],
     })
 
     expect(mockSupabase.rpc).toHaveBeenCalledWith('update_meal_with_items', {
@@ -220,6 +230,8 @@ describe('useEntriesStore.addMeal', () => {
           position: 0,
           consumed_at: '2026-04-15T11:00:00.000Z',
           calories: 5,
+          protein_g: 0.1,
+          fiber_g: 0,
         },
       ],
     })
@@ -246,6 +258,8 @@ describe('useEntriesStore.addMeal', () => {
           consumed_at: '2026-04-15T12:00:00.000Z',
           created_at: '2026-04-15T12:00:00.000Z',
           calories: 95,
+          protein_g: 0.5,
+          fiber_g: 4.4,
           qty: null,
         },
       ],
@@ -269,6 +283,8 @@ describe('useEntriesStore.addMeal', () => {
           consumed_at: '2026-04-15T13:00:00.000Z',
           created_at: '2026-04-15T13:00:00.000Z',
           calories: 300,
+          protein_g: null,
+          fiber_g: null,
           qty: null,
         },
       ],
@@ -292,6 +308,8 @@ describe('useEntriesStore.addMeal', () => {
           consumed_at: '2026-04-15T12:00:00.000Z',
           created_at: '2026-04-15T12:00:00.000Z',
           calories: 95,
+          protein_g: null,
+          fiber_g: null,
           qty: null,
         },
       ],
@@ -323,6 +341,8 @@ describe('useEntriesStore.addMeal', () => {
               position: 0,
               consumed_at: '2026-04-15T12:00:00.000Z',
               calories: 95,
+              protein_g: 0.5,
+              fiber_g: 4.4,
             },
           ],
         },
@@ -337,6 +357,8 @@ describe('useEntriesStore.addMeal', () => {
               position: 0,
               consumed_at: '2026-04-15T13:00:00.000Z',
               calories: 300,
+              protein_g: null,
+              fiber_g: null,
             },
           ],
         },
@@ -414,6 +436,8 @@ describe('useEntriesStore.addMeal', () => {
               position: 0,
               consumed_at: '2026-04-15T12:00:00.000Z',
               calories: null,
+              protein_g: null,
+              fiber_g: null,
             },
           ],
         },
@@ -428,6 +452,8 @@ describe('useEntriesStore.addMeal', () => {
               position: 0,
               consumed_at: '2026-04-15T13:00:00.000Z',
               calories: null,
+              protein_g: null,
+              fiber_g: null,
             },
           ],
         },
@@ -442,6 +468,8 @@ describe('useEntriesStore.addMeal', () => {
               position: 0,
               consumed_at: '2026-04-15T14:00:00.000Z',
               calories: null,
+              protein_g: null,
+              fiber_g: null,
             },
           ],
         },
@@ -566,6 +594,8 @@ describe('useEntriesStore.addMeal', () => {
               consumed_at: '2026-04-15T09:00:00.000Z',
               created_at: '2026-04-15T09:00:00.000Z',
               calories: null,
+              protein_g: null,
+              fiber_g: null,
               qty: null,
             },
             {
@@ -576,6 +606,8 @@ describe('useEntriesStore.addMeal', () => {
               consumed_at: '2026-04-15T09:00:00.000Z',
               created_at: '2026-04-15T09:00:00.000Z',
               calories: 120,
+              protein_g: null,
+              fiber_g: null,
               qty: null,
             },
           ],
@@ -607,6 +639,8 @@ describe('useEntriesStore.addMeal', () => {
             consumed_at: '2026-04-15T09:00:00.000Z',
             created_at: '2026-04-15T09:00:00.000Z',
             calories: null,
+            protein_g: null,
+            fiber_g: null,
             qty: null,
           },
           {
@@ -617,6 +651,8 @@ describe('useEntriesStore.addMeal', () => {
             consumed_at: '2026-04-15T09:00:00.000Z',
             created_at: '2026-04-15T09:00:00.000Z',
             calories: 120,
+            protein_g: null,
+            fiber_g: null,
             qty: null,
           },
         ],
@@ -675,5 +711,153 @@ describe('useEntriesStore.loadDay', () => {
 
     expect(useEntriesStore.getState().meals.map((m) => m.id)).toEqual(['cached'])
     expect(useEntriesStore.getState().isLoading).toBe(false)
+  })
+})
+
+describe('useEntriesStore protein/fiber', () => {
+  beforeEach(() => {
+    mockSupabase.from.mockReset()
+    mockSupabase.rpc.mockReset()
+    mockSupabase.auth.getUser.mockReset()
+    useEntriesStore.setState({ meals: [], dayCache: {}, isAuthed: false, isLoading: false })
+  })
+
+  it('creates anonymous items with null protein and fiber', async () => {
+    const created = await useEntriesStore.getState().addMeal({
+      meal_type: 'snack',
+      consumed_at: '2026-04-15T09:00:00.000Z',
+      raw_input: 'apple',
+      items: ['apple'],
+    })
+    expect(created.items[0].protein_g).toBeNull()
+    expect(created.items[0].fiber_g).toBeNull()
+  })
+
+  it('editMeal keeps and updates protein/fiber on anonymous items', async () => {
+    const meal = makeStoredMeal({ id: 'local-1', description: 'apple', consumedAt: '2026-04-15T12:00:00.000Z', userId: null })
+    useEntriesStore.setState({ meals: [meal], isAuthed: false })
+
+    await useEntriesStore.getState().editMeal('local-1', {
+      meal_type: 'snack',
+      consumed_at: '2026-04-15T12:00:00.000Z',
+      items: [
+        { id: 'local-1-item', description: 'apple', calories: 95, protein_g: 0.5, fiber_g: 4.4 },
+        { description: 'toast', calories: null },
+      ],
+    })
+
+    const items = useEntriesStore.getState().meals[0].items
+    expect(items[0]).toMatchObject({ id: 'local-1-item', calories: 95, protein_g: 0.5, fiber_g: 4.4 })
+    expect(items[1]).toMatchObject({ description: 'toast', protein_g: null, fiber_g: null })
+  })
+
+  it('editMeal sends null protein/fiber for chips that omit them', async () => {
+    const meal = makeStoredMeal({ id: 'meal-1', description: 'apple', consumedAt: '2026-04-15T12:00:00.000Z', userId: 'u' })
+    useEntriesStore.setState({ meals: [meal], isAuthed: true })
+    mockSupabase.rpc.mockResolvedValue({ data: meal, error: null })
+
+    await useEntriesStore.getState().editMeal('meal-1', {
+      meal_type: 'snack',
+      consumed_at: '2026-04-15T12:00:00.000Z',
+      items: [{ description: 'apple', calories: null }],
+    })
+
+    const args = mockSupabase.rpc.mock.calls[0][1]
+    expect(args.p_items).toEqual([
+      { description: 'apple', position: 0, consumed_at: '2026-04-15T12:00:00.000Z', calories: null, protein_g: null, fiber_g: null },
+    ])
+  })
+
+  it('accepts RPC meals whose items lack protein_g/fiber_g (server without the migration)', async () => {
+    useEntriesStore.setState({ meals: [], isAuthed: true })
+    const legacyItem = {
+      id: 'item-1', meal_id: 'meal-1', description: 'coffee', position: 0,
+      consumed_at: '2026-04-15T10:00:00.000Z', created_at: '2026-04-15T10:00:00.000Z', calories: null, qty: null,
+    }
+    mockSupabase.rpc.mockResolvedValue({
+      data: {
+        id: 'meal-1', user_id: 'u', meal_type: 'drink', consumed_at: '2026-04-15T10:00:00.000Z', raw_input: 'coffee',
+        headline: null, note: null, created_at: '2026-04-15T10:00:00.000Z', updated_at: '2026-04-15T10:00:00.000Z',
+        items: [legacyItem],
+      },
+      error: null,
+    })
+
+    const created = await useEntriesStore.getState().addMeal({
+      meal_type: 'drink', consumed_at: '2026-04-15T10:00:00.000Z', raw_input: 'coffee', items: ['coffee'],
+    })
+    expect(created.items[0].description).toBe('coffee')
+  })
+
+  it('rejects a non-numeric protein_g', async () => {
+    useEntriesStore.setState({ meals: [], isAuthed: true })
+    mockSupabase.rpc.mockResolvedValue({
+      data: {
+        id: 'meal-1', user_id: 'u', meal_type: 'drink', consumed_at: '2026-04-15T10:00:00.000Z', raw_input: 'coffee',
+        headline: null, note: null, created_at: '2026-04-15T10:00:00.000Z', updated_at: '2026-04-15T10:00:00.000Z',
+        items: [{
+          id: 'i', meal_id: 'meal-1', description: 'coffee', position: 0, consumed_at: 'x', created_at: 'x',
+          calories: null, protein_g: 'lots', fiber_g: null, qty: null,
+        }],
+      },
+      error: null,
+    })
+    await expect(useEntriesStore.getState().addMeal({
+      meal_type: 'drink', consumed_at: '2026-04-15T10:00:00.000Z', raw_input: 'coffee', items: ['coffee'],
+    })).rejects.toThrow('Invalid meal payload')
+  })
+
+  describe('updateItemNutrients', () => {
+    function mockUpdate(result: { error: unknown }) {
+      const eq = vi.fn().mockResolvedValue(result)
+      const update = vi.fn().mockReturnValue({ eq })
+      mockSupabase.from.mockReturnValue({ update })
+      return { eq, update }
+    }
+
+    it('updates an anonymous item locally without calling supabase', async () => {
+      const meal = makeStoredMeal({ id: 'local-1', description: 'apple', consumedAt: '2026-04-15T12:00:00.000Z', userId: null })
+      useEntriesStore.setState({ meals: [meal], isAuthed: false })
+
+      await useEntriesStore.getState().updateItemNutrients('local-1-item', { protein_g: 1.2, fiber_g: 3 })
+
+      expect(useEntriesStore.getState().meals[0].items[0]).toMatchObject({ calories: null, protein_g: 1.2, fiber_g: 3 })
+      expect(mockSupabase.from).not.toHaveBeenCalled()
+    })
+
+    it('optimistically updates, then sends only the patch to meal_items when authed', async () => {
+      const meal = makeStoredMeal({ id: 'meal-1', description: 'apple', consumedAt: '2026-04-15T12:00:00.000Z', userId: 'u' })
+      useEntriesStore.setState({ meals: [meal], isAuthed: true })
+      const { eq, update } = mockUpdate({ error: null })
+
+      await useEntriesStore.getState().updateItemNutrients('meal-1-item', { calories: 95, protein_g: 0.5 })
+
+      expect(mockSupabase.from).toHaveBeenCalledWith('meal_items')
+      expect(update).toHaveBeenCalledWith({ calories: 95, protein_g: 0.5 })
+      expect(eq).toHaveBeenCalledWith('id', 'meal-1-item')
+      expect(useEntriesStore.getState().meals[0].items[0]).toMatchObject({ calories: 95, protein_g: 0.5, fiber_g: null })
+    })
+
+    it('reverts the optimistic update and throws when supabase fails', async () => {
+      const meal = makeStoredMeal({ id: 'meal-1', description: 'apple', consumedAt: '2026-04-15T12:00:00.000Z', userId: 'u' })
+      useEntriesStore.setState({ meals: [meal], isAuthed: true })
+      const dbError = { message: 'nope' }
+      mockUpdate({ error: dbError })
+
+      await expect(useEntriesStore.getState().updateItemNutrients('meal-1-item', { fiber_g: 2 })).rejects.toEqual(dbError)
+
+      expect(useEntriesStore.getState().meals[0].items[0].fiber_g).toBeNull()
+    })
+
+    it('updateItemCalories is a thin wrapper that only patches calories', async () => {
+      const meal = makeStoredMeal({ id: 'meal-1', description: 'apple', consumedAt: '2026-04-15T12:00:00.000Z', userId: 'u' })
+      useEntriesStore.setState({ meals: [meal], isAuthed: true })
+      const { update } = mockUpdate({ error: null })
+
+      await useEntriesStore.getState().updateItemCalories('meal-1-item', 120)
+
+      expect(update).toHaveBeenCalledWith({ calories: 120 })
+      expect(useEntriesStore.getState().meals[0].items[0].calories).toBe(120)
+    })
   })
 })

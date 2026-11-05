@@ -1,5 +1,6 @@
 import type { MealWithItems } from '@shared/types/database'
 import { MEAL_TYPE_LABELS } from '../lib/mealType'
+import { formatGrams, sumNutrients } from '../lib/nutrients'
 import { EITile } from './EITile'
 
 interface Props {
@@ -19,9 +20,10 @@ function formatDate(iso: string): string {
 }
 
 export function MealDetail({ meal, onClose, onEdit, onDelete, onDuplicate }: Props) {
-  const itemsWithCal = meal.items.filter(i => i.calories != null)
-  const totalCal = itemsWithCal.reduce((sum, i) => sum + (i.calories ?? 0), 0)
-  const hasPartial = itemsWithCal.length > 0 && itemsWithCal.length < meal.items.length
+  const totals = sumNutrients(meal.items)
+  const hasAnyCal = meal.items.some(i => i.calories != null)
+  const hasAnyProtein = meal.items.some(i => i.protein_g != null)
+  const hasAnyFiber = meal.items.some(i => i.fiber_g != null)
   // First tile gets double width, the rest share the remainder
   const stripColumns = meal.items.slice(0, 4).map((_, i) => (i === 0 ? '2fr' : '1fr')).join(' ')
 
@@ -65,18 +67,44 @@ export function MealDetail({ meal, onClose, onEdit, onDelete, onDuplicate }: Pro
                 {item.calories != null && (
                   <span className="ei-meal-detail__item-cal">{item.calories} cal</span>
                 )}
+                {item.protein_g != null && (
+                  <span className="ei-meal-detail__item-macro">{formatGrams(item.protein_g)} protein</span>
+                )}
+                {item.fiber_g != null && (
+                  <span className="ei-meal-detail__item-macro">{formatGrams(item.fiber_g)} fiber</span>
+                )}
               </div>
             </li>
           ))}
         </ul>
 
         {/* Total */}
-        {itemsWithCal.length > 0 && (
-          <div className="ei-meal-detail__total">
-            <span className="ei-meal-detail__total-label">Total</span>
-            <span className="ei-meal-detail__total-value" data-meal-type={meal.meal_type}>
-              {hasPartial ? '~' : ''}{totalCal.toLocaleString()} kcal
-            </span>
+        {(hasAnyCal || hasAnyProtein || hasAnyFiber) && (
+          <div className="ei-meal-detail__totals">
+            {hasAnyCal && (
+              <div className="ei-meal-detail__total">
+                <span className="ei-meal-detail__total-label">Total</span>
+                <span className="ei-meal-detail__total-value" data-meal-type={meal.meal_type}>
+                  {totals.caloriesPartial ? '~' : ''}{totals.calories.toLocaleString()} kcal
+                </span>
+              </div>
+            )}
+            {hasAnyProtein && (
+              <div className="ei-meal-detail__total ei-meal-detail__total--macro">
+                <span className="ei-meal-detail__total-label">Protein</span>
+                <span className="ei-meal-detail__total-value ei-meal-detail__total-value--macro">
+                  {totals.proteinPartial ? '~' : ''}{formatGrams(totals.protein_g)}
+                </span>
+              </div>
+            )}
+            {hasAnyFiber && (
+              <div className="ei-meal-detail__total ei-meal-detail__total--macro">
+                <span className="ei-meal-detail__total-label">Fiber</span>
+                <span className="ei-meal-detail__total-value ei-meal-detail__total-value--macro">
+                  {totals.fiberPartial ? '~' : ''}{formatGrams(totals.fiber_g)}
+                </span>
+              </div>
+            )}
           </div>
         )}
 

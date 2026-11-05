@@ -1,9 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import type { MealWithItems } from '@shared/types/database'
+import type { MealItem, MealWithItems } from '@shared/types/database'
 import { MealCard } from './MealCard'
 
+const authState = vi.hoisted(() => ({ isAuthed: false }))
+
 vi.mock('../lib/store', () => ({
-  useEntriesStore: () => false,
+  useEntriesStore: (selector?: (s: { isAuthed: boolean }) => unknown) =>
+    selector ? selector({ isAuthed: authState.isAuthed }) : authState,
 }))
 
 function makeMeal(overrides: Partial<MealWithItems> = {}): MealWithItems {
@@ -26,9 +29,27 @@ function makeMeal(overrides: Partial<MealWithItems> = {}): MealWithItems {
         consumed_at: '2026-04-15T09:00:00.000Z',
         created_at: '2026-04-15T09:00:00.000Z',
         calories: null,
+        protein_g: null,
+        fiber_g: null,
         qty: null,
       },
     ],
+    ...overrides,
+  }
+}
+
+function makeItem(id: string, overrides: Partial<MealItem> = {}): MealItem {
+  return {
+    id,
+    meal_id: 'meal-1',
+    description: id,
+    position: 0,
+    consumed_at: '2026-04-15T09:00:00.000Z',
+    created_at: '2026-04-15T09:00:00.000Z',
+    calories: null,
+    protein_g: null,
+    fiber_g: null,
+    qty: null,
     ...overrides,
   }
 }
@@ -46,6 +67,8 @@ function renderCard(propsOverride: Record<string, unknown> = {}) {
 }
 
 describe('MealCard', () => {
+  beforeEach(() => { authState.isAuthed = false })
+
   it('renders meal type and item description', () => {
     renderCard()
     expect(screen.getByText('Breakfast')).toBeInTheDocument()
@@ -122,5 +145,90 @@ describe('MealCard', () => {
     fireEvent.click(backdrop)
 
     expect(screen.queryByText('Delete')).not.toBeInTheDocument()
+  })
+  describe('protein and fiber', () => {
+    it('shows per-item protein and fiber, only the parts that exist', () => {
+      const meal = makeMeal({
+        items: [
+          makeItem('Eggs', { calories: 140, protein_g: 12, fiber_g: 0.5 }),
+          makeItem('Toast', { position: 1, calories: 80, protein_g: 3.2 }),
+          makeItem('Jam', { position: 2, calories: 50 }),
+        ],
+      })
+      renderCard({ meal })
+
+      expect(screen.getByText('12 g protein · 0.5 g fiber')).toBeInTheDocument()
+      expect(screen.getByText('3.2 g protein')).toBeInTheDocument()
+      expect(document.querySelectorAll('.meal-card__nutrients')).toHaveLength(2)
+    })
+
+    it('shows meal totals, with ~ when some items are missing the value', () => {
+      const meal = makeMeal({
+        items: [
+          makeItem('Eggs', { protein_g: 12, fiber_g: 1 }),
+          makeItem('Toast', { position: 1, protein_g: 3, fiber_g: 2 }),
+          makeItem('Jam', { position: 2, protein_g: 0.2 }),
+        ],
+      })
+      renderCard({ meal })
+
+      const totals = document.querySelector('.meal-card__totals')!
+      expect(totals).toHaveTextContent('Protein 15.2 g')
+      expect(totals).not.toHaveTextContent('Protein ~')
+      expect(totals).toHaveTextContent('Fiber ~3 g')
+    })
+
+    it('shows nothing when no item has protein or fiber (including pre-migration undefined values)', () => {
+      const legacy = makeItem('Eggs', { calories: 100 }) as Partial<MealItem> as MealItem
+      delete (legacy as Partial<MealItem>).protein_g
+      delete (legacy as Partial<MealItem>).fiber_g
+      renderCard({ meal: makeMeal({ items: [legacy] }) })
+
+      expect(document.querySelector('.meal-card__nutrients')).toBeNull()
+      expect(document.querySelector('.meal-card__totals')).toBeNull()
+    })
+
+    it('renders a 0 g value', () => {
+      renderCard({ meal: makeMeal({ items: [makeItem('Water', { protein_g: 0, fiber_g: 0 })] }) })
+      expect(screen.getByText('0 g protein · 0 g fiber')).toBeInTheDocument()
+    })
+  })
+
+  describe('estimate nutrition button', () => {
+    const complete = { calories: 100, protein_g: 1, fiber_g: 1 }
+
+    it('is hidden for anonymous users', () => {
+      renderCard({ meal: makeMeal({ items: [makeItem('a')] }), onEstimateCalories: vi.fn() })
+      expect(screen.queryByRole('button', { name: /estimate/i })).not.toBeInTheDocument()
+    })
+
+    it('appears for authed users when only protein is missing', () => {
+      authState.isAuthed = true
+      renderCard({
+        meal: makeMeal({ items: [makeItem('a', { calories: 100, protein_g: null, fiber_g: 2 })] }),
+        onEstimateCalories: vi.fn(),
+      })
+      expect(screen.getByRole('button', { name: 'Estimate calories, protein and fiber' })).toHaveTextContent('Estimate nutrition')
+    })
+
+    it('is hidden once every item has calories, protein and fiber', () => {
+      authState.isAuthed = true
+      renderCard({ meal: makeMeal({ items: [makeItem('a', complete)] }), onEstimateCalories: vi.fn() })
+      expect(screen.queryByRole('button', { name: /estimate/i })).not.toBeInTheDocument()
+    })
+
+    it('calls onEstimateCalories and shows Estimating… while pending', async () => {
+      authState.isAuthed = true
+      let resolve!: () => void
+      const onEstimateCalories = vi.fn(() => new Promise<void>((r) => { resolve = r }))
+      const meal = makeMeal({ items: [makeItem('a')] })
+      renderCard({ meal, onEstimateCalories })
+
+      fireEvent.click(screen.getByRole('button', { name: /estimate/i }))
+      expect(onEstimateCalories).toHaveBeenCalledWith(meal)
+      expect(await screen.findByText(/Estimating…/)).toBeInTheDocument()
+      resolve()
+      expect(await screen.findByText(/Estimate nutrition/)).toBeInTheDocument()
+    })
   })
 })

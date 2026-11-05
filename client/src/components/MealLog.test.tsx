@@ -20,7 +20,7 @@ function makeMeal(id: string, description: string, createdAt: Date): MealWithIte
     created_at: iso,
     updated_at: iso,
     items: [
-      { id: `${id}-i`, meal_id: id, description, position: 0, consumed_at: iso, created_at: iso, calories: null, qty: null },
+      { id: `${id}-i`, meal_id: id, description, position: 0, consumed_at: iso, created_at: iso, calories: null, protein_g: null, fiber_g: null, qty: null },
     ],
   }
 }

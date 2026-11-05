@@ -32,13 +32,24 @@ interface SearchMealRpcRow {
 export interface ChipItem {
   description: string
   calories: number | null
+  protein_g?: number | null
+  fiber_g?: number | null
   id?: string
 }
 
 interface RpcMealItem {
   description: string
   calories: number | null
+  protein_g: number | null
+  fiber_g: number | null
   consumed_at: string
+}
+
+/** Fields `updateItemNutrients` can change on a single item. */
+export interface ItemNutrientsUpdate {
+  calories?: number | null
+  protein_g?: number | null
+  fiber_g?: number | null
 }
 
 interface MealsState {
@@ -62,6 +73,7 @@ interface MealsState {
   syncLocalToRemote: () => Promise<void>
   setAuthed: (authed: boolean) => void
   updateItemCalories: (itemId: string, calories: number | null) => Promise<void>
+  updateItemNutrients: (itemId: string, patch: ItemNutrientsUpdate) => Promise<void>
   searchMeals: (query: string) => Promise<MealWithItems[]>
   loadWeek: (date?: string) => Promise<void>
   loadPriorItems: (beforeDate: string) => Promise<Set<string>>
@@ -173,6 +185,8 @@ function serializeRpcItems(items: RpcMealItem[]): Json {
     position,
     consumed_at: item.consumed_at,
     calories: item.calories,
+    protein_g: item.protein_g,
+    fiber_g: item.fiber_g,
   }))
 }
 
@@ -184,6 +198,10 @@ function isMealType(value: unknown): value is MealType {
   return typeof value === 'string' && MEAL_TYPES.includes(value as MealType)
 }
 
+function isNullableNumber(value: unknown): boolean {
+  return value == null || typeof value === 'number'
+}
+
 function isMealItem(value: unknown): value is MealItem {
   return isRecord(value)
     && typeof value.id === 'string'
@@ -193,6 +211,9 @@ function isMealItem(value: unknown): value is MealItem {
     && typeof value.consumed_at === 'string'
     && typeof value.created_at === 'string'
     && (value.calories === null || typeof value.calories === 'number')
+    // protein_g / fiber_g may be absent (undefined) on older payloads
+    && isNullableNumber(value.protein_g)
+    && isNullableNumber(value.fiber_g)
 }
 
 function isMealWithItems(value: unknown): value is MealWithItems {
@@ -238,6 +259,8 @@ function serializeBatchSyncMeals(meals: MealWithItems[]): Json {
       meal.items.map((item) => ({
         description: item.description,
         calories: item.calories,
+        protein_g: item.protein_g ?? null,
+        fiber_g: item.fiber_g ?? null,
         consumed_at: item.consumed_at,
       }))
     ),
@@ -331,6 +354,8 @@ function localMeal(
     position: i,
     consumed_at: insert.consumed_at ?? now,
     calories: null,
+    protein_g: null,
+    fiber_g: null,
     qty: null,
     created_at: now,
   }))
@@ -428,6 +453,8 @@ export const useEntriesStore = create<MealsState>()(
             insert.items.map((description) => ({
               description,
               calories: null,
+              protein_g: null,
+              fiber_g: null,
               consumed_at: consumedAt,
             }))
           ),
@@ -463,6 +490,8 @@ export const useEntriesStore = create<MealsState>()(
                 position: i,
                 consumed_at: updates.consumed_at,
                 calories: chip.calories ?? null,
+                protein_g: chip.protein_g ?? null,
+                fiber_g: chip.fiber_g ?? null,
                 qty: null,
                 created_at: m.items[i]?.created_at ?? now,
               }))
@@ -488,6 +517,8 @@ export const useEntriesStore = create<MealsState>()(
             updates.items.map((item) => ({
               description: item.description,
               calories: item.calories ?? null,
+              protein_g: item.protein_g ?? null,
+              fiber_g: item.fiber_g ?? null,
               consumed_at: updates.consumed_at,
             }))
           ),
@@ -547,13 +578,15 @@ export const useEntriesStore = create<MealsState>()(
         }))
       },
 
-      updateItemCalories: async (itemId, calories) => {
+      updateItemCalories: (itemId, calories) => get().updateItemNutrients(itemId, { calories }),
+
+      updateItemNutrients: async (itemId, patch) => {
         // Optimistic update
         const prevMeals = get().meals
         set((s) => ({
           meals: s.meals.map((m) =>
             m.items.some((i) => i.id === itemId)
-              ? { ...m, items: m.items.map((i) => i.id === itemId ? { ...i, calories } : i) }
+              ? { ...m, items: m.items.map((i) => i.id === itemId ? { ...i, ...patch } : i) }
               : m
           ),
         }))
@@ -563,13 +596,13 @@ export const useEntriesStore = create<MealsState>()(
 
         const { error } = await supabase
           .from('meal_items')
-          .update({ calories })
+          .update(patch)
           .eq('id', itemId)
 
         if (error) {
           // Revert on error
           set({ meals: prevMeals })
-          log.withMetadata({ itemId, error: errorMessage(error) }).error('updateItemCalories failed')
+          log.withMetadata({ itemId, error: errorMessage(error) }).error('updateItemNutrients failed')
           throw error
         }
       },
