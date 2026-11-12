@@ -783,6 +783,21 @@
   padding: 0 7px 0 18px;
   border-radius: 30px;
 }
+/* Recent chips in the dock: one swipeable row that floats over the cards */
+.gl-dock .gl-recent {
+  flex-wrap: nowrap;
+  margin-top: 0;
+  padding: 2px 2px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.gl-dock .gl-recent::-webkit-scrollbar { display: none; }
+.gl-dock .gl-recent__chip {
+  flex-shrink: 0;
+  white-space: nowrap;
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+}
 .gl-dock .gl-in { min-width: 0; padding: 0; font-size: 16px; }
 .gl-dock .gl-type { padding: 8px 11px; }
 .gl-dock .gl-log { width: 46px; height: 46px; margin: 0; padding: 0; font-size: 17px; }
@@ -809,7 +824,7 @@
   /* toasts float above the docked compose bar, not over it */
   .toast-container { bottom: calc(max(24px, env(safe-area-inset-bottom)) + 76px); }
 
-  .gl-day { display: block; padding: 20px 16px 170px; }
+  .gl-day { display: block; padding: 20px 16px 210px; }
   .gl-left { position: static; }
   .gl-h1 { font-size: 44px; letter-spacing: -1.8px; }
   .gl-list { margin-top: 20px; }

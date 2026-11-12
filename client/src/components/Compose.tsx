@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useMemo, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import type { MealType } from '@shared/types/database'
 import { MEAL_TYPE_LABELS, MEAL_TYPE_ORDER, suggestMealType } from '../lib/mealType'
 import { parseSentence } from '../lib/parser'
@@ -18,6 +18,8 @@ interface Props {
   onChange: (value: string) => void
   now: Date
   onSubmit: (payload: ComposePayload) => void
+  /** `dock` only: rendered between the bubbles and the bar (e.g. recent-item chips). */
+  chips?: ReactNode
 }
 
 /** Collapse inner whitespace and capitalise the first letter. */
@@ -34,7 +36,7 @@ function formatTime(d: Date): string {
  * Compose — type a sentence, watch it split into live bubbles, hit Enter to
  * log. Meal type is suggested from the clock (tap the pill to cycle).
  */
-export function Compose({ variant, value, onChange, now, onSubmit }: Props) {
+export function Compose({ variant, value, onChange, now, onSubmit, chips }: Props) {
   const [typeOverride, setTypeOverride] = useState<MealType | null>(null)
   const parsed = useMemo(() => parseSentence(value, now), [value, now])
   const items = useMemo(() => parsed.items.map(tidy), [parsed])
@@ -104,6 +106,7 @@ export function Compose({ variant, value, onChange, now, onSubmit }: Props) {
     return (
       <form className="gl-dock" onSubmit={handleSubmit}>
         {items.length > 0 && <div className="gl-tray">{bubbles}</div>}
+        {chips}
         <div className="gl-bar gl-glass">
           {input}
           {typePill}
