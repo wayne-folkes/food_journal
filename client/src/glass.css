@@ -582,6 +582,26 @@
 }
 .meal-card__totals span + span::before { content: '·'; margin-right: 6px; }
 
+.gl-daytotals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 14px;
+  padding: 12px 18px;
+  border-radius: 20px;
+  color: var(--mute);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.gl-daytotals__label {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.gl-daytotals__kcal { color: var(--ink); font-size: 15px; font-weight: 600; }
+
 .meal-card__cal-badge {
   flex-shrink: 0;
   padding: 2px 9px;

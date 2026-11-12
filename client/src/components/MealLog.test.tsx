@@ -110,4 +110,39 @@ describe('MealLog', () => {
     const { onFresh } = renderLog([meal], makeFlight())
     expect(onFresh).toHaveBeenCalledTimes(1)
   })
+
+  describe('day total', () => {
+    function withNutrients(meal: MealWithItems, n: { calories?: number | null; protein_g?: number | null; fiber_g?: number | null }): MealWithItems {
+      return { ...meal, items: meal.items.map((it) => ({ ...it, ...n })) }
+    }
+    const old = (hours: number) => new Date(Date.now() - hours * 3600_000)
+
+    it('sums calories, protein and fiber across all meals', () => {
+      const a = withNutrients(makeMeal('a', 'Toast', old(5)), { calories: 1200, protein_g: 30.5, fiber_g: 5 })
+      const b = withNutrients(makeMeal('b', 'Pasta', old(3)), { calories: 650, protein_g: 20, fiber_g: 4.5 })
+      const { getByLabelText } = renderLog([a, b])
+      const total = getByLabelText('Day total')
+      expect(total).toHaveTextContent('1,850 kcal')
+      expect(total).toHaveTextContent('Protein 50.5 g')
+      expect(total).toHaveTextContent('Fiber 9.5 g')
+      expect(total).not.toHaveTextContent('~')
+    })
+
+    it('marks the total as approximate when some items have no calories', () => {
+      const a = withNutrients(makeMeal('a', 'Toast', old(5)), { calories: 400 })
+      const b = makeMeal('b', 'Pasta', old(3))
+      const { getByLabelText } = renderLog([a, b])
+      expect(getByLabelText('Day total')).toHaveTextContent('~400 kcal')
+    })
+
+    it('is hidden when no meal has any nutrition data', () => {
+      const { queryByLabelText } = renderLog([makeMeal('a', 'Toast', old(5))])
+      expect(queryByLabelText('Day total')).toBeNull()
+    })
+
+    it('is hidden on an empty day', () => {
+      const { queryByLabelText } = renderLog([])
+      expect(queryByLabelText('Day total')).toBeNull()
+    })
+  })
 })
