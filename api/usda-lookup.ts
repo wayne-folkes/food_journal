@@ -2,9 +2,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import type { LookupItem, LookupResult } from '../shared/usda-lookup'
 import { errorMessage } from '../shared/logger'
-import { buildLookupCacheRows, dedupeCacheRows, dropFailedLegacyRefreshes, isCacheHit } from './usda-cache'
+import { buildLookupCacheRows, dedupeCacheRows, dropFailedLegacyRefreshes, dropFailedLookups, isCacheHit } from './usda-cache'
 import { aiEstimateEnabled, estimateCaloriesWithAi } from './ai-estimate'
 import { extractUsdaNutrients, type UsdaFoodNutrient } from './usda-nutrients'
+import { pickServingGrams, scaleToServing, type Per100g, type UsdaFoodPortion } from './usda-serving'
 import { log as rootLog } from './logger'
 
 async function pLimit<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
@@ -38,12 +39,16 @@ interface CachedLookupRow {
   calories_per_100g: number | null
   protein_per_100g: number | null
   fiber_per_100g: number | null
+  serving_g?: number | null
   source: 'usda' | 'not_found'
+  created_at: string | null
 }
+
+const USDA_TIMEOUT_MS = 8000
 
 async function fetchFromUsda(
   description: string
-): Promise<{ calories: number | null; protein_g: number | null; fiber_g: number | null; fdcId: number | null }> {
+): Promise<Per100g & { fdcId: number | null; servingG: number | null }> {
   const response = await fetch('https://api.nal.usda.gov/fdc/v1/foods/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Api-Key': USDA_API_KEY },
@@ -53,8 +58,14 @@ async function fetchFromUsda(
       pageSize: 25,
       sortBy: 'score',
       sortOrder: 'desc'
-    })
+    }),
+    signal: AbortSignal.timeout(USDA_TIMEOUT_MS)
   })
+
+  // A failed request is not a "no match" answer: throw so the caller doesn't cache it
+  if (!response.ok) {
+    throw new Error(`USDA search failed with status ${response.status}`)
+  }
 
   const data = await response.json() as {
     foods?: Array<{
@@ -92,7 +103,30 @@ async function fetchFromUsda(
 
   const { calories, protein_g, fiber_g } = extractUsdaNutrients(food?.foodNutrients)
 
-  return { calories, protein_g, fiber_g, fdcId: food?.fdcId ?? null }
+  // Search values are per 100 g; the details call gives the typical serving weight.
+  // Its failure must not turn a successful search into not_found: fall back to 100 g.
+  let servingG: number | null = null
+  if (food && calories !== null) {
+    try {
+      servingG = await fetchServingGrams(food.fdcId)
+    } catch (err) {
+      rootLog.withMetadata({ fdcId: food.fdcId, error: errorMessage(err) }).warn('USDA details lookup failed, using 100 g')
+    }
+  }
+
+  return { calories, protein_g, fiber_g, fdcId: food?.fdcId ?? null, servingG }
+}
+
+async function fetchServingGrams(fdcId: number): Promise<number | null> {
+  const response = await fetch(`https://api.nal.usda.gov/fdc/v1/food/${fdcId}`, {
+    headers: { 'X-Api-Key': USDA_API_KEY },
+    signal: AbortSignal.timeout(USDA_TIMEOUT_MS)
+  })
+  if (!response.ok) {
+    throw new Error(`USDA details failed with status ${response.status}`)
+  }
+  const data = await response.json() as { foodPortions?: UsdaFoodPortion[] }
+  return pickServingGrams(data.foodPortions)
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -115,7 +149,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const log = rootLog.child()
     log.withContext({ handler: 'usda-lookup', userId: user.id })
 
-    // 2. Per-user rate limit check (60 req/hr)
+    // 2. Parse body (validated before the rate limit so malformed requests don't burn quota): { items: LookupItem[] }
+    const body = req.body as { items?: LookupItem[] }
+    const items = body?.items
+
+    // 3. Validate items array (max 20 items)
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items must be a non-empty array' })
+    }
+    if (items.length > 20) {
+      return res.status(400).json({ error: 'items array must not exceed 20 entries' })
+    }
+    if (items.some(i => typeof i.description !== 'string' || i.description.length === 0 || i.description.length > 200)) {
+      return res.status(400).json({ error: 'each item description must be 1–200 characters' })
+    }
+
+    // 4. Per-user rate limit check (60 req/hr)
     const { data: overLimit, error: rlError } = await supabaseAdmin
       .rpc('check_and_increment_api_rate_limit', {
         p_user_id: user.id,
@@ -129,27 +178,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(429).json({ error: 'Rate limit exceeded. Try again next hour.' })
     }
 
-    // 3. Parse body: { items: LookupItem[] }
-    const body = req.body as { items?: LookupItem[] }
-    const items = body?.items
-
-    // 4. Validate items array (max 20 items)
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'items must be a non-empty array' })
-    }
-    if (items.length > 20) {
-      return res.status(400).json({ error: 'items array must not exceed 20 entries' })
-    }
-    if (items.some(i => typeof i.description !== 'string' || i.description.length === 0 || i.description.length > 200)) {
-      return res.status(400).json({ error: 'each item description must be 1–200 characters' })
-    }
-
     // 5. Batch cache lookup
     const keys = items.map(i => i.description.toLowerCase().trim())
-    const { data: cached } = await supabaseAdmin
+    const selectCols = 'description_key, calories_per_100g, protein_per_100g, fiber_per_100g, source, created_at'
+    let cached: unknown[] | null = null
+    const withServing = await supabaseAdmin
       .from('food_lookup')
-      .select('description_key, calories_per_100g, protein_per_100g, fiber_per_100g, source')
+      .select(`${selectCols}, serving_g`)
       .in('description_key', keys)
+    cached = withServing.data
+    if (withServing.error) {
+      // Remove this fallback once migration 0019 (serving_g) is applied
+      log.withMetadata({ error: errorMessage(withServing.error) }).warn('cache select failed, retrying without serving_g')
+      cached = (await supabaseAdmin
+        .from('food_lookup')
+        .select(selectCols)
+        .in('description_key', keys)).data
+    }
 
     const cacheMap = new Map(
       ((cached ?? []) as CachedLookupRow[]).map((row) => [row.description_key, row] as const)
@@ -168,32 +213,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         hits.push({
           id: item.id,
           description: item.description,
-          calories: row.calories_per_100g ?? null,
-          protein_g: row.protein_per_100g ?? null,
-          fiber_g: row.fiber_per_100g ?? null,
+          ...scaleToServing({
+            calories: row.calories_per_100g ?? null,
+            protein_g: row.protein_per_100g ?? null,
+            fiber_g: row.fiber_per_100g ?? null
+          }, row.serving_g),
           source: 'cache'
         })
       } else {
         misses.push(item)
-        if (row) legacyRows.set(key, row)
+        // Only stale USDA rows are protected; an expired not_found row may be replaced
+        if (row?.source === 'usda') legacyRows.set(key, row)
       }
     }
 
     // 6. USDA calls for misses (concurrency-limited to 5)
     const missResults = await pLimit(
-      misses.map((item) => async (): Promise<{ result: LookupResult; fdcId: number | null }> => {
+      misses.map((item) => async (): Promise<{ result: LookupResult; fdcId: number | null; per100g?: Per100g; servingG?: number | null; failed?: boolean }> => {
         try {
-          const { calories, protein_g, fiber_g, fdcId } = await fetchFromUsda(item.description)
+          const { servingG, fdcId, ...per100g } = await fetchFromUsda(item.description)
           return {
             result: {
               id: item.id,
               description: item.description,
-              calories,
-              protein_g,
-              fiber_g,
-              source: calories !== null ? 'usda' : 'not_found'
+              ...scaleToServing(per100g, servingG),
+              source: per100g.calories !== null ? 'usda' : 'not_found'
             },
-            fdcId
+            fdcId,
+            per100g,
+            servingG
           }
         } catch (err) {
           log.withMetadata({ description: item.description, error: errorMessage(err) }).error('USDA lookup failed')
@@ -206,25 +254,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               fiber_g: null,
               source: 'not_found'
             },
-            fdcId: null
+            fdcId: null,
+            failed: true
           }
         }
       }),
       5
     )
 
-    // 7. Cache write for new results (upsert all misses, including not_found)
+    // 7. Cache write for new results (upsert misses, including genuine not_found, but
+    // never failed lookups)
+    const failedKeys = new Set(
+      misses.filter((_, i) => missResults[i].failed).map((m) => m.description.toLowerCase().trim())
+    )
     const upsertRows = dedupeCacheRows(
-      dropFailedLegacyRefreshes(buildLookupCacheRows(misses, missResults), new Set(legacyRows.keys()))
+      dropFailedLegacyRefreshes(
+        dropFailedLookups(buildLookupCacheRows(misses, missResults), failedKeys),
+        new Set(legacyRows.keys())
+      )
     )
 
     if (upsertRows.length > 0) {
-      const { error: upsertError } = await supabaseAdmin
+      let { error: upsertError } = await supabaseAdmin
         .from('food_lookup')
         .upsert(upsertRows, { onConflict: 'description_key' })
 
       if (upsertError) {
-        log.withMetadata({ error: errorMessage(upsertError) }).warn('cache upsert failed')
+        // Remove this fallback once migration 0019 (serving_g) is applied
+        log.withMetadata({ error: errorMessage(upsertError) }).warn('cache upsert failed, retrying without serving_g')
+        const legacyShape = upsertRows.map(({ serving_g: _servingG, ...rest }) => rest)
+        ;({ error: upsertError } = await supabaseAdmin
+          .from('food_lookup')
+          .upsert(legacyShape, { onConflict: 'description_key' }))
+        if (upsertError) {
+          log.withMetadata({ error: errorMessage(upsertError) }).warn('cache upsert failed')
+        }
       }
     }
 
@@ -235,7 +299,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (row && missResults[index].result.source !== 'usda') {
         missResults[index].result = {
           ...missResults[index].result,
-          calories: row.calories_per_100g ?? null,
+          calories: scaleToServing(
+            { calories: row.calories_per_100g ?? null, protein_g: null, fiber_g: null },
+            row.serving_g
+          ).calories,
           protein_g: null,
           fiber_g: null,
           source: 'cache'

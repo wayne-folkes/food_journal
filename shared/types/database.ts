@@ -102,6 +102,7 @@ export type Database = {
           calories_per_100g: number | null
           protein_per_100g: number | null
           fiber_per_100g: number | null
+          serving_g: number | null
           source: string
           usda_fdc_id: number | null
           created_at: string
@@ -112,6 +113,7 @@ export type Database = {
           calories_per_100g?: number | null
           protein_per_100g?: number | null
           fiber_per_100g?: number | null
+          serving_g?: number | null
           source?: string
           usda_fdc_id?: number | null
           created_at?: string
@@ -121,6 +123,7 @@ export type Database = {
           calories_per_100g?: number | null
           protein_per_100g?: number | null
           fiber_per_100g?: number | null
+          serving_g?: number | null
           source?: string
           usda_fdc_id?: number | null
           created_at?: string

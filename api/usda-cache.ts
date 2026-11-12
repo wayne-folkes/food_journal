@@ -1,4 +1,5 @@
 import type { LookupItem, LookupResult } from '../shared/usda-lookup'
+import type { Per100g } from './usda-serving'
 
 export interface LookupCacheRow {
   description_key: string
@@ -8,15 +9,40 @@ export interface LookupCacheRow {
   fiber_per_100g: number | null
   source: 'usda' | 'not_found'
   usda_fdc_id: number | null
+  /** Typical serving weight in grams (null: USDA had no portions); the values above stay per 100 g. */
+  serving_g: number | null
+  /** ISO timestamp; sent on every upsert so a refreshed row restarts its TTL. */
+  created_at: string
 }
+
+/** not_found rows expire so a food USDA later learns about is looked up again. */
+export const NOT_FOUND_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
  * Legacy USDA rows were cached before protein/fiber existed, so they have null
  * protein. Treat them as misses so the refetch upserts them with macros.
- * not_found rows stay hits.
+ * not_found rows stay hits until they are older than NOT_FOUND_TTL_MS (a missing
+ * or unparseable created_at counts as fresh).
  */
-export function isCacheHit(row: { source: string; protein_per_100g: number | null }): boolean {
-  return row.source !== 'usda' || row.protein_per_100g !== null
+export function isCacheHit(
+  row: { source: string; protein_per_100g: number | null; created_at?: string | null },
+  now: number = Date.now()
+): boolean {
+  if (row.source === 'usda') return row.protein_per_100g !== null
+  const createdAt = row.created_at ? Date.parse(row.created_at) : NaN
+  return Number.isNaN(createdAt) || now - createdAt <= NOT_FOUND_TTL_MS
+}
+
+/**
+ * Only definitive answers may be cached. A lookup that failed (USDA 429/5xx,
+ * timeout, network error) says nothing about the food, so its row is dropped
+ * and the next request tries USDA again.
+ */
+export function dropFailedLookups(
+  rows: LookupCacheRow[],
+  failedKeys: ReadonlySet<string>
+): LookupCacheRow[] {
+  return rows.filter((row) => !failedKeys.has(row.description_key))
 }
 
 /**
@@ -43,18 +69,29 @@ export function dedupeCacheRows(rows: LookupCacheRow[]): LookupCacheRow[] {
 
 export function buildLookupCacheRows(
   misses: LookupItem[],
-  missResults: Array<{ result: LookupResult; fdcId: number | null }>
+  missResults: Array<{
+    result: LookupResult
+    fdcId: number | null
+    /** Values as USDA reports them; `result` holds the (scaled) per-serving values. Defaults to `result`. */
+    per100g?: Per100g
+    servingG?: number | null
+  }>,
+  now: Date = new Date()
 ): LookupCacheRow[] {
   return misses.map((item, index) => {
-    const { result, fdcId } = missResults[index]
+    const { result, fdcId, servingG } = missResults[index]
+    const per100g = missResults[index].per100g
+      ?? { calories: result.calories, protein_g: result.protein_g, fiber_g: result.fiber_g }
     return {
       description_key: item.description.toLowerCase().trim(),
       description: item.description,
-      calories_per_100g: result.calories,
-      protein_per_100g: result.protein_g,
-      fiber_per_100g: result.fiber_g,
+      calories_per_100g: per100g.calories,
+      protein_per_100g: per100g.protein_g,
+      fiber_per_100g: per100g.fiber_g,
       source: result.source === 'usda' ? 'usda' : 'not_found',
       usda_fdc_id: fdcId,
+      serving_g: servingG ?? null,
+      created_at: now.toISOString(),
     }
   })
 }
