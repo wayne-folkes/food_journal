@@ -149,6 +149,10 @@ function AppInner() {
     [authResolved, meals, selectedDate]
   )
 
+  /** Tapping a recent chip appends that item to the compose input. */
+  const appendRecentItem = (item: string) =>
+    setComposeText((t) => (t.trim() ? `${t.trim()}, ${item}` : item))
+
   const dayIsLoading = !authResolved || isLoading
   const weekIsLoading = !authResolved || weekLoading
 
@@ -422,10 +426,7 @@ function AppInner() {
 
               {/* Recent items — tap to append to the compose input */}
               {!mobile && isAuthed && itemHistory.length > 0 && (
-                <RecentChips
-                  items={itemHistory.slice(0, 8)}
-                  onSelect={(item) => setComposeText((t) => (t.trim() ? `${t.trim()}, ${item}` : item))}
-                />
+                <RecentChips items={itemHistory.slice(0, 8)} onSelect={appendRecentItem} />
               )}
 
               {/* Anonymous-mode notice — meals are device-only until sign-in */}
@@ -471,7 +472,16 @@ function AppInner() {
       </div>
 
       {mobile && (
-        <Compose variant="dock" value={composeText} onChange={setComposeText} now={now} onSubmit={handleCompose} />
+        <Compose
+          variant="dock"
+          value={composeText}
+          onChange={setComposeText}
+          now={now}
+          onSubmit={handleCompose}
+          chips={viewMode === 'day' && isAuthed && itemHistory.length > 0 ? (
+            <RecentChips items={itemHistory.slice(0, 8)} onSelect={appendRecentItem} />
+          ) : null}
+        />
       )}
 
       <div className="fj-flight" data-flight-layer="" aria-hidden="true" />
