@@ -72,16 +72,14 @@ export function buildLookupCacheRows(
   missResults: Array<{
     result: LookupResult
     fdcId: number | null
-    /** Values as USDA reports them; `result` holds the (scaled) per-serving values. Defaults to `result`. */
-    per100g?: Per100g
+    /** Values as USDA reports them; `result` holds the (scaled) per-serving values, which must never be cached. */
+    per100g: Per100g
     servingG?: number | null
   }>,
   now: Date = new Date()
 ): LookupCacheRow[] {
   return misses.map((item, index) => {
-    const { result, fdcId, servingG } = missResults[index]
-    const per100g = missResults[index].per100g
-      ?? { calories: result.calories, protein_g: result.protein_g, fiber_g: result.fiber_g }
+    const { result, fdcId, servingG, per100g } = missResults[index]
     return {
       description_key: item.description.toLowerCase().trim(),
       description: item.description,
@@ -94,4 +92,13 @@ export function buildLookupCacheRows(
       created_at: now.toISOString(),
     }
   })
+}
+
+/**
+ * True when a Supabase/PostgREST error means a column does not exist (migration
+ * 0019 not applied): PGRST204 (schema cache: column not found) or Postgres 42703
+ * (undefined column). Any other error must not trigger the serving_g fallback.
+ */
+export function isUnknownColumnError(error: { code?: string | null } | null | undefined): boolean {
+  return error?.code === 'PGRST204' || error?.code === '42703'
 }

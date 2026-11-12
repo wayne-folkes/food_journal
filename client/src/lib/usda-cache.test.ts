@@ -1,4 +1,4 @@
-import { buildLookupCacheRows, dedupeCacheRows, dropFailedLegacyRefreshes, dropFailedLookups, isCacheHit, NOT_FOUND_TTL_MS, type LookupCacheRow } from '../../../api/usda-cache'
+import { buildLookupCacheRows, dedupeCacheRows, dropFailedLegacyRefreshes, dropFailedLookups, isCacheHit, isUnknownColumnError, NOT_FOUND_TTL_MS, type LookupCacheRow } from '../../../api/usda-cache'
 
 const NOW = new Date('2026-11-12T00:00:00.000Z')
 
@@ -16,6 +16,7 @@ describe('buildLookupCacheRows', () => {
           source: 'not_found',
         },
         fdcId: null,
+        per100g: { calories: null, protein_g: null, fiber_g: null },
       }],
       NOW
     )
@@ -48,6 +49,7 @@ describe('buildLookupCacheRows', () => {
           source: 'usda',
         },
         fdcId: 170392,
+        per100g: { calories: 364, protein_g: 19.3, fiber_g: 17.4 },
       }],
       NOW
     )
@@ -144,5 +146,17 @@ describe('not_found TTL and failed lookups', () => {
     )
 
     expect(rows[0]).toMatchObject({ calories_per_100g: 579, protein_per_100g: 21.2, fiber_per_100g: 12.5, serving_g: 28 })
+  })
+})
+
+describe('isUnknownColumnError', () => {
+  it('matches only PostgREST PGRST204 and Postgres 42703', () => {
+    expect(isUnknownColumnError({ code: 'PGRST204' })).toBe(true)
+    expect(isUnknownColumnError({ code: '42703' })).toBe(true)
+    expect(isUnknownColumnError({ code: '23505' })).toBe(false)
+    expect(isUnknownColumnError({ code: 'PGRST301' })).toBe(false)
+    expect(isUnknownColumnError({})).toBe(false)
+    expect(isUnknownColumnError(null)).toBe(false)
+    expect(isUnknownColumnError(undefined)).toBe(false)
   })
 })

@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import type { LookupItem, LookupResult } from '../shared/usda-lookup'
 import { errorMessage } from '../shared/logger'
-import { buildLookupCacheRows, dedupeCacheRows, dropFailedLegacyRefreshes, dropFailedLookups, isCacheHit } from './usda-cache'
+import { buildLookupCacheRows, dedupeCacheRows, dropFailedLegacyRefreshes, dropFailedLookups, isCacheHit, isUnknownColumnError } from './usda-cache'
 import { aiEstimateEnabled, estimateCaloriesWithAi } from './ai-estimate'
 import { extractUsdaNutrients, type UsdaFoodNutrient } from './usda-nutrients'
 import { pickServingGrams, scaleToServing, type Per100g, type UsdaFoodPortion } from './usda-serving'
@@ -48,7 +48,7 @@ const USDA_TIMEOUT_MS = 8000
 
 async function fetchFromUsda(
   description: string
-): Promise<Per100g & { fdcId: number | null; servingG: number | null }> {
+): Promise<Per100g & { fdcId: number | null; servingG: number | null; servingFailed: boolean }> {
   const response = await fetch('https://api.nal.usda.gov/fdc/v1/foods/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Api-Key': USDA_API_KEY },
@@ -105,16 +105,19 @@ async function fetchFromUsda(
 
   // Search values are per 100 g; the details call gives the typical serving weight.
   // Its failure must not turn a successful search into not_found: fall back to 100 g.
+  // servingFailed keeps the row out of the cache: null serving_g must only mean "USDA lists no portions".
   let servingG: number | null = null
+  let servingFailed = false
   if (food && calories !== null) {
     try {
       servingG = await fetchServingGrams(food.fdcId)
     } catch (err) {
+      servingFailed = true
       rootLog.withMetadata({ fdcId: food.fdcId, error: errorMessage(err) }).warn('USDA details lookup failed, using 100 g')
     }
   }
 
-  return { calories, protein_g, fiber_g, fdcId: food?.fdcId ?? null, servingG }
+  return { calories, protein_g, fiber_g, fdcId: food?.fdcId ?? null, servingG, servingFailed }
 }
 
 async function fetchServingGrams(fdcId: number): Promise<number | null> {
@@ -187,7 +190,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .select(`${selectCols}, serving_g`)
       .in('description_key', keys)
     cached = withServing.data
-    if (withServing.error) {
+    if (withServing.error && !isUnknownColumnError(withServing.error)) {
+      log.withMetadata({ error: errorMessage(withServing.error) }).warn('cache select failed')
+    } else if (withServing.error) {
       // Remove this fallback once migration 0019 (serving_g) is applied
       log.withMetadata({ error: errorMessage(withServing.error) }).warn('cache select failed, retrying without serving_g')
       cached = (await supabaseAdmin
@@ -229,9 +234,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 6. USDA calls for misses (concurrency-limited to 5)
     const missResults = await pLimit(
-      misses.map((item) => async (): Promise<{ result: LookupResult; fdcId: number | null; per100g?: Per100g; servingG?: number | null; failed?: boolean }> => {
+      misses.map((item) => async (): Promise<{ result: LookupResult; fdcId: number | null; per100g: Per100g; servingG?: number | null; failed?: boolean }> => {
         try {
-          const { servingG, fdcId, ...per100g } = await fetchFromUsda(item.description)
+          const { servingG, fdcId, servingFailed, ...per100g } = await fetchFromUsda(item.description)
           return {
             result: {
               id: item.id,
@@ -241,7 +246,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             },
             fdcId,
             per100g,
-            servingG
+            servingG,
+            // Details call failed: respond at 100 g but don't cache a null serving_g
+            failed: servingFailed
           }
         } catch (err) {
           log.withMetadata({ description: item.description, error: errorMessage(err) }).error('USDA lookup failed')
@@ -255,6 +262,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               source: 'not_found'
             },
             fdcId: null,
+            per100g: { calories: null, protein_g: null, fiber_g: null },
             failed: true
           }
         }
@@ -279,7 +287,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .from('food_lookup')
         .upsert(upsertRows, { onConflict: 'description_key' })
 
-      if (upsertError) {
+      if (upsertError && !isUnknownColumnError(upsertError)) {
+        log.withMetadata({ error: errorMessage(upsertError) }).warn('cache upsert failed')
+      } else if (upsertError) {
         // Remove this fallback once migration 0019 (serving_g) is applied
         log.withMetadata({ error: errorMessage(upsertError) }).warn('cache upsert failed, retrying without serving_g')
         const legacyShape = upsertRows.map(({ serving_g: _servingG, ...rest }) => rest)
