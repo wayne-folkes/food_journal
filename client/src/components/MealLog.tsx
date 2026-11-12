@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 import type { MealWithItems } from '@shared/types/database'
 import { EASE_SETTLE, ZOOM_MS, fadeOutCard, flipMeals, flyBubbles, prefersReducedMotion, snapshotMeals, type Flight } from '../lib/glassMotion'
+import { formatGrams, sumNutrients } from '../lib/nutrients'
 import { MealCard } from './MealCard'
 
 /** A meal created this recently that we did not log ourselves counts as "arrived". */
@@ -38,6 +39,33 @@ function LoadingSkeleton() {
         </div>
       ))}
     </div>
+  )
+}
+
+/** Calories, protein and fiber summed across every meal of the day. */
+function DayTotals({ meals }: { meals: MealWithItems[] }) {
+  const items = meals.flatMap((m) => m.items)
+  const totals = sumNutrients(items)
+  const hasCal = items.some((i) => i.calories != null)
+  const hasProtein = items.some((i) => i.protein_g != null)
+  const hasFiber = items.some((i) => i.fiber_g != null)
+  if (!hasCal && !hasProtein && !hasFiber) return null
+
+  return (
+    <section className="gl-daytotals gl-glass" aria-label="Day total">
+      <span className="gl-daytotals__label">Day total</span>
+      {hasCal && (
+        <span className="gl-daytotals__kcal">
+          {totals.caloriesPartial ? '~' : ''}{totals.calories.toLocaleString()} kcal
+        </span>
+      )}
+      {hasProtein && (
+        <span>Protein {totals.proteinPartial ? '~' : ''}{formatGrams(totals.protein_g)}</span>
+      )}
+      {hasFiber && (
+        <span>Fiber {totals.fiberPartial ? '~' : ''}{formatGrams(totals.fiber_g)}</span>
+      )}
+    </section>
   )
 }
 
@@ -152,6 +180,7 @@ export function MealLog({
 
   return (
     <div className="gl-list">
+      <DayTotals meals={sorted} />
       {sorted.map((meal) => (
         <MealCard
           key={meal.id}
