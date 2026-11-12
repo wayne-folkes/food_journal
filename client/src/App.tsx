@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { errorMessage } from '@shared/logger'
 import { supabase } from './lib/supabase'
-import { useEntriesStore, todayString, getWeekBounds, stashLocalMealsForSync, restoreUnsyncedMeals } from './lib/store'
+import { useEntriesStore, todayString, getWeekBounds, stashLocalMealsForSync, restoreUnsyncedMeals, resetEntriesState } from './lib/store'
 import { Sky, type Bloom } from './components/Sky'
 import { TopBar } from './components/TopBar'
 import { Compose, type ComposePayload } from './components/Compose'
@@ -77,22 +77,20 @@ function AppInner() {
 
   // Auth listener
   useEffect(() => {
-    const resetEntriesState = () => {
-      useEntriesStore.setState({ meals: [], dayCache: {}, weekMeals: [], itemHistory: [] })
-      void useEntriesStore.persist.clearStorage()
-    }
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const nextUserId = session?.user?.id ?? null
       const previousUserId = activeUserIdRef.current
       // Anonymous -> signed in: capture (and park) device-only meals before the reset below.
       // Only a repeat of the same sign-in is ignored, so one sign-in uploads once.
-      const pendingUpload = previousUserId === null && nextUserId !== null ? stashLocalMealsForSync() : []
+      const uploadUserId = previousUserId === null ? nextUserId : null
+      const pendingUpload = uploadUserId !== null ? stashLocalMealsForSync(uploadUserId) : []
 
       setUser(session?.user ?? null)
 
       if (event === 'SIGNED_OUT' || previousUserId !== nextUserId) {
         resetEntriesState()
+        // A direct account switch keeps isAuthed true, so nothing else reloads the new account's days
+        if (nextUserId !== null) setSyncVersion((v) => v + 1)
         setSearchOpen(false)
         setEditingMeal(null)
         setSelectedMeal(null)
@@ -103,27 +101,29 @@ function AppInner() {
       setAuthResolved(true)
 
       // Meals kept after a failed upload come back to the anonymous device view
-      if (nextUserId === null) restoreUnsyncedMeals()
+      if (nextUserId === null) void restoreUnsyncedMeals()
 
-      if (pendingUpload.length > 0) {
+      if (uploadUserId !== null && pendingUpload.length > 0) {
         // Not awaited here: Supabase calls inside onAuthStateChange can deadlock on the auth lock
         const token = ++syncTokenRef.current
         setTimeout(() => {
           if (token !== syncTokenRef.current || activeUserIdRef.current !== nextUserId) return
-          void uploadLocalMeals(pendingUpload)
+          void uploadLocalMeals(pendingUpload, uploadUserId)
         }, 0)
       }
     })
 
-    async function uploadLocalMeals(meals: MealWithItems[]) {
-      const result = await useEntriesStore.getState().syncLocalToRemote(meals)
-      if (!result) return
+    async function uploadLocalMeals(meals: MealWithItems[], userId: string) {
+      const result = await useEntriesStore.getState().syncLocalToRemote(meals, userId)
       if (result.synced > 0) {
         setSyncVersion((v) => v + 1)
         toast.success(`Synced ${result.synced} meal${result.synced === 1 ? '' : 's'} from this device to your account`)
       }
       if (result.failed > 0) {
         toast.error(`${result.failed} meal${result.failed === 1 ? '' : 's'} could not be synced. ${result.failed === 1 ? 'It is' : 'They are'} kept on this device and will retry on next sign-in.`)
+      }
+      if (result.unknown > 0) {
+        toast.error(`${result.unknown} meal${result.unknown === 1 ? '' : 's'} may or may not have been saved to your account. Check your log before adding ${result.unknown === 1 ? 'it' : 'them'} again.`)
       }
     }
     return () => subscription.unsubscribe()
@@ -316,24 +316,13 @@ function AppInner() {
     toast.success('Meal deleted', {
       label: 'Undo',
       onClick: () => {
+        // headline/note are not restored: addMeal/create_meal_with_items has no args for them.
         addMeal({
           meal_type: meal.meal_type,
           consumed_at: meal.consumed_at,
           raw_input: meal.raw_input ?? '',
           items: meal.items.map((i) => i.description),
-        }).then(async (restored) => {
-          // addMeal only takes descriptions; re-apply nutrients (items come back in order).
-          // headline/note are not restored: addMeal/create_meal_with_items has no args for them.
-          await Promise.all(meal.items.map(async (orig, idx) => {
-            const target = restored.items[idx]
-            const patch: { calories?: number; protein_g?: number; fiber_g?: number } = {}
-            if (orig.calories != null) patch.calories = orig.calories
-            if (orig.protein_g != null) patch.protein_g = orig.protein_g
-            if (orig.fiber_g != null) patch.fiber_g = orig.fiber_g
-            if (!target || Object.keys(patch).length === 0) return
-            await updateItemNutrients(target.id, patch)
-          }))
-        }).catch(() => {
+        }, meal.items.map((i) => ({ calories: i.calories, protein_g: i.protein_g ?? null, fiber_g: i.fiber_g ?? null }))).catch(() => {
           toast.error('Failed to undo delete. Please try again.')
         })
       },

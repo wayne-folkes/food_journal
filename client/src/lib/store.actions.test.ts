@@ -64,6 +64,10 @@ function makeStoredMeal({
   }
 }
 
+afterEach(() => {
+  vi.mocked(localStorage.getItem).mockReset().mockReturnValue(null)
+})
+
 const setItemCalls = () =>
   (localStorage.setItem as unknown as { mock: { calls: string[][] } }).mock.calls.filter(
     (c) => c[0] === 'food_journal_unsynced_meals'
@@ -329,12 +333,15 @@ describe('useEntriesStore.addMeal', () => {
       error: null,
     })
 
-    const result = await useEntriesStore.getState().syncLocalToRemote([firstLocalMeal, secondLocalMeal])
+    vi.mocked(localStorage.getItem).mockReturnValue(
+      JSON.stringify({ userId: 'user-1', meals: [firstLocalMeal, secondLocalMeal] })
+    )
+    const result = await useEntriesStore.getState().syncLocalToRemote([firstLocalMeal, secondLocalMeal], 'user-1')
 
-    expect(result).toEqual({ synced: 1, failed: 1 })
+    expect(result).toEqual({ synced: 1, failed: 1, unknown: 0 })
     expect(mockSupabase.auth.getUser).not.toHaveBeenCalled()
     // the failed meal is parked for retry; the synced day is invalidated, others kept
-    expect(JSON.parse(setItemCalls().at(-1)![1])).toEqual([secondLocalMeal])
+    expect(JSON.parse(setItemCalls().at(-1)![1])).toEqual({ userId: 'user-1', meals: [secondLocalMeal] })
     expect(Object.keys(useEntriesStore.getState().dayCache)).toEqual(['2026-04-14'])
     expect(mockSupabase.rpc).toHaveBeenCalledWith('create_meals_with_items_batch', {
       p_meals: [
@@ -426,9 +433,10 @@ describe('useEntriesStore.addMeal', () => {
       error: null,
     })
 
-    const result = await useEntriesStore.getState().syncLocalToRemote(localMeals)
+    vi.mocked(localStorage.getItem).mockReturnValue(JSON.stringify({ userId: 'user-1', meals: localMeals }))
+    const result = await useEntriesStore.getState().syncLocalToRemote(localMeals, 'user-1')
 
-    expect(result).toEqual({ synced: 3, failed: 0 })
+    expect(result).toEqual({ synced: 3, failed: 0, unknown: 0 })
     expect(localStorage.removeItem).toHaveBeenCalledWith('food_journal_unsynced_meals')
     expect(mockSupabase.rpc).toHaveBeenCalledTimes(1)
     expect(mockSupabase.rpc).toHaveBeenCalledWith('create_meals_with_items_batch', {
@@ -995,70 +1003,282 @@ describe('useEntriesStore protein/fiber', () => {
   })
 })
 
-describe('syncLocalToRemote failure handling and parked meals', () => {
-  const meal = makeStoredMeal({ id: 'local-1', description: 'apple', consumedAt: '2026-04-15T12:00:00.000Z', userId: null })
-
+describe('useEntriesStore.addMeal nutrients', () => {
   beforeEach(() => {
     mockSupabase.rpc.mockReset()
-    vi.mocked(localStorage.setItem).mockClear()
-    vi.mocked(localStorage.removeItem).mockClear()
-    vi.mocked(localStorage.getItem).mockReset().mockReturnValue(null)
+    useEntriesStore.setState({ meals: [], dayCache: {}, isAuthed: false, isLoading: false })
+  })
+
+  it('stores per-item nutrients on the local meal for anonymous users', async () => {
+    const created = await useEntriesStore.getState().addMeal(
+      { consumed_at: '2026-04-15T09:00:00.000Z', items: ['a', 'b'] },
+      [{ calories: 95, protein_g: 0.5, fiber_g: 4.4 }]
+    )
+    expect(created.items[0]).toMatchObject({ calories: 95, protein_g: 0.5, fiber_g: 4.4 })
+    expect(created.items[1]).toMatchObject({ calories: null, protein_g: null, fiber_g: null })
+  })
+
+  it('sends per-item nutrients in the one create_meal_with_items call', async () => {
+    useEntriesStore.setState({ isAuthed: true })
+    const meal = makeStoredMeal({ id: 'm', description: 'a', consumedAt: '2026-04-15T09:00:00.000Z', userId: 'u' })
+    mockSupabase.rpc.mockResolvedValue({ data: meal, error: null })
+
+    await useEntriesStore.getState().addMeal(
+      { consumed_at: '2026-04-15T09:00:00.000Z', items: ['a', 'b'] },
+      [{ calories: 95, protein_g: 0.5 }, { fiber_g: 2 }]
+    )
+
+    expect(mockSupabase.rpc).toHaveBeenCalledTimes(1)
+    expect(mockSupabase.rpc.mock.calls[0][1].p_items).toEqual([
+      { description: 'a', position: 0, calories: 95, protein_g: 0.5, fiber_g: null, consumed_at: '2026-04-15T09:00:00.000Z' },
+      { description: 'b', position: 1, calories: null, protein_g: null, fiber_g: 2, consumed_at: '2026-04-15T09:00:00.000Z' },
+    ])
+  })
+})
+
+describe('useEntriesStore.loadDay in-flight protection', () => {
+  const row = (id: string) => ({
+    ...makeStoredMeal({ id, description: id, consumedAt: '2026-04-15T09:00:00.000Z', userId: 'u' }),
+    meal_items: [],
+  })
+  function query(rows: unknown[], gate?: Promise<void>, onResult?: () => Promise<void>) {
+    const chain = {
+      select: vi.fn(() => chain),
+      gte: vi.fn(() => chain),
+      lte: vi.fn(() => chain),
+      order: vi.fn(async () => {
+        if (gate) await gate
+        if (onResult) await onResult()
+        return { data: rows, error: null }
+      }),
+    }
+    return chain
+  }
+  const addedMeal = makeStoredMeal({ id: 'added', description: 'added', consumedAt: '2026-04-15T10:00:00.000Z', userId: 'u' })
+
+  beforeEach(() => {
+    mockSupabase.from.mockReset()
+    mockSupabase.rpc.mockReset().mockResolvedValue({ data: addedMeal, error: null })
+    useEntriesStore.setState({ meals: [], dayCache: {}, isAuthed: true, isLoading: false })
+  })
+
+  it('refetches a first-time load when a local mutation happened during the fetch', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    mockSupabase.from
+      .mockReturnValueOnce(query([row('before-add')], gate))
+      .mockReturnValueOnce(query([row('before-add'), row('added')]))
+
+    const pending = useEntriesStore.getState().loadDay('2026-04-15')
+    await useEntriesStore.getState().addMeal({ consumed_at: '2026-04-15T10:00:00.000Z', items: ['added'] })
+    release()
+    await pending
+
+    expect(mockSupabase.from).toHaveBeenCalledTimes(2)
+    expect(useEntriesStore.getState().meals.map((m) => m.id)).toEqual(['before-add', 'added'])
+    expect(useEntriesStore.getState().dayCache['2026-04-15']?.map((m) => m.id)).toEqual(['before-add', 'added'])
+    expect(useEntriesStore.getState().isLoading).toBe(false)
+  })
+
+  it('gives up without applying stale data when mutations never stop, and clears isLoading', async () => {
+    const mutate = async () => { await useEntriesStore.getState().addMeal({ consumed_at: '2026-04-15T10:00:00.000Z', items: ['x'] }) }
+    mockSupabase.from.mockImplementation(() => query([row('stale')], undefined, mutate))
+
+    await useEntriesStore.getState().loadDay('2026-04-15')
+
+    expect(mockSupabase.from).toHaveBeenCalledTimes(3)
+    expect(useEntriesStore.getState().meals.map((m) => m.id)).not.toContain('stale')
+    expect(useEntriesStore.getState().dayCache['2026-04-15']).toBeUndefined()
+    expect(useEntriesStore.getState().isLoading).toBe(false)
+  })
+
+  it('resetEntriesState drops an in-flight load so the old account cannot write into the new state', async () => {
+    const { resetEntriesState } = await import('./store')
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    mockSupabase.from.mockReturnValueOnce(query([row('user-a-meal')], gate))
+
+    const pending = useEntriesStore.getState().loadDay('2026-04-15')
+    resetEntriesState()
+    release()
+    await pending
+
+    expect(useEntriesStore.getState().meals).toEqual([])
+    expect(useEntriesStore.getState().dayCache).toEqual({})
+    expect(useEntriesStore.getState().isLoading).toBe(false)
+  })
+})
+
+describe('syncLocalToRemote failure handling and parked meals', () => {
+  const meal = makeStoredMeal({ id: 'local-1', description: 'apple', consumedAt: '2026-04-15T12:00:00.000Z', userId: null })
+  const meal2 = makeStoredMeal({ id: 'local-2', description: 'toast', consumedAt: '2026-04-15T08:00:00.000Z', userId: null })
+  const remote = (m: MealWithItems) => ({ ...m, id: `remote-${m.id}`, user_id: 'user-1' })
+  const ok = (...ms: MealWithItems[]) => ({ data: ms.map((m) => ({ local_id: m.id, meal: remote(m) })), error: null })
+  let disk: Record<string, string>
+  const KEY = 'food_journal_unsynced_meals'
+  const park = (userId: string | null, meals: MealWithItems[]) => { disk[KEY] = JSON.stringify({ userId, meals }) }
+  const parked = () => (disk[KEY] ? JSON.parse(disk[KEY]) : null)
+  const sync = (meals: MealWithItems[], userId = 'user-1') => useEntriesStore.getState().syncLocalToRemote(meals, userId)
+
+  beforeEach(() => {
+    disk = {}
+    mockSupabase.rpc.mockReset()
+    vi.mocked(localStorage.getItem).mockReset().mockImplementation((k: string) => disk[k] ?? null)
+    vi.mocked(localStorage.setItem).mockReset().mockImplementation((k: string, v: string) => { disk[k] = v })
+    vi.mocked(localStorage.removeItem).mockReset().mockImplementation((k: string) => { delete disk[k] })
     useEntriesStore.setState({ meals: [], dayCache: {}, isAuthed: true, isLoading: false })
   })
 
   it('parks every meal when the whole batch errors', async () => {
+    park('user-1', [meal])
     mockSupabase.rpc.mockResolvedValue({ data: null, error: { message: 'boom' } })
 
-    const result = await useEntriesStore.getState().syncLocalToRemote([meal])
+    const result = await sync([meal])
 
-    expect(result).toEqual({ synced: 0, failed: 1 })
-    expect(JSON.parse(setItemCalls().at(-1)![1])).toEqual([meal])
+    expect(result).toEqual({ synced: 0, failed: 1, unknown: 0 })
+    expect(parked()).toEqual({ userId: 'user-1', meals: [meal] })
     expect(useEntriesStore.getState().meals).toEqual([])
   })
 
   it('parks every meal when the RPC call throws', async () => {
+    park('user-1', [meal])
     mockSupabase.rpc.mockRejectedValue(new Error('offline'))
 
-    const result = await useEntriesStore.getState().syncLocalToRemote([meal])
+    const result = await sync([meal])
 
-    expect(result).toEqual({ synced: 0, failed: 1 })
-    expect(JSON.parse(setItemCalls().at(-1)![1])).toEqual([meal])
+    expect(result).toEqual({ synced: 0, failed: 1, unknown: 0 })
+    expect(parked()).toEqual({ userId: 'user-1', meals: [meal] })
   })
 
-  it('refuses a second upload while one is in flight', async () => {
-    let release: (v: unknown) => void = () => {}
-    mockSupabase.rpc.mockReturnValue(new Promise((r) => { release = r }))
+  it('does not keep meals for retry when the call succeeded but the reply cannot be parsed', async () => {
+    park('user-1', [meal, meal2])
+    mockSupabase.rpc.mockResolvedValue({ data: [{ nonsense: true }], error: null })
 
-    const first = useEntriesStore.getState().syncLocalToRemote([meal])
-    expect(await useEntriesStore.getState().syncLocalToRemote([meal])).toBeNull()
-    release({ data: null, error: { message: 'x' } })
-    await first
+    const result = await sync([meal, meal2])
+
+    expect(result).toEqual({ synced: 0, failed: 0, unknown: 2 })
+    expect(parked()).toBeNull()
+  })
+
+  it('a second tab that gets the lock after the first finished uploads nothing', async () => {
+    park('user-1', [meal])
+    mockSupabase.rpc.mockResolvedValue(ok(meal))
+
+    const tabA = sync([meal])
+    const tabB = sync([meal]) // same pending list, e.g. from the other tab's own copy
+    expect(await tabA).toEqual({ synced: 1, failed: 0, unknown: 0 })
+    expect(await tabB).toEqual({ synced: 0, failed: 0, unknown: 0 })
+
     expect(mockSupabase.rpc).toHaveBeenCalledTimes(1)
+    expect(parked()).toBeNull()
   })
 
-  it('stashLocalMealsForSync parks store meals merged with earlier failures, without duplicates', async () => {
+  it('a meal parked while an upload is in flight is kept and uploaded afterwards', async () => {
     const { stashLocalMealsForSync } = await import('./store')
-    const earlier = makeStoredMeal({ id: 'local-0', description: 'toast', consumedAt: '2026-04-14T08:00:00.000Z', userId: null })
-    vi.mocked(localStorage.getItem).mockReturnValue(JSON.stringify([earlier, meal]))
+    park('user-1', [meal])
+    let release!: (v: unknown) => void
+    mockSupabase.rpc
+      .mockReturnValueOnce(new Promise((r) => { release = r }))
+      .mockResolvedValueOnce(ok(meal2))
+
+    const first = sync([meal])
+    useEntriesStore.setState({ meals: [meal2] })
+    const pending = stashLocalMealsForSync('user-1') // parks meal2 next to meal while the upload runs
+    expect(pending.map((m) => m.id)).toEqual(['local-2', 'local-1'])
+    const second = sync([meal2])
+    release(ok(meal))
+
+    expect(await first).toEqual({ synced: 1, failed: 0, unknown: 0 })
+    expect(parked()).toEqual({ userId: 'user-1', meals: [meal2] }) // only the confirmed meal was removed
+    expect(await second).toEqual({ synced: 1, failed: 0, unknown: 0 })
+    expect(mockSupabase.rpc).toHaveBeenCalledTimes(2)
+    expect(mockSupabase.rpc.mock.calls[1][1].p_meals.map((m: { local_id: string }) => m.local_id)).toEqual(['local-2'])
+    expect(parked()).toBeNull()
+  })
+
+  it('runs the upload inside the Web Lock when the browser has one', async () => {
+    const events: string[] = []
+    const request = vi.fn(async (_name: string, cb: () => Promise<unknown>) => {
+      events.push('lock acquired')
+      const result = await cb()
+      events.push('lock released')
+      return result
+    })
+    Object.defineProperty(navigator, 'locks', { value: { request }, configurable: true })
+    park('user-1', [meal])
+    mockSupabase.rpc.mockImplementation(async () => { events.push('rpc'); return ok(meal) })
+
+    try {
+      await sync([meal])
+    } finally {
+      delete (navigator as unknown as { locks?: unknown }).locks
+    }
+
+    expect(request).toHaveBeenCalledWith('food_journal_sync', expect.any(Function))
+    expect(events).toEqual(['lock acquired', 'rpc', 'lock released'])
+  })
+
+  it('stashLocalMealsForSync parks store meals merged with earlier failures for the same user, without duplicates', async () => {
+    const { stashLocalMealsForSync } = await import('./store')
+    park('user-1', [meal2, meal])
     useEntriesStore.setState({ meals: [meal] })
 
-    const pending = stashLocalMealsForSync()
+    const pending = stashLocalMealsForSync('user-1')
 
-    expect(pending.map((m) => m.id)).toEqual(['local-1', 'local-0'])
-    expect(JSON.parse(setItemCalls().at(-1)![1]).map((m: MealWithItems) => m.id)).toEqual(['local-1', 'local-0'])
+    expect(pending.map((m) => m.id)).toEqual(['local-1', 'local-2'])
+    expect(parked()).toEqual({ userId: 'user-1', meals: pending })
+  })
+
+  it('does not take over meals parked for another account or in the old array format', async () => {
+    const { stashLocalMealsForSync } = await import('./store')
+
+    park('user-a', [meal])
+    expect(stashLocalMealsForSync('user-b')).toEqual([])
+    expect(parked()).toEqual({ userId: 'user-a', meals: [meal] })
+
+    disk[KEY] = JSON.stringify([meal]) // pre-ownership format
+    expect(stashLocalMealsForSync('user-b')).toEqual([])
+    expect(JSON.parse(disk[KEY])).toEqual([meal])
+  })
+
+  it('does not upload parked meals that belong to another account', async () => {
+    park('user-a', [meal])
+
+    expect(await sync([meal], 'user-b')).toEqual({ synced: 0, failed: 0, unknown: 0 })
+    expect(mockSupabase.rpc).not.toHaveBeenCalled()
+    expect(parked()).toEqual({ userId: 'user-a', meals: [meal] })
   })
 
   it('restoreUnsyncedMeals moves parked meals into the anonymous store and drops the parked copy', async () => {
     const { restoreUnsyncedMeals } = await import('./store')
-    vi.mocked(localStorage.getItem).mockReturnValue(JSON.stringify([meal]))
+    park('user-a', [meal])
 
     useEntriesStore.setState({ isAuthed: true })
-    restoreUnsyncedMeals()
+    await restoreUnsyncedMeals()
     expect(useEntriesStore.getState().meals).toEqual([]) // still authed: left alone
 
     useEntriesStore.setState({ isAuthed: false })
-    restoreUnsyncedMeals()
+    await restoreUnsyncedMeals()
     expect(useEntriesStore.getState().meals).toEqual([meal])
-    expect(localStorage.removeItem).toHaveBeenCalledWith('food_journal_unsynced_meals')
+    expect(parked()).toBeNull()
+  })
+
+  it('restoreUnsyncedMeals waits for a running upload, then restores what it left parked', async () => {
+    const { restoreUnsyncedMeals } = await import('./store')
+    park('user-1', [meal, meal2])
+    let release!: (v: unknown) => void
+    mockSupabase.rpc.mockReturnValue(new Promise((r) => { release = r }))
+
+    const upload = sync([meal, meal2])
+    useEntriesStore.setState({ isAuthed: false }) // signed out during the upload
+    const restored = restoreUnsyncedMeals()
+    await Promise.resolve()
+    expect(useEntriesStore.getState().meals).toEqual([])
+
+    release(ok(meal)) // meal2 not confirmed
+    await upload
+    await restored
+    expect(useEntriesStore.getState().meals).toEqual([meal2])
+    expect(parked()).toBeNull()
   })
 })
