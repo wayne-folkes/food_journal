@@ -13,16 +13,20 @@ this repo. Read this before making non-trivial changes.
   domain types. `shared/usda-lookup.ts` holds the lookup request/response
   contract. Anything domain-shaped that both the client and the API consume
   belongs in `shared/`.
-- **Future:** A native iOS app is planned (see `IOS_PLAN.md`). It will
-  reuse the same Supabase project, the same Vercel endpoints, and the same
-  `shared/` contracts.
+- **iOS:** A native SwiftUI app lives in `ios/` (see `ios/README.md` and
+  `IOS_PLAN.md`). It reuses the same Supabase project, the same Vercel
+  endpoints, and the same `shared/` contracts.
+- **iOS calorie estimates:** `ios/FoodJournal/Data/CaloriesService.swift`
+  estimates calories on-device rather than calling `/api/usda-lookup`. Both
+  paths must mean the same thing by an item's calories (one typical
+  serving), so keep it in step with `api/usda-lookup.ts` / `api/ai-estimate.ts`.
 
 ## Core rules
 
 ### 1. Design every new feature to be iOS-compatible
 
-The iOS app is not shipped yet, but **new backend and contract decisions
-should assume it will exist**. Specifically:
+The iOS app now exists in `ios/`, but **new backend and contract decisions
+should assume it will keep evolving alongside the web client**. Specifically:
 
 - **Keep endpoint auth JWT-only.** Do not introduce cookie-based auth,
   same-origin assumptions, or Origin-header allowlists on `/api/*` routes.

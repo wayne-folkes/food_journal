@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => {
   const mockLoadItemHistory = vi.fn()
   const mockSetState = vi.fn()
   const mockClearStorage = vi.fn()
+  const mockStash = vi.fn()
+  const mockRestore = vi.fn()
+  const mockReset = vi.fn()
 
   const mockStoreState = {
     meals: [
@@ -86,6 +89,9 @@ const mocks = vi.hoisted(() => {
     mockLoadItemHistory,
     mockSetState,
     mockClearStorage,
+    mockStash,
+    mockRestore,
+    mockReset,
     mockUseEntriesStore,
   }
 })
@@ -94,6 +100,9 @@ vi.mock('./lib/store', () => ({
   useEntriesStore: mocks.mockUseEntriesStore,
   todayString: () => '2026-04-17',
   getWeekBounds: () => ({ start: '2026-04-14', end: '2026-04-20' }),
+  stashLocalMealsForSync: mocks.mockStash,
+  restoreUnsyncedMeals: mocks.mockRestore,
+  resetEntriesState: mocks.mockReset,
 }))
 
 vi.mock('./lib/supabase', () => ({
@@ -152,25 +161,100 @@ describe('App auth privacy', () => {
     mocks.mockLoadItemHistory.mockReset()
     mocks.mockSetState.mockReset()
     mocks.mockClearStorage.mockReset()
+    mocks.mockStash.mockReset().mockImplementation(() => mocks.mockStoreState.meals.filter((m) => m.user_id === null))
+    mocks.mockRestore.mockReset()
+    mocks.mockReset.mockReset()
+    mocks.mockSyncLocalToRemote.mockResolvedValue({ synced: 1, failed: 0, unknown: 0 })
   })
 
-  it('clears local anonymous meals on sign-in instead of syncing them into the account', async () => {
-    render(<App />)
+  const signIn = (event: string, id = 'user-1') =>
+    act(async () => {
+      await mocks.authStateChangeHandler?.(event, { user: { id, app_metadata: {} } })
+    })
 
+  it('uploads local anonymous meals on sign-in, resets local state and reports success', async () => {
+    render(<App />)
     expect(mocks.authStateChangeHandler).not.toBeNull()
 
+    await signIn('SIGNED_IN')
+
+    await waitFor(() => expect(mocks.mockSyncLocalToRemote).toHaveBeenCalledTimes(1))
+    expect(mocks.mockStash).toHaveBeenCalledWith('user-1')
+    expect(mocks.mockSyncLocalToRemote).toHaveBeenCalledWith(mocks.mockStoreState.meals, 'user-1', expect.any(Function))
+    // state reset goes through the store so in-flight requests are invalidated too
+    expect(mocks.mockReset).toHaveBeenCalledTimes(1)
+    expect(mocks.mockSetAuthed).toHaveBeenCalledWith(true)
+    expect(await screen.findByText('Synced 1 meal from this device to your account')).toBeInTheDocument()
+    // days are reloaded after the upload so the uploaded meals show up
+    await waitFor(() => expect(mocks.mockLoadDay.mock.calls.length).toBeGreaterThanOrEqual(2))
+  })
+
+  it('does not call the upload synchronously inside the auth callback', async () => {
+    render(<App />)
+    let calledInsideCallback = true
     await act(async () => {
       await mocks.authStateChangeHandler?.('SIGNED_IN', { user: { id: 'user-1', app_metadata: {} } })
+      calledInsideCallback = mocks.mockSyncLocalToRemote.mock.calls.length > 0
     })
+    expect(calledInsideCallback).toBe(false)
+    await waitFor(() => expect(mocks.mockSyncLocalToRemote).toHaveBeenCalledTimes(1))
+  })
 
+  it('keeps meals for retry and shows an error toast when the upload fails', async () => {
+    mocks.mockSyncLocalToRemote.mockResolvedValue({ synced: 0, failed: 1, unknown: 0 })
+    render(<App />)
+
+    await signIn('SIGNED_IN')
+
+    expect(await screen.findByText(/kept on this device and will retry the next time the app loads while you are signed in/)).toBeInTheDocument()
+    expect(screen.queryByText(/Synced/)).not.toBeInTheDocument()
+  })
+
+  it('tells the user when an upload may or may not have been saved', async () => {
+    mocks.mockSyncLocalToRemote.mockResolvedValue({ synced: 0, failed: 0, unknown: 2 })
+    render(<App />)
+
+    await signIn('SIGNED_IN')
+
+    expect(await screen.findByText(/2 meals may or may not have been saved/)).toBeInTheDocument()
+  })
+
+  it('uploads nothing when switching from one account to another', async () => {
+    render(<App />)
+    await signIn('SIGNED_IN', 'user-1')
+    await waitFor(() => expect(mocks.mockSyncLocalToRemote).toHaveBeenCalledTimes(1))
+    mocks.mockSyncLocalToRemote.mockClear()
+    mocks.mockStash.mockClear()
+    mocks.mockReset.mockClear()
+
+    await signIn('SIGNED_IN', 'user-2')
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
+
+    expect(mocks.mockStash).not.toHaveBeenCalled()
     expect(mocks.mockSyncLocalToRemote).not.toHaveBeenCalled()
-    expect(mocks.mockSetState).toHaveBeenCalledWith({ meals: [], dayCache: {}, weekMeals: [], itemHistory: [] })
-    expect(mocks.mockClearStorage).toHaveBeenCalledTimes(1)
-    expect(mocks.mockSetAuthed).toHaveBeenCalledWith(true)
+    expect(mocks.mockReset).toHaveBeenCalledTimes(1)
+  })
 
-    await waitFor(() => {
-      expect(screen.getByText('Local device-only meals were cleared on sign-in to protect privacy.')).toBeInTheDocument()
-    })
+  it('uploads once when sign-in events repeat', async () => {
+    render(<App />)
+    await signIn('INITIAL_SESSION')
+    await signIn('SIGNED_IN')
+    await signIn('TOKEN_REFRESHED')
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
+
+    expect(mocks.mockSyncLocalToRemote).toHaveBeenCalledTimes(1)
+  })
+
+  it('restores parked meals to the anonymous view on sign-out', async () => {
+    render(<App />)
+    await signIn('SIGNED_IN')
+    await waitFor(() => expect(mocks.mockSyncLocalToRemote).toHaveBeenCalled())
+    mocks.mockSyncLocalToRemote.mockClear()
+
+    await act(async () => { await mocks.authStateChangeHandler?.('SIGNED_OUT', null) })
+
+    expect(mocks.mockRestore).toHaveBeenCalled()
+    expect(mocks.mockSyncLocalToRemote).not.toHaveBeenCalled()
   })
 })
 
@@ -243,5 +327,66 @@ describe('App nutrition estimate', () => {
     await estimate()
 
     expect(await screen.findByText('Failed to estimate nutrition')).toBeInTheDocument()
+  })
+})
+
+describe('App undo delete', () => {
+  const original = {
+    id: 'm-del', user_id: 'u', meal_type: 'snack' as const, consumed_at: '2026-04-17T09:00:00.000Z',
+    raw_input: 'apple, toast', created_at: '', updated_at: '',
+    items: [
+      { id: 'a', meal_id: 'm-del', description: 'apple', position: 0, consumed_at: '', created_at: '', calories: 95, protein_g: 0.5, fiber_g: 4.4 },
+      { id: 'b', meal_id: 'm-del', description: 'toast', position: 1, consumed_at: '', created_at: '', calories: null, protein_g: null, fiber_g: null },
+      { id: 'c', meal_id: 'm-del', description: 'jam', position: 2, consumed_at: '', created_at: '', calories: 50, protein_g: null, fiber_g: null },
+    ],
+  }
+
+  async function deleteThenUndo() {
+    render(<App />)
+    await act(async () => {
+      await (mocks.mealLogProps.current as unknown as { onDelete: (id: string) => Promise<boolean> }).onDelete('m-del')
+    })
+    await act(async () => {
+      screen.getByRole('button', { name: 'Undo' }).click()
+    })
+  }
+
+  it('re-creates the meal with its nutrient values in the single addMeal call', async () => {
+    const saved = mocks.mockStoreState.meals
+    mocks.mockStoreState.meals = [original] as unknown as typeof saved
+    mocks.mockDeleteMeal.mockReset().mockResolvedValue(undefined)
+    mocks.mockUpdateItemNutrients.mockReset()
+    mocks.mockAddMeal.mockReset().mockResolvedValue({ ...original, id: 'm-new' })
+
+    try {
+      await deleteThenUndo()
+      await waitFor(() => expect(mocks.mockAddMeal).toHaveBeenCalledTimes(1))
+      expect(mocks.mockAddMeal).toHaveBeenCalledWith(
+        { meal_type: 'snack', consumed_at: original.consumed_at, raw_input: 'apple, toast', items: ['apple', 'toast', 'jam'] },
+        [
+          { calories: 95, protein_g: 0.5, fiber_g: 4.4 },
+          { calories: null, protein_g: null, fiber_g: null },
+          { calories: 50, protein_g: null, fiber_g: null },
+        ]
+      )
+      expect(mocks.mockUpdateItemNutrients).not.toHaveBeenCalled()
+      expect(screen.queryByText('Failed to undo delete. Please try again.')).not.toBeInTheDocument()
+    } finally {
+      mocks.mockStoreState.meals = saved
+    }
+  })
+
+  it('shows the error only when the meal could not be restored', async () => {
+    const saved = mocks.mockStoreState.meals
+    mocks.mockStoreState.meals = [original] as unknown as typeof saved
+    mocks.mockDeleteMeal.mockReset().mockResolvedValue(undefined)
+    mocks.mockAddMeal.mockReset().mockRejectedValue(new Error('rpc down'))
+
+    try {
+      await deleteThenUndo()
+      expect(await screen.findByText('Failed to undo delete. Please try again.')).toBeInTheDocument()
+    } finally {
+      mocks.mockStoreState.meals = saved
+    }
   })
 })

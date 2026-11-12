@@ -58,6 +58,19 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+  api-typecheck:
+    name: API Type Check
+    runs-on: ubuntu-latest
+    # Runs at the repo root, which has no package-lock, so no npm cache is configured.
+    # tsconfig.check.json is CI-only so the tsconfig Vercel builds with stays untouched.
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm install --no-package-lock
+      - run: npx --package typescript@~6.0.2 tsc -p api/tsconfig.check.json
+
   schema-drift:
     name: Schema drift check
     runs-on: ubuntu-latest
@@ -73,15 +86,37 @@ jobs:
         run: |
           LOCAL_COUNT=$(ls supabase/migrations/*.sql 2>/dev/null | wc -l | tr -d ' ')
 
-          REMOTE_COUNT=$(curl -sf \
+          # Local names: filename minus the NNNN_ prefix and .sql, sorted (C locale so comm matches).
+          LOCAL_LIST="$RUNNER_TEMP/local-names.txt"
+          REMOTE_JSON="$RUNNER_TEMP/remote-migrations.json"
+          REMOTE_LIST="$RUNNER_TEMP/remote-names.txt"
+          for f in supabase/migrations/*.sql; do
+            basename "$f" .sql
+          done | sed -E 's/^[0-9]+_//' | LC_ALL=C sort > "$LOCAL_LIST"
+
+          curl -sf \
             -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
             "https://api.supabase.com/v1/projects/kbdtcoyrspyjqjsgkwjl/database/migrations" \
-            | python3 -c "import sys, json; print(len(json.load(sys.stdin)))")
+            > "$REMOTE_JSON"
+          REMOTE_COUNT=$(python3 -I -c "import json, sys; print(len(json.load(open(sys.argv[1]))))" "$REMOTE_JSON")
+          python3 -I -c "import json, sys; [print(m['name']) for m in json.load(open(sys.argv[1]))]" "$REMOTE_JSON" \
+            | LC_ALL=C sort > "$REMOTE_LIST"
 
           echo "Local migration files : $LOCAL_COUNT"
           echo "Applied to production : $REMOTE_COUNT"
+          echo ""
+          echo "Local migration names (sorted):"
+          sed 's/^/  /' "$LOCAL_LIST"
+          echo ""
+          echo "Remote migration names (sorted):"
+          sed 's/^/  /' "$REMOTE_LIST"
 
           if [ "$LOCAL_COUNT" -ne "$REMOTE_COUNT" ]; then
+            echo ""
+            echo "Names only in local files:"
+            comm -23 "$LOCAL_LIST" "$REMOTE_LIST" | sed 's/^/  /'
+            echo "Names only in production (remote):"
+            comm -13 "$LOCAL_LIST" "$REMOTE_LIST" | sed 's/^/  /'
             echo ""
             echo "❌ Schema drift — $LOCAL_COUNT local file(s), $REMOTE_COUNT applied to prod."
             echo "Apply the missing migration(s) via the Supabase MCP apply_migration tool."
