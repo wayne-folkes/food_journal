@@ -77,6 +77,7 @@ describe('legacy cache refresh safety', () => {
     fiber_per_100g: source === 'usda' ? 2.6 : null,
     source,
     usda_fdc_id: null,
+    serving_g: null,
     created_at: NOW.toISOString(),
   })
 
@@ -124,7 +125,7 @@ describe('not_found TTL and failed lookups', () => {
     const mk = (key: string, source: 'usda' | 'not_found'): LookupCacheRow => ({
       description_key: key, description: key,
       calories_per_100g: null, protein_per_100g: null, fiber_per_100g: null,
-      source, usda_fdc_id: null, created_at: NOW.toISOString(),
+      source, usda_fdc_id: null, serving_g: null, created_at: NOW.toISOString(),
     })
     const rows = [mk('flaky', 'not_found'), mk('mystery', 'not_found'), mk('apple', 'usda')]
     expect(dropFailedLookups(rows, new Set(['flaky'])).map((r) => r.description_key)).toEqual(['mystery', 'apple'])
