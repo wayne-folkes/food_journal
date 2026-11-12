@@ -64,6 +64,11 @@ function makeStoredMeal({
   }
 }
 
+const setItemCalls = () =>
+  (localStorage.setItem as unknown as { mock: { calls: string[][] } }).mock.calls.filter(
+    (c) => c[0] === 'food_journal_unsynced_meals'
+  )
+
 describe('useEntriesStore.addMeal', () => {
   beforeEach(() => {
     mockSupabase.from.mockReset()
@@ -315,8 +320,7 @@ describe('useEntriesStore.addMeal', () => {
       ],
     }
 
-    useEntriesStore.setState({ meals: [firstLocalMeal, secondLocalMeal], isAuthed: true, isLoading: false })
-    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null })
+    useEntriesStore.setState({ meals: [], isAuthed: true, isLoading: false, dayCache: { '2026-04-15': [], '2026-04-14': [] } })
     mockSupabase.rpc.mockResolvedValue({
       data: [
         { local_id: 'local-1', meal: syncedRemoteMeal },
@@ -325,9 +329,13 @@ describe('useEntriesStore.addMeal', () => {
       error: null,
     })
 
-    await useEntriesStore.getState().syncLocalToRemote()
+    const result = await useEntriesStore.getState().syncLocalToRemote([firstLocalMeal, secondLocalMeal])
 
-    expect(useEntriesStore.getState().meals).toEqual([secondLocalMeal, syncedRemoteMeal])
+    expect(result).toEqual({ synced: 1, failed: 1 })
+    expect(mockSupabase.auth.getUser).not.toHaveBeenCalled()
+    // the failed meal is parked for retry; the synced day is invalidated, others kept
+    expect(JSON.parse(setItemCalls().at(-1)![1])).toEqual([secondLocalMeal])
+    expect(Object.keys(useEntriesStore.getState().dayCache)).toEqual(['2026-04-14'])
     expect(mockSupabase.rpc).toHaveBeenCalledWith('create_meals_with_items_batch', {
       p_meals: [
         {
@@ -408,8 +416,7 @@ describe('useEntriesStore.addMeal', () => {
       }),
     ]
 
-    useEntriesStore.setState({ meals: localMeals, isAuthed: true, isLoading: false })
-    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null })
+    useEntriesStore.setState({ meals: [], isAuthed: true, isLoading: false })
     mockSupabase.rpc.mockResolvedValue({
       data: [
         { local_id: 'local-1', meal: remoteMeals[0] },
@@ -419,9 +426,10 @@ describe('useEntriesStore.addMeal', () => {
       error: null,
     })
 
-    await useEntriesStore.getState().syncLocalToRemote()
+    const result = await useEntriesStore.getState().syncLocalToRemote(localMeals)
 
-    expect(useEntriesStore.getState().meals).toEqual(remoteMeals)
+    expect(result).toEqual({ synced: 3, failed: 0 })
+    expect(localStorage.removeItem).toHaveBeenCalledWith('food_journal_unsynced_meals')
     expect(mockSupabase.rpc).toHaveBeenCalledTimes(1)
     expect(mockSupabase.rpc).toHaveBeenCalledWith('create_meals_with_items_batch', {
       p_meals: [
@@ -714,6 +722,131 @@ describe('useEntriesStore.loadDay', () => {
   })
 })
 
+describe('useEntriesStore day cache consistency', () => {
+  function queryReturning(rows: unknown[], gate?: Promise<void>) {
+    const result = async () => { if (gate) await gate; return { data: rows, error: null } }
+    const chain = {
+      select: vi.fn(() => chain),
+      gte: vi.fn(() => chain),
+      lte: vi.fn(() => chain),
+      order: vi.fn(() => result()),
+    }
+    return chain
+  }
+  const row = (m: MealWithItems) => ({ ...m, meal_items: m.items })
+  const mealAt = (id: string, consumedAt: string) =>
+    makeStoredMeal({ id, description: id, consumedAt, userId: 'u' })
+
+  beforeEach(() => {
+    mockSupabase.from.mockReset()
+    mockSupabase.rpc.mockReset()
+    useEntriesStore.setState({ meals: [], dayCache: {}, isAuthed: true, isLoading: false })
+  })
+
+  it('updateItemNutrients invalidates the cached day so a later visit sees the edit', async () => {
+    const meal = mealAt('m1', '2026-04-15T12:00:00.000Z')
+    useEntriesStore.setState({ meals: [meal], dayCache: { '2026-04-15': [meal], '2026-04-14': [] } })
+    const eq = vi.fn().mockResolvedValue({ error: null })
+    mockSupabase.from.mockReturnValue({ update: vi.fn(() => ({ eq })) })
+
+    await useEntriesStore.getState().updateItemNutrients('m1-item', { calories: 300 })
+
+    const cache = useEntriesStore.getState().dayCache
+    expect(cache['2026-04-15']).toBeUndefined()
+    expect(cache['2026-04-14']).toEqual([])
+    expect(useEntriesStore.getState().meals[0].items[0].calories).toBe(300)
+  })
+
+  it('updateItemNutrients leaves no stale cached value after an error revert', async () => {
+    const meal = mealAt('m1', '2026-04-15T12:00:00.000Z')
+    useEntriesStore.setState({ meals: [meal], dayCache: { '2026-04-15': [meal] } })
+    const eq = vi.fn().mockResolvedValue({ error: new Error('nope') })
+    mockSupabase.from.mockReturnValue({ update: vi.fn(() => ({ eq })) })
+
+    await expect(useEntriesStore.getState().updateItemNutrients('m1-item', { calories: 300 })).rejects.toThrow('nope')
+
+    const state = useEntriesStore.getState()
+    expect(state.meals[0].items[0].calories).toBeNull()
+    const cached = state.dayCache['2026-04-15']
+    expect(cached === undefined || cached[0].items[0].calories === null).toBe(true)
+  })
+
+  it('editMeal invalidates both the old and the new day when consumed_at moves', async () => {
+    const oldMeal = mealAt('m1', '2026-04-14T12:00:00.000Z')
+    const moved = mealAt('m1', '2026-04-16T12:00:00.000Z')
+    useEntriesStore.setState({
+      meals: [oldMeal],
+      dayCache: { '2026-04-14': [oldMeal], '2026-04-16': [], '2026-04-10': [] },
+    })
+    mockSupabase.rpc.mockResolvedValue({ data: moved, error: null })
+
+    await useEntriesStore.getState().editMeal('m1', {
+      meal_type: 'snack',
+      consumed_at: '2026-04-16T12:00:00.000Z',
+      items: [{ id: 'm1-item', description: 'm1', calories: null, protein_g: null, fiber_g: null }],
+    })
+
+    const cache = useEntriesStore.getState().dayCache
+    expect(cache['2026-04-14']).toBeUndefined()
+    expect(cache['2026-04-16']).toBeUndefined()
+    expect(cache['2026-04-10']).toEqual([])
+  })
+
+  it('loadDay shows a cache hit immediately, then revalidates in the background', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const stale = mealAt('stale', '2026-04-15T09:00:00.000Z')
+    const fresh = mealAt('fresh', '2026-04-15T09:00:00.000Z')
+    mockSupabase.from.mockReturnValueOnce(queryReturning([row(fresh)], gate))
+    useEntriesStore.setState({ dayCache: { '2026-04-15': [stale] } })
+
+    const pending = useEntriesStore.getState().loadDay('2026-04-15')
+    expect(useEntriesStore.getState().meals.map((m) => m.id)).toEqual(['stale'])
+    expect(useEntriesStore.getState().isLoading).toBe(false)
+    expect(mockSupabase.from).toHaveBeenCalledTimes(1)
+
+    release()
+    await pending
+    expect(useEntriesStore.getState().meals.map((m) => m.id)).toEqual(['fresh'])
+    expect(useEntriesStore.getState().dayCache['2026-04-15']?.map((m) => m.id)).toEqual(['fresh'])
+  })
+
+  it('a revalidation started before a local mutation cannot overwrite the newer state', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const meal = mealAt('m1', '2026-04-15T09:00:00.000Z')
+    // server snapshot taken before the calorie edit
+    mockSupabase.from.mockReturnValueOnce(queryReturning([row(meal)], gate))
+    useEntriesStore.setState({ meals: [meal], dayCache: { '2026-04-15': [meal] } })
+
+    const pending = useEntriesStore.getState().loadDay('2026-04-15')
+    const eq = vi.fn().mockResolvedValue({ error: null })
+    mockSupabase.from.mockReturnValueOnce({ update: vi.fn(() => ({ eq })) })
+    await useEntriesStore.getState().updateItemNutrients('m1-item', { calories: 300 })
+
+    release()
+    await pending
+    expect(useEntriesStore.getState().meals[0].items[0].calories).toBe(300)
+    expect(useEntriesStore.getState().dayCache['2026-04-15']).toBeUndefined()
+  })
+
+  it('a revalidation does not write after sign-out', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const stale = mealAt('stale', '2026-04-15T09:00:00.000Z')
+    mockSupabase.from.mockReturnValueOnce(queryReturning([row(mealAt('fresh', '2026-04-15T09:00:00.000Z'))], gate))
+    useEntriesStore.setState({ dayCache: { '2026-04-15': [stale] } })
+
+    const pending = useEntriesStore.getState().loadDay('2026-04-15')
+    useEntriesStore.setState({ isAuthed: false, meals: [], dayCache: {} })
+    release()
+    await pending
+
+    expect(useEntriesStore.getState().meals).toEqual([])
+    expect(useEntriesStore.getState().dayCache).toEqual({})
+  })
+})
+
 describe('useEntriesStore protein/fiber', () => {
   beforeEach(() => {
     mockSupabase.from.mockReset()
@@ -859,5 +992,73 @@ describe('useEntriesStore protein/fiber', () => {
       expect(update).toHaveBeenCalledWith({ calories: 120 })
       expect(useEntriesStore.getState().meals[0].items[0].calories).toBe(120)
     })
+  })
+})
+
+describe('syncLocalToRemote failure handling and parked meals', () => {
+  const meal = makeStoredMeal({ id: 'local-1', description: 'apple', consumedAt: '2026-04-15T12:00:00.000Z', userId: null })
+
+  beforeEach(() => {
+    mockSupabase.rpc.mockReset()
+    vi.mocked(localStorage.setItem).mockClear()
+    vi.mocked(localStorage.removeItem).mockClear()
+    vi.mocked(localStorage.getItem).mockReset().mockReturnValue(null)
+    useEntriesStore.setState({ meals: [], dayCache: {}, isAuthed: true, isLoading: false })
+  })
+
+  it('parks every meal when the whole batch errors', async () => {
+    mockSupabase.rpc.mockResolvedValue({ data: null, error: { message: 'boom' } })
+
+    const result = await useEntriesStore.getState().syncLocalToRemote([meal])
+
+    expect(result).toEqual({ synced: 0, failed: 1 })
+    expect(JSON.parse(setItemCalls().at(-1)![1])).toEqual([meal])
+    expect(useEntriesStore.getState().meals).toEqual([])
+  })
+
+  it('parks every meal when the RPC call throws', async () => {
+    mockSupabase.rpc.mockRejectedValue(new Error('offline'))
+
+    const result = await useEntriesStore.getState().syncLocalToRemote([meal])
+
+    expect(result).toEqual({ synced: 0, failed: 1 })
+    expect(JSON.parse(setItemCalls().at(-1)![1])).toEqual([meal])
+  })
+
+  it('refuses a second upload while one is in flight', async () => {
+    let release: (v: unknown) => void = () => {}
+    mockSupabase.rpc.mockReturnValue(new Promise((r) => { release = r }))
+
+    const first = useEntriesStore.getState().syncLocalToRemote([meal])
+    expect(await useEntriesStore.getState().syncLocalToRemote([meal])).toBeNull()
+    release({ data: null, error: { message: 'x' } })
+    await first
+    expect(mockSupabase.rpc).toHaveBeenCalledTimes(1)
+  })
+
+  it('stashLocalMealsForSync parks store meals merged with earlier failures, without duplicates', async () => {
+    const { stashLocalMealsForSync } = await import('./store')
+    const earlier = makeStoredMeal({ id: 'local-0', description: 'toast', consumedAt: '2026-04-14T08:00:00.000Z', userId: null })
+    vi.mocked(localStorage.getItem).mockReturnValue(JSON.stringify([earlier, meal]))
+    useEntriesStore.setState({ meals: [meal] })
+
+    const pending = stashLocalMealsForSync()
+
+    expect(pending.map((m) => m.id)).toEqual(['local-1', 'local-0'])
+    expect(JSON.parse(setItemCalls().at(-1)![1]).map((m: MealWithItems) => m.id)).toEqual(['local-1', 'local-0'])
+  })
+
+  it('restoreUnsyncedMeals moves parked meals into the anonymous store and drops the parked copy', async () => {
+    const { restoreUnsyncedMeals } = await import('./store')
+    vi.mocked(localStorage.getItem).mockReturnValue(JSON.stringify([meal]))
+
+    useEntriesStore.setState({ isAuthed: true })
+    restoreUnsyncedMeals()
+    expect(useEntriesStore.getState().meals).toEqual([]) // still authed: left alone
+
+    useEntriesStore.setState({ isAuthed: false })
+    restoreUnsyncedMeals()
+    expect(useEntriesStore.getState().meals).toEqual([meal])
+    expect(localStorage.removeItem).toHaveBeenCalledWith('food_journal_unsynced_meals')
   })
 })

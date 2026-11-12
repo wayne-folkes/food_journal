@@ -6,6 +6,12 @@ import { supabase } from './supabase'
 import { log } from './logger'
 
 const LOCAL_KEY = 'food_journal_meals'
+/**
+ * Device-only meals that are waiting to be (re)uploaded after sign-in. Kept
+ * apart from LOCAL_KEY because the persist middleware writes `{}` to LOCAL_KEY
+ * while authed and the auth listener clears it on every user change.
+ */
+const UNSYNCED_KEY = 'food_journal_unsynced_meals'
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'drink']
 
 interface SyncedLocalMeal {
@@ -70,7 +76,8 @@ interface MealsState {
   deleteMeal: (id: string) => Promise<void>
   removeMealLocally: (id: string) => void
   restoreMeal: (meal: MealWithItems) => void
-  syncLocalToRemote: () => Promise<void>
+  /** Uploads the given device-only meals; resolves null if another upload is already running. */
+  syncLocalToRemote: (localMeals: MealWithItems[]) => Promise<SyncResult | null>
   setAuthed: (authed: boolean) => void
   updateItemCalories: (itemId: string, calories: number | null) => Promise<void>
   updateItemNutrients: (itemId: string, patch: ItemNutrientsUpdate) => Promise<void>
@@ -80,8 +87,22 @@ interface MealsState {
   loadItemHistory: () => Promise<void>
 }
 
+export interface SyncResult {
+  synced: number
+  /** Meals that stay on this device (kept under UNSYNCED_KEY) for a later retry. */
+  failed: number
+}
+
+/** True while a syncLocalToRemote upload is in flight (blocks double uploads). */
+let syncing = false
+
 /** Monotonic id of the latest loadDay call — superseded responses are dropped. */
 let loadDaySeq = 0
+/**
+ * Bumped by every local mutation. A background revalidation that began before
+ * a mutation holds an older server snapshot and must drop its result.
+ */
+let mutationEpoch = 0
 
 /** Returns today's date string in YYYY-MM-DD (local time). */
 export function todayString(): string {
@@ -373,6 +394,31 @@ function localMeal(
   }
 }
 
+/** Meals parked for retry. Never throws: storage can be unavailable. */
+function readUnsyncedMeals(): MealWithItems[] {
+  try {
+    const raw = localStorage.getItem(UNSYNCED_KEY)
+    const parsed: unknown = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed.filter(isMealWithItems).map(normalizeMealWithItems) : []
+  } catch {
+    return []
+  }
+}
+
+function writeUnsyncedMeals(meals: MealWithItems[]): void {
+  try {
+    if (meals.length === 0) localStorage.removeItem(UNSYNCED_KEY)
+    else localStorage.setItem(UNSYNCED_KEY, JSON.stringify(meals))
+  } catch (err) {
+    log.withMetadata({ error: errorMessage(err) }).error('writeUnsyncedMeals failed')
+  }
+}
+
+function mergeById(first: MealWithItems[], second: MealWithItems[]): MealWithItems[] {
+  const seen = new Set(first.map((m) => m.id))
+  return [...first, ...second.filter((m) => !seen.has(m.id))]
+}
+
 export const useEntriesStore = create<MealsState>()(
   persist(
     (set, get) => ({
@@ -393,14 +439,14 @@ export const useEntriesStore = create<MealsState>()(
         // Rapid navigation: only the newest request may write `meals`
         const seq = ++loadDaySeq
 
-        // P3: check day-level cache before hitting Supabase
+        // P3: show the day-level cache immediately, then revalidate below
         const cached = get().dayCache[date]
         if (cached) {
           set({ meals: cached, isLoading: false })
-          return
+        } else {
+          set({ isLoading: true })
         }
-
-        set({ isLoading: true })
+        const epoch = mutationEpoch
         const start = new Date(`${date}T00:00:00`).toISOString()
         const end = new Date(`${date}T23:59:59.999`).toISOString()
 
@@ -418,6 +464,8 @@ export const useEntriesStore = create<MealsState>()(
           if (!get().isAuthed) return
           // A newer loadDay started while this one was in flight
           if (seq !== loadDaySeq) return
+          // Revalidation only: a local mutation since we started means this snapshot is older
+          if (cached && epoch !== mutationEpoch) return
 
           // Supabase returns the relation as `meal_items` (the table name).
           // Map it to `items` to match our MealWithItems shape.
@@ -430,6 +478,10 @@ export const useEntriesStore = create<MealsState>()(
           }))
           // P3: store in cache and update meals atomically
           set({ meals, dayCache: { ...get().dayCache, [date]: meals } })
+        } catch (err) {
+          // A failed background revalidation keeps the cached meals on screen
+          if (!cached) throw err
+          log.withMetadata({ error: errorMessage(err) }).error('loadDay revalidation failed')
         } finally {
           if (seq === loadDaySeq) set({ isLoading: false })
         }
@@ -471,6 +523,7 @@ export const useEntriesStore = create<MealsState>()(
         const addedDate = new Date(consumedAt).toLocaleDateString('sv')
         const addMealCacheRest = { ...get().dayCache }
         delete addMealCacheRest[addedDate]
+        mutationEpoch++
         set((s) => ({ meals: [...s.meals, mealWithItems], dayCache: addMealCacheRest }))
         return mealWithItems
       },
@@ -535,6 +588,11 @@ export const useEntriesStore = create<MealsState>()(
         const editedDate = new Date(updates.consumed_at).toLocaleDateString('sv')
         const editMealCacheRest = { ...get().dayCache }
         delete editMealCacheRest[editedDate]
+        // The meal may have moved from another day: drop any cached day that still holds it
+        for (const [day, dayMeals] of Object.entries(editMealCacheRest)) {
+          if (dayMeals.some((m) => m.id === id)) delete editMealCacheRest[day]
+        }
+        mutationEpoch++
         set((s) => ({
           meals: s.meals.map((meal) => (meal.id === id ? updatedMeal : meal)),
           dayCache: editMealCacheRest,
@@ -556,6 +614,7 @@ export const useEntriesStore = create<MealsState>()(
         const { error } = await supabase.from('meals').delete().eq('id', id)
         if (error) { log.withMetadata({ error: errorMessage(error) }).error('deleteMeal failed'); throw error }
 
+        mutationEpoch++
         // P3: invalidate cache for the deleted meal's date
         if (deletedDate) {
           const deleteMealCacheRest = { ...get().dayCache }
@@ -583,12 +642,19 @@ export const useEntriesStore = create<MealsState>()(
       updateItemNutrients: async (itemId, patch) => {
         // Optimistic update
         const prevMeals = get().meals
+        mutationEpoch++
+        // Drop any cached day holding this item so a later visit refetches the edit
+        const nutrientsCache = { ...get().dayCache }
+        for (const [day, dayMeals] of Object.entries(nutrientsCache)) {
+          if (dayMeals.some((m) => m.items.some((i) => i.id === itemId))) delete nutrientsCache[day]
+        }
         set((s) => ({
           meals: s.meals.map((m) =>
             m.items.some((i) => i.id === itemId)
               ? { ...m, items: m.items.map((i) => i.id === itemId ? { ...i, ...patch } : i) }
               : m
           ),
+          dayCache: nutrientsCache,
         }))
 
         const { isAuthed } = get()
@@ -599,8 +665,10 @@ export const useEntriesStore = create<MealsState>()(
           .update(patch)
           .eq('id', itemId)
 
+        // Revalidations that began while the write was in flight may hold a pre-write snapshot
+        mutationEpoch++
         if (error) {
-          // Revert on error
+          // Revert on error (cache entry was already dropped, so nothing stale remains)
           set({ meals: prevMeals })
           log.withMetadata({ itemId, error: errorMessage(error) }).error('updateItemNutrients failed')
           throw error
@@ -714,14 +782,13 @@ export const useEntriesStore = create<MealsState>()(
         set({ itemHistory: (data ?? []).map((r: { description: string }) => r.description) })
       },
 
-      syncLocalToRemote: async () => {
-        const { meals } = get()
-        const localMeals = meals.filter((m) => m.user_id === null)
-        if (localMeals.length === 0) return
+      syncLocalToRemote: async (localMeals) => {
+        if (localMeals.length === 0) return { synced: 0, failed: 0 }
+        if (syncing) return null
+        syncing = true
 
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-
+        let syncedMeals: MealWithItems[] = []
+        let failedMeals = localMeals
         try {
           const { data, error } = await supabase.rpc('create_meals_with_items_batch', {
             p_meals: serializeBatchSyncMeals(localMeals),
@@ -729,31 +796,32 @@ export const useEntriesStore = create<MealsState>()(
 
           if (error || !data) {
             log.withMetadata({ error: errorMessage(error) }).error('syncLocalToRemote batch failed')
-            return
+          } else {
+            const { synced, failed } = fromBatchSyncRpc(data, 'create_meals_with_items_batch')
+            for (const failure of failed) {
+              log.withMetadata({ error: failure.error }).error('syncLocalToRemote meal failed')
+            }
+            const syncedLocalIds = new Set(synced.map((result) => result.localId))
+            syncedMeals = synced.map((result) => result.meal)
+            // Anything the RPC did not confirm stays on the device
+            failedMeals = localMeals.filter((m) => !syncedLocalIds.has(m.id))
           }
-
-          const { synced: successfulSyncs, failed } = fromBatchSyncRpc(
-            data,
-            'create_meals_with_items_batch'
-          )
-
-          for (const failure of failed) {
-            log.withMetadata({ error: failure.error }).error('syncLocalToRemote meal failed')
-          }
-
-          if (successfulSyncs.length === 0) return
-
-          const synced = successfulSyncs.map((result) => result.meal)
-          const syncedLocalIds = new Set(successfulSyncs.map((result) => result.localId))
-
-          if (syncedLocalIds.size === 0) return
-
-          set((s) => ({
-            meals: [...s.meals.filter((m) => !syncedLocalIds.has(m.id)), ...synced],
-          }))
         } catch (err) {
           log.withMetadata({ error: errorMessage(err) }).error('syncLocalToRemote batch failed')
+        } finally {
+          syncing = false
         }
+
+        writeUnsyncedMeals(failedMeals)
+
+        if (syncedMeals.length > 0) {
+          // The uploaded meals are only visible after a fresh load of their days
+          const cache = { ...get().dayCache }
+          for (const meal of syncedMeals) delete cache[new Date(meal.consumed_at).toLocaleDateString('sv')]
+          mutationEpoch++
+          set({ dayCache: cache })
+        }
+        return { synced: syncedMeals.length, failed: failedMeals.length }
       },
     }),
     {
@@ -763,3 +831,28 @@ export const useEntriesStore = create<MealsState>()(
   )
 )
 
+
+/**
+ * Called on the anonymous -> signed-in transition, before local state is
+ * reset: parks every device-only meal (store + earlier failures) under
+ * UNSYNCED_KEY so nothing is lost if the tab closes mid-upload, and returns them.
+ */
+export function stashLocalMealsForSync(): MealWithItems[] {
+  const inStore = useEntriesStore.getState().meals.filter((m) => m.user_id === null)
+  const pending = mergeById(inStore, readUnsyncedMeals())
+  if (pending.length > 0) writeUnsyncedMeals(pending)
+  return pending
+}
+
+/**
+ * While anonymous, moves parked meals back into the store (and so back under
+ * LOCAL_KEY via persist), then drops the parked copy so there is one owner.
+ * Call after `setAuthed(false)`, otherwise persist would write `{}`.
+ */
+export function restoreUnsyncedMeals(): void {
+  if (syncing || useEntriesStore.getState().isAuthed) return
+  const parked = readUnsyncedMeals()
+  if (parked.length === 0) return
+  useEntriesStore.setState((s) => ({ meals: mergeById(s.meals, parked) }))
+  writeUnsyncedMeals([])
+}

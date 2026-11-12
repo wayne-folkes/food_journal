@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { errorMessage } from '@shared/logger'
 import { supabase } from './lib/supabase'
-import { useEntriesStore, todayString, getWeekBounds } from './lib/store'
+import { useEntriesStore, todayString, getWeekBounds, stashLocalMealsForSync, restoreUnsyncedMeals } from './lib/store'
 import { Sky, type Bloom } from './components/Sky'
 import { TopBar } from './components/TopBar'
 import { Compose, type ComposePayload } from './components/Compose'
@@ -65,7 +65,10 @@ function AppInner() {
   const [blooms, setBlooms] = useState<Bloom[]>([])
   // Bumped each time the week view is shown so its tubes re-fill
   const [weekKey, setWeekKey] = useState(0)
+  // Bumped after device-only meals are uploaded so day/week/history reload
+  const [syncVersion, setSyncVersion] = useState(0)
   const activeUserIdRef = useRef<string | null>(null)
+  const syncTokenRef = useRef(0)
   const rootRef = useRef<HTMLDivElement>(null)
   const toast = useToast()
   const now = useNow()
@@ -82,7 +85,9 @@ function AppInner() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const nextUserId = session?.user?.id ?? null
       const previousUserId = activeUserIdRef.current
-      const hadAnonymousMeals = useEntriesStore.getState().meals.some((meal) => meal.user_id === null)
+      // Anonymous -> signed in: capture (and park) device-only meals before the reset below.
+      // Only a repeat of the same sign-in is ignored, so one sign-in uploads once.
+      const pendingUpload = previousUserId === null && nextUserId !== null ? stashLocalMealsForSync() : []
 
       setUser(session?.user ?? null)
 
@@ -91,16 +96,36 @@ function AppInner() {
         setSearchOpen(false)
         setEditingMeal(null)
         setSelectedMeal(null)
-
-        if (nextUserId !== null && hadAnonymousMeals) {
-          toast.error('Local device-only meals were cleared on sign-in to protect privacy.')
-        }
       }
 
       activeUserIdRef.current = nextUserId
       setAuthed(nextUserId !== null)
       setAuthResolved(true)
+
+      // Meals kept after a failed upload come back to the anonymous device view
+      if (nextUserId === null) restoreUnsyncedMeals()
+
+      if (pendingUpload.length > 0) {
+        // Not awaited here: Supabase calls inside onAuthStateChange can deadlock on the auth lock
+        const token = ++syncTokenRef.current
+        setTimeout(() => {
+          if (token !== syncTokenRef.current || activeUserIdRef.current !== nextUserId) return
+          void uploadLocalMeals(pendingUpload)
+        }, 0)
+      }
     })
+
+    async function uploadLocalMeals(meals: MealWithItems[]) {
+      const result = await useEntriesStore.getState().syncLocalToRemote(meals)
+      if (!result) return
+      if (result.synced > 0) {
+        setSyncVersion((v) => v + 1)
+        toast.success(`Synced ${result.synced} meal${result.synced === 1 ? '' : 's'} from this device to your account`)
+      }
+      if (result.failed > 0) {
+        toast.error(`${result.failed} meal${result.failed === 1 ? '' : 's'} could not be synced. ${result.failed === 1 ? 'It is' : 'They are'} kept on this device and will retry on next sign-in.`)
+      }
+    }
     return () => subscription.unsubscribe()
   }, [setAuthed, toast])
 
@@ -111,14 +136,14 @@ function AppInner() {
     if (isAuthed) {
       loadItemHistory()
     }
-  }, [authResolved, isAuthed, loadItemHistory])
+  }, [authResolved, isAuthed, loadItemHistory, syncVersion])
 
   // Reload meals whenever the selected date or auth state changes
   useEffect(() => {
     if (!authResolved) return
 
     loadDay(selectedDate)
-  }, [authResolved, isAuthed, selectedDate, loadDay])
+  }, [authResolved, isAuthed, selectedDate, loadDay, syncVersion])
 
   // Load week data when switching to week view or when date changes in week view
   useEffect(() => {
@@ -127,7 +152,7 @@ function AppInner() {
     if (viewMode === 'week') {
       loadWeek(selectedDate)
     }
-  }, [authResolved, viewMode, selectedDate, loadWeek])
+  }, [authResolved, viewMode, selectedDate, loadWeek, syncVersion])
 
   // ⌘K / Ctrl+K opens the search palette
   useEffect(() => {
@@ -296,6 +321,18 @@ function AppInner() {
           consumed_at: meal.consumed_at,
           raw_input: meal.raw_input ?? '',
           items: meal.items.map((i) => i.description),
+        }).then(async (restored) => {
+          // addMeal only takes descriptions; re-apply nutrients (items come back in order).
+          // headline/note are not restored: addMeal/create_meal_with_items has no args for them.
+          await Promise.all(meal.items.map(async (orig, idx) => {
+            const target = restored.items[idx]
+            const patch: { calories?: number; protein_g?: number; fiber_g?: number } = {}
+            if (orig.calories != null) patch.calories = orig.calories
+            if (orig.protein_g != null) patch.protein_g = orig.protein_g
+            if (orig.fiber_g != null) patch.fiber_g = orig.fiber_g
+            if (!target || Object.keys(patch).length === 0) return
+            await updateItemNutrients(target.id, patch)
+          }))
         }).catch(() => {
           toast.error('Failed to undo delete. Please try again.')
         })
