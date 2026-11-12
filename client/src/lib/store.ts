@@ -12,6 +12,9 @@ const LOCAL_KEY = 'food_journal_meals'
  * while authed and the auth listener clears it on every user change.
  */
 const UNSYNCED_KEY = 'food_journal_unsynced_meals'
+/** Ids of device-only meals already uploaded (or given up on); stops a second tab re-uploading them. */
+const SYNCED_IDS_KEY = 'food_journal_synced_local_ids'
+const MAX_SYNCED_IDS = 300
 /** Web Lock that serialises parking/uploading/restoring across tabs. */
 const SYNC_LOCK = 'food_journal_sync'
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'drink']
@@ -83,7 +86,8 @@ interface MealsState {
    * Uploads the given device-only meals for `userId`, but only those still parked
    * for that user. Uploads run one at a time, across tabs.
    */
-  syncLocalToRemote: (localMeals: MealWithItems[], userId: string) => Promise<SyncResult>
+  /** `isStillUser` is checked under the lock; false leaves the meals parked untouched. */
+  syncLocalToRemote: (localMeals: MealWithItems[], userId: string, isStillUser?: () => boolean) => Promise<SyncResult>
   setAuthed: (authed: boolean) => void
   updateItemCalories: (itemId: string, calories: number | null) => Promise<void>
   updateItemNutrients: (itemId: string, patch: ItemNutrientsUpdate) => Promise<void>
@@ -127,6 +131,8 @@ let loadDaySeq = 0
  * a mutation holds an older server snapshot and must drop its result.
  */
 let mutationEpoch = 0
+/** Bumped only by resetEntriesState (sign-out / account switch). */
+let accountEpoch = 0
 const MAX_LOAD_ATTEMPTS = 3
 
 /** Returns today's date string in YYYY-MM-DD (local time). */
@@ -445,6 +451,27 @@ function writeParked(userId: string | null, meals: MealWithItems[]): void {
   }
 }
 
+/** Ids of local meals already handled by some tab; empty when storage is unavailable or malformed. */
+function readSyncedIds(): string[] {
+  try {
+    const raw = localStorage.getItem(SYNCED_IDS_KEY)
+    const parsed: unknown = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function recordSyncedIds(ids: Set<string>): void {
+  if (ids.size === 0) return
+  try {
+    const merged = [...readSyncedIds().filter((id) => !ids.has(id)), ...ids]
+    localStorage.setItem(SYNCED_IDS_KEY, JSON.stringify(merged.slice(-MAX_SYNCED_IDS)))
+  } catch (err) {
+    log.withMetadata({ error: errorMessage(err) }).error('recordSyncedIds failed')
+  }
+}
+
 function mergeById(first: MealWithItems[], second: MealWithItems[]): MealWithItems[] {
   const seen = new Set(first.map((m) => m.id))
   return [...first, ...second.filter((m) => !seen.has(m.id))]
@@ -756,6 +783,7 @@ export const useEntriesStore = create<MealsState>()(
 
         // Clear stale data immediately so WeekView renders the new week's
         // skeleton structure rather than the previous week's content.
+        const epoch = accountEpoch
         set({ weekLoading: true, weekMeals: [] })
         try {
           const startISO = new Date(`${start}T00:00:00`).toISOString()
@@ -766,6 +794,7 @@ export const useEntriesStore = create<MealsState>()(
             .gte('consumed_at', startISO)
             .lte('consumed_at', endISO)
             .order('consumed_at', { ascending: true })
+          if (epoch !== accountEpoch) return // account changed; resetEntriesState already cleared weekLoading
           if (error) { log.withMetadata({ error: error.message }).error('loadWeek failed'); return }
           type SupabaseMealRow = Omit<MealWithItems, 'items'> & { meal_items: MealWithItems['items'] }
           const weekMeals = (data as SupabaseMealRow[] ?? []).map((m) =>
@@ -773,7 +802,7 @@ export const useEntriesStore = create<MealsState>()(
           )
           set({ weekMeals })
         } finally {
-          set({ weekLoading: false })
+          if (epoch === accountEpoch) set({ weekLoading: false })
         }
       },
 
@@ -815,13 +844,19 @@ export const useEntriesStore = create<MealsState>()(
           return
         }
 
+        const epoch = accountEpoch
         const { data, error } = await supabase
           .rpc('get_recent_item_descriptions', { p_limit: 500 })
+        if (epoch !== accountEpoch) return
         if (error) { log.withMetadata({ error: errorMessage(error) }).error('loadItemHistory failed'); return }
         set({ itemHistory: (data ?? []).map((r: { description: string }) => r.description) })
       },
 
-      syncLocalToRemote: (localMeals, userId) => withSyncLock(async () => {
+      syncLocalToRemote: (localMeals, userId, isStillUser) => withSyncLock(async () => {
+        if (isStillUser && !isStillUser()) return { synced: 0, failed: 0, unknown: 0 } // account switched while queued; meals stay parked
+        // Another tab may have handled some of these already
+        const handledElsewhere = new Set(readSyncedIds())
+        localMeals = localMeals.filter((m) => !handledElsewhere.has(m.id))
         // Another tab may have uploaded (and unparked) these meals while we waited for the lock
         const parked = readParked()
         const parkedIds = new Set(parked?.meals.map((m) => m.id))
@@ -864,6 +899,8 @@ export const useEntriesStore = create<MealsState>()(
         const handledIds = new Set([...uploadedIds, ...unknown.map((m) => m.id)])
         const failedMeals = toUpload.filter((m) => !handledIds.has(m.id))
 
+        recordSyncedIds(handledIds)
+
         // Re-read: meals may have been parked while we uploaded. Drop only the handled ones.
         const current = readParked()
         if (!current || current.userId === userId || current.meals.length === 0) {
@@ -895,7 +932,8 @@ export const useEntriesStore = create<MealsState>()(
  * mid-upload, and returns them. Meals parked for another account are left alone.
  */
 export function stashLocalMealsForSync(userId: string): MealWithItems[] {
-  const inStore = useEntriesStore.getState().meals.filter((m) => m.user_id === null)
+  const done = new Set(readSyncedIds())
+  const inStore = useEntriesStore.getState().meals.filter((m) => m.user_id === null && !done.has(m.id))
   const parked = readParked()
   const own = parked?.userId === userId ? parked.meals : []
   const pending = mergeById(inStore, own)
@@ -927,6 +965,7 @@ export function restoreUnsyncedMeals(): Promise<void> {
 export function resetEntriesState(): void {
   loadDaySeq++
   mutationEpoch++
+  accountEpoch++
   useEntriesStore.setState({ meals: [], dayCache: {}, weekMeals: [], itemHistory: [], isLoading: false, weekLoading: false })
   void useEntriesStore.persist.clearStorage()
 }

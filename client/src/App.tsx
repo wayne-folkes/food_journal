@@ -114,13 +114,13 @@ function AppInner() {
     })
 
     async function uploadLocalMeals(meals: MealWithItems[], userId: string) {
-      const result = await useEntriesStore.getState().syncLocalToRemote(meals, userId)
+      const result = await useEntriesStore.getState().syncLocalToRemote(meals, userId, () => activeUserIdRef.current === userId)
       if (result.synced > 0) {
         setSyncVersion((v) => v + 1)
         toast.success(`Synced ${result.synced} meal${result.synced === 1 ? '' : 's'} from this device to your account`)
       }
       if (result.failed > 0) {
-        toast.error(`${result.failed} meal${result.failed === 1 ? '' : 's'} could not be synced. ${result.failed === 1 ? 'It is' : 'They are'} kept on this device and will retry on next sign-in.`)
+        toast.error(`${result.failed} meal${result.failed === 1 ? '' : 's'} could not be synced. ${result.failed === 1 ? 'It is' : 'They are'} kept on this device and will retry the next time the app loads while you are signed in.`)
       }
       if (result.unknown > 0) {
         toast.error(`${result.unknown} meal${result.unknown === 1 ? '' : 's'} may or may not have been saved to your account. Check your log before adding ${result.unknown === 1 ? 'it' : 'them'} again.`)

@@ -1282,3 +1282,120 @@ describe('syncLocalToRemote failure handling and parked meals', () => {
     expect(parked()).toBeNull()
   })
 })
+
+describe('synced-ids ledger, user check and reset invalidation', () => {
+  const mk = (id: string) => makeStoredMeal({ id, description: id, consumedAt: '2026-04-15T12:00:00.000Z', userId: null })
+  const m1 = mk('local-1')
+  const m2 = mk('local-2')
+  const remote = (m: MealWithItems) => ({ ...m, id: `remote-${m.id}`, user_id: 'user-1' })
+  const ok = (...ms: MealWithItems[]) => ({ data: ms.map((m) => ({ local_id: m.id, meal: remote(m) })), error: null })
+  const PARKED = 'food_journal_unsynced_meals'
+  const SYNCED = 'food_journal_synced_local_ids'
+  let disk: Record<string, string>
+  const rpcIds = (call: number) => mockSupabase.rpc.mock.calls[call][1].p_meals.map((m: { local_id: string }) => m.local_id)
+
+  beforeEach(() => {
+    disk = {}
+    mockSupabase.rpc.mockReset()
+    mockSupabase.from.mockReset()
+    vi.mocked(localStorage.getItem).mockReset().mockImplementation((k: string) => disk[k] ?? null)
+    vi.mocked(localStorage.setItem).mockReset().mockImplementation((k: string, v: string) => { disk[k] = v })
+    vi.mocked(localStorage.removeItem).mockReset().mockImplementation((k: string) => { delete disk[k] })
+    useEntriesStore.setState({ meals: [], dayCache: {}, weekMeals: [], itemHistory: [], isAuthed: true, isLoading: false, weekLoading: false })
+  })
+
+  it('a late tab does not re-upload meals another tab already uploaded', async () => {
+    const { stashLocalMealsForSync } = await import('./store')
+    // Tab A: stash, upload, unpark
+    useEntriesStore.setState({ meals: [m1, m2] })
+    mockSupabase.rpc.mockResolvedValue(ok(m1, m2))
+    const pendingA = stashLocalMealsForSync('user-1')
+    await useEntriesStore.getState().syncLocalToRemote(pendingA, 'user-1')
+    expect(mockSupabase.rpc).toHaveBeenCalledTimes(1)
+    expect(disk[PARKED]).toBeUndefined()
+
+    // Tab B still holds the same meals in memory
+    const pendingB = stashLocalMealsForSync('user-1')
+    expect(pendingB).toEqual([])
+    const result = await useEntriesStore.getState().syncLocalToRemote([m1, m2], 'user-1')
+    expect(result).toEqual({ synced: 0, failed: 0, unknown: 0 })
+    expect(mockSupabase.rpc).toHaveBeenCalledTimes(1)
+  })
+
+  it('a late tab uploads only the meals the other tab did not handle', async () => {
+    const { stashLocalMealsForSync } = await import('./store')
+    const extra = mk('local-extra')
+    useEntriesStore.setState({ meals: [m1] })
+    mockSupabase.rpc.mockResolvedValue(ok(m1))
+    await useEntriesStore.getState().syncLocalToRemote(stashLocalMealsForSync('user-1'), 'user-1')
+
+    useEntriesStore.setState({ meals: [m1, extra] })
+    mockSupabase.rpc.mockResolvedValue(ok(extra))
+    const pendingB = stashLocalMealsForSync('user-1')
+    expect(pendingB.map((m) => m.id)).toEqual(['local-extra'])
+    const result = await useEntriesStore.getState().syncLocalToRemote([m1, extra], 'user-1')
+    expect(result.synced).toBe(1)
+    expect(rpcIds(1)).toEqual(['local-extra'])
+  })
+
+  it('records given-up (unknown) meals too, caps the list, and tolerates a malformed value', async () => {
+    park()
+    function park() { disk[PARKED] = JSON.stringify({ userId: 'user-1', meals: [m1] }) }
+    mockSupabase.rpc.mockResolvedValue({ data: [{ nonsense: true }], error: null })
+    disk[SYNCED] = '{not json'
+    await useEntriesStore.getState().syncLocalToRemote([m1], 'user-1')
+    expect(JSON.parse(disk[SYNCED])).toEqual(['local-1'])
+
+    disk[SYNCED] = JSON.stringify(Array.from({ length: 400 }, (_, i) => `old-${i}`))
+    disk[PARKED] = JSON.stringify({ userId: 'user-1', meals: [m2] })
+    mockSupabase.rpc.mockResolvedValue(ok(m2))
+    await useEntriesStore.getState().syncLocalToRemote([m2], 'user-1')
+    const ids = JSON.parse(disk[SYNCED]) as string[]
+    expect(ids.length).toBeLessThanOrEqual(300)
+    expect(ids[ids.length - 1]).toBe('local-2')
+  })
+
+  it('leaves meals parked and does not call the RPC when the user changed while waiting for the lock', async () => {
+    disk[PARKED] = JSON.stringify({ userId: 'user-1', meals: [m1] })
+    mockSupabase.rpc.mockResolvedValue(ok(m1))
+    const result = await useEntriesStore.getState().syncLocalToRemote([m1], 'user-1', () => false)
+    expect(result).toEqual({ synced: 0, failed: 0, unknown: 0 })
+    expect(mockSupabase.rpc).not.toHaveBeenCalled()
+    expect(JSON.parse(disk[PARKED])).toEqual({ userId: 'user-1', meals: [m1] })
+    expect(disk[SYNCED]).toBeUndefined()
+  })
+
+  it('loadWeek drops a response that finished after a reset and does not leave weekLoading stuck', async () => {
+    const { resetEntriesState } = await import('./store')
+    let release!: (v: unknown) => void
+    const pending = new Promise((r) => { release = r })
+    const chain: Record<string, unknown> = {}
+    for (const k of ['select', 'gte', 'lte']) chain[k] = () => chain
+    chain.order = () => pending
+    mockSupabase.from.mockReturnValue(chain)
+
+    const p = useEntriesStore.getState().loadWeek('2026-04-15')
+    expect(useEntriesStore.getState().weekLoading).toBe(true)
+    resetEntriesState()
+    useEntriesStore.setState({ isAuthed: true })
+    release({ data: [{ ...m1, user_id: 'user-a', meal_items: m1.items }], error: null })
+    await p
+
+    expect(useEntriesStore.getState().weekMeals).toEqual([])
+    expect(useEntriesStore.getState().weekLoading).toBe(false)
+  })
+
+  it('loadItemHistory drops a response that finished after a reset', async () => {
+    const { resetEntriesState } = await import('./store')
+    let release!: (v: unknown) => void
+    mockSupabase.rpc.mockReturnValue(new Promise((r) => { release = r }))
+
+    const p = useEntriesStore.getState().loadItemHistory()
+    resetEntriesState()
+    useEntriesStore.setState({ isAuthed: true })
+    release({ data: [{ description: 'secret of account A' }], error: null })
+    await p
+
+    expect(useEntriesStore.getState().itemHistory).toEqual([])
+  })
+})

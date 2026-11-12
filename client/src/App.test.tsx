@@ -180,7 +180,7 @@ describe('App auth privacy', () => {
 
     await waitFor(() => expect(mocks.mockSyncLocalToRemote).toHaveBeenCalledTimes(1))
     expect(mocks.mockStash).toHaveBeenCalledWith('user-1')
-    expect(mocks.mockSyncLocalToRemote).toHaveBeenCalledWith(mocks.mockStoreState.meals, 'user-1')
+    expect(mocks.mockSyncLocalToRemote).toHaveBeenCalledWith(mocks.mockStoreState.meals, 'user-1', expect.any(Function))
     // state reset goes through the store so in-flight requests are invalidated too
     expect(mocks.mockReset).toHaveBeenCalledTimes(1)
     expect(mocks.mockSetAuthed).toHaveBeenCalledWith(true)
@@ -206,7 +206,7 @@ describe('App auth privacy', () => {
 
     await signIn('SIGNED_IN')
 
-    expect(await screen.findByText(/kept on this device and will retry on next sign-in/)).toBeInTheDocument()
+    expect(await screen.findByText(/kept on this device and will retry the next time the app loads while you are signed in/)).toBeInTheDocument()
     expect(screen.queryByText(/Synced/)).not.toBeInTheDocument()
   })
 
