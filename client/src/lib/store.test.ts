@@ -31,6 +31,7 @@ function makeMeal(opts: MakeMealOptions = {}): MealWithItems {
     calories: null as number | null,
     protein_g: null as number | null,
     fiber_g: null as number | null,
+    nutrients: null,
     qty: null,
     created_at: now,
   }))

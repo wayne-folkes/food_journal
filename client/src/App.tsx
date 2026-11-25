@@ -38,7 +38,7 @@ const BLOOM_MS = 2_700
 const localDate = (iso: string) => new Date(iso).toLocaleDateString('sv')
 
 /** True when a lookup produced at least one nutrient value. */
-const hasNutrition = (r: LookupResult) => r.calories != null || r.protein_g != null || r.fiber_g != null
+const hasNutrition = (r: LookupResult) => r.calories != null || r.protein_g != null || r.fiber_g != null || r.nutrients != null
 
 /** The item as it is in the store right now (falls back to the given copy). */
 function currentItem(fallback: MealItem): MealItem {
@@ -322,7 +322,7 @@ function AppInner() {
           consumed_at: meal.consumed_at,
           raw_input: meal.raw_input ?? '',
           items: meal.items.map((i) => i.description),
-        }, meal.items.map((i) => ({ calories: i.calories, protein_g: i.protein_g ?? null, fiber_g: i.fiber_g ?? null }))).catch(() => {
+        }, meal.items.map((i) => ({ calories: i.calories, protein_g: i.protein_g ?? null, fiber_g: i.fiber_g ?? null, nutrients: i.nutrients ?? null }))).catch(() => {
           toast.error('Failed to undo delete. Please try again.')
         })
       },

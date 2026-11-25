@@ -21,10 +21,12 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
-/** "12 g protein · 3 g fiber" — only the parts that exist; '' when neither. */
+/** "12 g protein · 30 g carbs · 9 g fat · 3 g fiber" — only the parts that exist; '' when none. Micros live in MealDetail. */
 function itemNutrientLine(item: MealItem): string {
   const parts: string[] = []
   if (item.protein_g != null) parts.push(`${formatGrams(item.protein_g)} protein`)
+  if (item.nutrients?.carbs_g != null) parts.push(`${formatGrams(item.nutrients.carbs_g)} carbs`)
+  if (item.nutrients?.fat_g != null) parts.push(`${formatGrams(item.nutrients.fat_g)} fat`)
   if (item.fiber_g != null) parts.push(`${formatGrams(item.fiber_g)} fiber`)
   return parts.join(' · ')
 }
@@ -114,6 +116,8 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
   const hasAnyCal = meal.items.some((i) => i.calories != null)
   const hasAnyProtein = meal.items.some((i) => i.protein_g != null)
   const hasAnyFiber = meal.items.some((i) => i.fiber_g != null)
+  const carbs = totals.nutrients.carbs_g
+  const fat = totals.nutrients.fat_g
   const showEstimateBtn = isAuthed && meal.items.some(itemNeedsEstimate) && onEstimateCalories != null
 
   async function handleEstimate() {
@@ -227,10 +231,16 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
         })}
       </ul>
 
-      {(hasAnyProtein || hasAnyFiber) && (
+      {(hasAnyProtein || hasAnyFiber || carbs != null || fat != null) && (
         <p className="meal-card__totals">
           {hasAnyProtein && (
             <span>Protein {totals.proteinPartial ? '~' : ''}{formatGrams(totals.protein_g)}</span>
+          )}
+          {carbs != null && (
+            <span>Carbs {totals.nutrientsPartial.includes('carbs_g') ? '~' : ''}{formatGrams(carbs)}</span>
+          )}
+          {fat != null && (
+            <span>Fat {totals.nutrientsPartial.includes('fat_g') ? '~' : ''}{formatGrams(fat)}</span>
           )}
           {hasAnyFiber && (
             <span>Fiber {totals.fiberPartial ? '~' : ''}{formatGrams(totals.fiber_g)}</span>
@@ -244,7 +254,7 @@ export function MealCard({ meal, onEdit, onDelete, onDuplicate, onUpdateCalories
           onClick={handleEstimate}
           disabled={estimating}
           type="button"
-          aria-label="Estimate calories, protein and fiber"
+          aria-label="Estimate nutrition"
         >
           ✨ {estimating ? 'Estimating…' : 'Estimate nutrition'}
         </button>

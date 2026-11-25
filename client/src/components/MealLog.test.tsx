@@ -20,7 +20,7 @@ function makeMeal(id: string, description: string, createdAt: Date): MealWithIte
     created_at: iso,
     updated_at: iso,
     items: [
-      { id: `${id}-i`, meal_id: id, description, position: 0, consumed_at: iso, created_at: iso, calories: null, protein_g: null, fiber_g: null, qty: null },
+      { id: `${id}-i`, meal_id: id, description, position: 0, consumed_at: iso, created_at: iso, calories: null, protein_g: null, fiber_g: null, nutrients: null, qty: null },
     ],
   }
 }
@@ -126,6 +126,16 @@ describe('MealLog', () => {
       expect(total).toHaveTextContent('Protein 50.5 g')
       expect(total).toHaveTextContent('Fiber 9.5 g')
       expect(total).not.toHaveTextContent('~')
+    })
+
+    it('adds carbs and fat but no micronutrients', () => {
+      const a = { ...makeMeal('a', 'Toast', old(5)) }
+      a.items = a.items.map((it) => ({ ...it, calories: 100, nutrients: { carbs_g: 20, fat_g: 2.5, sodium_mg: 300 } }))
+      const { getByLabelText } = renderLog([a])
+      const total = getByLabelText('Day total')
+      expect(total).toHaveTextContent('Carbs 20 g')
+      expect(total).toHaveTextContent('Fat 2.5 g')
+      expect(total).not.toHaveTextContent('Sodium')
     })
 
     it('marks the total as approximate when some items have no calories', () => {

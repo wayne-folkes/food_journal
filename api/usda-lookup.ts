@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import type { LookupItem, LookupResult } from '../shared/usda-lookup'
+import type { ItemNutrients } from '../shared/nutrients'
 import { errorMessage } from '../shared/logger'
 import { buildLookupCacheRows, dedupeCacheRows, dropFailedLegacyRefreshes, dropFailedLookups, isCacheHit, isUnknownColumnError } from './usda-cache'
 import { aiEstimateEnabled, estimateCaloriesWithAi } from './ai-estimate'
@@ -39,6 +40,7 @@ interface CachedLookupRow {
   calories_per_100g: number | null
   protein_per_100g: number | null
   fiber_per_100g: number | null
+  nutrients_per_100g?: ItemNutrients | null
   serving_g?: number | null
   source: 'usda' | 'not_found'
   created_at: string | null
@@ -101,7 +103,7 @@ async function fetchFromUsda(
     ? [...foods].sort((a, b) => scoreFood(b) - scoreFood(a))[0]
     : undefined
 
-  const { calories, protein_g, fiber_g } = extractUsdaNutrients(food?.foodNutrients)
+  const { calories, protein_g, fiber_g, nutrients } = extractUsdaNutrients(food?.foodNutrients)
 
   // Search values are per 100 g; the details call gives the typical serving weight.
   // Its failure must not turn a successful search into not_found: fall back to 100 g.
@@ -117,7 +119,7 @@ async function fetchFromUsda(
     }
   }
 
-  return { calories, protein_g, fiber_g, fdcId: food?.fdcId ?? null, servingG, servingFailed }
+  return { calories, protein_g, fiber_g, nutrients, fdcId: food?.fdcId ?? null, servingG, servingFailed }
 }
 
 async function fetchServingGrams(fdcId: number): Promise<number | null> {
@@ -184,21 +186,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 5. Batch cache lookup
     const keys = items.map(i => i.description.toLowerCase().trim())
     const selectCols = 'description_key, calories_per_100g, protein_per_100g, fiber_per_100g, source, created_at'
+    // Newest columns first; each unknown-column error drops one, so a database
+    // missing only migration 0020 still gets serving_g.
+    // Remove the fallbacks once migrations 0019 (serving_g) and 0020 (nutrients_per_100g) are applied.
+    const columnVariants = [', serving_g, nutrients_per_100g', ', serving_g', '']
     let cached: unknown[] | null = null
-    const withServing = await supabaseAdmin
-      .from('food_lookup')
-      .select(`${selectCols}, serving_g`)
-      .in('description_key', keys)
-    cached = withServing.data
-    if (withServing.error && !isUnknownColumnError(withServing.error)) {
-      log.withMetadata({ error: errorMessage(withServing.error) }).warn('cache select failed')
-    } else if (withServing.error) {
-      // Remove this fallback once migration 0019 (serving_g) is applied
-      log.withMetadata({ error: errorMessage(withServing.error) }).warn('cache select failed, retrying without serving_g')
-      cached = (await supabaseAdmin
+    for (const extraCols of columnVariants) {
+      const { data, error } = await supabaseAdmin
         .from('food_lookup')
-        .select(selectCols)
-        .in('description_key', keys)).data
+        .select(selectCols + extraCols)
+        .in('description_key', keys)
+      cached = data
+      if (!error) break
+      if (!isUnknownColumnError(error) || extraCols === '') {
+        log.withMetadata({ error: errorMessage(error) }).warn('cache select failed')
+        break
+      }
+      log.withMetadata({ error: errorMessage(error) }).warn('cache select failed, retrying with fewer columns')
     }
 
     const cacheMap = new Map(
@@ -221,7 +225,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ...scaleToServing({
             calories: row.calories_per_100g ?? null,
             protein_g: row.protein_per_100g ?? null,
-            fiber_g: row.fiber_per_100g ?? null
+            fiber_g: row.fiber_per_100g ?? null,
+            nutrients: row.nutrients_per_100g ?? null
           }, row.serving_g),
           source: 'cache'
         })
@@ -259,10 +264,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               calories: null,
               protein_g: null,
               fiber_g: null,
+              nutrients: null,
               source: 'not_found'
             },
             fdcId: null,
-            per100g: { calories: null, protein_g: null, fiber_g: null },
+            per100g: { calories: null, protein_g: null, fiber_g: null, nutrients: null },
             failed: true
           }
         }
@@ -283,22 +289,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     )
 
     if (upsertRows.length > 0) {
-      let { error: upsertError } = await supabaseAdmin
-        .from('food_lookup')
-        .upsert(upsertRows, { onConflict: 'description_key' })
-
-      if (upsertError && !isUnknownColumnError(upsertError)) {
-        log.withMetadata({ error: errorMessage(upsertError) }).warn('cache upsert failed')
-      } else if (upsertError) {
-        // Remove this fallback once migration 0019 (serving_g) is applied
-        log.withMetadata({ error: errorMessage(upsertError) }).warn('cache upsert failed, retrying without serving_g')
-        const legacyShape = upsertRows.map(({ serving_g: _servingG, ...rest }) => rest)
-        ;({ error: upsertError } = await supabaseAdmin
+      // Same column fallbacks as the select above, newest column dropped first
+      const shapes = [
+        upsertRows,
+        upsertRows.map(({ nutrients_per_100g: _nutrients, ...rest }) => rest),
+        upsertRows.map(({ nutrients_per_100g: _nutrients, serving_g: _servingG, ...rest }) => rest),
+      ]
+      for (const [index, shape] of shapes.entries()) {
+        const { error: upsertError } = await supabaseAdmin
           .from('food_lookup')
-          .upsert(legacyShape, { onConflict: 'description_key' }))
-        if (upsertError) {
+          .upsert(shape, { onConflict: 'description_key' })
+        if (!upsertError) break
+        if (!isUnknownColumnError(upsertError) || index === shapes.length - 1) {
           log.withMetadata({ error: errorMessage(upsertError) }).warn('cache upsert failed')
+          break
         }
+        log.withMetadata({ error: errorMessage(upsertError) }).warn('cache upsert failed, retrying with fewer columns')
       }
     }
 
@@ -310,11 +316,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         missResults[index].result = {
           ...missResults[index].result,
           calories: scaleToServing(
-            { calories: row.calories_per_100g ?? null, protein_g: null, fiber_g: null },
+            { calories: row.calories_per_100g ?? null, protein_g: null, fiber_g: null, nutrients: null },
             row.serving_g
           ).calories,
           protein_g: null,
           fiber_g: null,
+          nutrients: null,
           source: 'cache'
         }
       }
@@ -348,6 +355,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             r.calories = estimate.calories
             r.protein_g = estimate.protein_g
             r.fiber_g = estimate.fiber_g
+            r.nutrients = estimate.nutrients
             r.source = 'ai'
           }
         }

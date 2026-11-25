@@ -33,17 +33,22 @@ describe('pickServingGrams', () => {
 
 describe('scaleToServing', () => {
   it('scales and rounds', () => {
-    expect(scaleToServing({ calories: 579, protein_g: 21.2, fiber_g: 12.5 }, 28))
-      .toEqual({ calories: 162, protein_g: 5.9, fiber_g: 3.5 })
+    expect(scaleToServing({ calories: 579, protein_g: 21.2, fiber_g: 12.5, nutrients: null }, 28))
+      .toEqual({ calories: 162, protein_g: 5.9, fiber_g: 3.5, nutrients: null })
+  })
+
+  it('scales every stored nutrient', () => {
+    expect(scaleToServing({ calories: 100, protein_g: 1, fiber_g: 1, nutrients: { carbs_g: 20, sodium_mg: 410 } }, 50).nutrients)
+      .toEqual({ carbs_g: 10, sodium_mg: 205 })
   })
 
   it('keeps nulls null', () => {
-    expect(scaleToServing({ calories: null, protein_g: null, fiber_g: null }, 28))
-      .toEqual({ calories: null, protein_g: null, fiber_g: null })
+    expect(scaleToServing({ calories: null, protein_g: null, fiber_g: null, nutrients: null }, 28))
+      .toEqual({ calories: null, protein_g: null, fiber_g: null, nutrients: null })
   })
 
   it('falls back to 100 g without a usable serving', () => {
-    const v = { calories: 52, protein_g: 0.3, fiber_g: 2.4 }
+    const v = { calories: 52, protein_g: 0.3, fiber_g: 2.4, nutrients: null }
     expect(scaleToServing(v, null)).toEqual(v)
     expect(scaleToServing(v, undefined)).toEqual(v)
     expect(scaleToServing(v, 0)).toEqual(v)

@@ -31,6 +31,7 @@ function makeMeal(overrides: Partial<MealWithItems> = {}): MealWithItems {
         calories: null,
         protein_g: null,
         fiber_g: null,
+        nutrients: null,
         qty: null,
       },
     ],
@@ -49,6 +50,7 @@ function makeItem(id: string, overrides: Partial<MealItem> = {}): MealItem {
     calories: null,
     protein_g: null,
     fiber_g: null,
+    nutrients: null,
     qty: null,
     ...overrides,
   }
@@ -195,7 +197,7 @@ describe('MealCard', () => {
   })
 
   describe('estimate nutrition button', () => {
-    const complete = { calories: 100, protein_g: 1, fiber_g: 1 }
+    const complete = { calories: 100, protein_g: 1, fiber_g: 1, nutrients: {} }
 
     it('is hidden for anonymous users', () => {
       renderCard({ meal: makeMeal({ items: [makeItem('a')] }), onEstimateCalories: vi.fn() })
@@ -208,10 +210,16 @@ describe('MealCard', () => {
         meal: makeMeal({ items: [makeItem('a', { calories: 100, protein_g: null, fiber_g: 2 })] }),
         onEstimateCalories: vi.fn(),
       })
-      expect(screen.getByRole('button', { name: 'Estimate calories, protein and fiber' })).toHaveTextContent('Estimate nutrition')
+      expect(screen.getByRole('button', { name: 'Estimate nutrition' })).toHaveTextContent('Estimate nutrition')
     })
 
-    it('is hidden once every item has calories, protein and fiber', () => {
+    it('appears when the item was never estimated for the other nutrients', () => {
+      authState.isAuthed = true
+      renderCard({ meal: makeMeal({ items: [makeItem('a', { ...complete, nutrients: null })] }), onEstimateCalories: vi.fn() })
+      expect(screen.getByRole('button', { name: 'Estimate nutrition' })).toBeInTheDocument()
+    })
+
+    it('is hidden once every item has calories, protein, fiber and nutrients', () => {
       authState.isAuthed = true
       renderCard({ meal: makeMeal({ items: [makeItem('a', complete)] }), onEstimateCalories: vi.fn() })
       expect(screen.queryByRole('button', { name: /estimate/i })).not.toBeInTheDocument()

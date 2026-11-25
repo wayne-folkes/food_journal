@@ -49,7 +49,9 @@ function DayTotals({ meals }: { meals: MealWithItems[] }) {
   const hasCal = items.some((i) => i.calories != null)
   const hasProtein = items.some((i) => i.protein_g != null)
   const hasFiber = items.some((i) => i.fiber_g != null)
-  if (!hasCal && !hasProtein && !hasFiber) return null
+  const carbs = totals.nutrients.carbs_g
+  const fat = totals.nutrients.fat_g
+  if (!hasCal && !hasProtein && !hasFiber && carbs == null && fat == null) return null
 
   return (
     <section className="gl-daytotals gl-glass" aria-label="Day total">
@@ -61,6 +63,12 @@ function DayTotals({ meals }: { meals: MealWithItems[] }) {
       )}
       {hasProtein && (
         <span>Protein {totals.proteinPartial ? '~' : ''}{formatGrams(totals.protein_g)}</span>
+      )}
+      {carbs != null && (
+        <span>Carbs {totals.nutrientsPartial.includes('carbs_g') ? '~' : ''}{formatGrams(carbs)}</span>
+      )}
+      {fat != null && (
+        <span>Fat {totals.nutrientsPartial.includes('fat_g') ? '~' : ''}{formatGrams(fat)}</span>
       )}
       {hasFiber && (
         <span>Fiber {totals.fiberPartial ? '~' : ''}{formatGrams(totals.fiber_g)}</span>

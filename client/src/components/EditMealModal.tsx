@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import type { MealWithItems, MealType } from '@shared/types/database'
 import type { ChipItem } from '../lib/store'
+import type { ItemNutrients } from '@shared/nutrients'
 import { MealTypePills } from './MealTypePills'
 import { ChipInput } from './ChipInput'
 import { EITile } from './EITile'
@@ -34,6 +35,7 @@ export function EditMealModal({ meal, onSave, onCancel }: Props) {
       calories: i.calories ?? null,
       protein_g: i.protein_g ?? null,
       fiber_g: i.fiber_g ?? null,
+      nutrients: i.nutrients,
       id: i.id,
     }))
   )
@@ -56,6 +58,7 @@ export function EditMealModal({ meal, onSave, onCancel }: Props) {
           calories: prev[i]?.calories ?? null,
           protein_g: prev[i]?.protein_g ?? null,
           fiber_g: prev[i]?.fiber_g ?? null,
+          nutrients: prev[i]?.nutrients ?? null,
           id: prev[i]?.id,
         }
       })
@@ -73,6 +76,18 @@ export function EditMealModal({ meal, onSave, onCancel }: Props) {
     setChips((prev) => prev.map((c, i) => i === index ? { ...c, [field]: grams } : c))
   }
 
+  /** Carbs and fat live in the item's `nutrients` object; empty input removes the key (unknown). */
+  function updateNutrient(index: number, key: 'carbs_g' | 'fat_g', raw: string) {
+    const grams = parseGrams(raw)
+    setChips((prev) => prev.map((c, i) => {
+      if (i !== index) return c
+      const next: ItemNutrients = { ...(c.nutrients ?? {}) }
+      if (grams == null) delete next[key]
+      else next[key] = grams
+      return { ...c, nutrients: next }
+    }))
+  }
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
 
@@ -81,7 +96,7 @@ export function EditMealModal({ meal, onSave, onCancel }: Props) {
     if (pending) {
       const { description, consumed_at } = parseChip(pending)
       const label = description || pending
-      finalChips = [...chips, { description: label, calories: null, protein_g: null, fiber_g: null }]
+      finalChips = [...chips, { description: label, calories: null, protein_g: null, fiber_g: null, nutrients: null }]
       setChips(finalChips)
       setInputValue('')
       if (consumed_at) setConsumedAt(formatTimeInput(consumed_at.toISOString()))
@@ -101,6 +116,7 @@ export function EditMealModal({ meal, onSave, onCancel }: Props) {
     calories: i.calories ?? null,
     protein_g: i.protein_g ?? null,
     fiber_g: i.fiber_g ?? null,
+    nutrients: i.nutrients,
     id: i.id,
   }))
   const originalTime = formatTimeInput(meal.consumed_at)
@@ -113,7 +129,9 @@ export function EditMealModal({ meal, onSave, onCancel }: Props) {
       c.description !== originalChips[i]?.description ||
       c.calories !== originalChips[i]?.calories ||
       (c.protein_g ?? null) !== originalChips[i]?.protein_g ||
-      (c.fiber_g ?? null) !== originalChips[i]?.fiber_g
+      (c.fiber_g ?? null) !== originalChips[i]?.fiber_g ||
+      (c.nutrients?.carbs_g ?? null) !== (originalChips[i]?.nutrients?.carbs_g ?? null) ||
+      (c.nutrients?.fat_g ?? null) !== (originalChips[i]?.nutrients?.fat_g ?? null)
     ) ||
     inputValue.trim().length > 0
 
@@ -180,6 +198,34 @@ export function EditMealModal({ meal, onSave, onCancel }: Props) {
                           onChange={(e) => updateGrams(i, 'protein_g', e.target.value)}
                           placeholder="—"
                           aria-label={`Protein for ${chip.description}`}
+                        />
+                      </label>
+                      <label className="edit-modal__nutrient">
+                        <span className="edit-modal__nutrient-label" aria-hidden="true">carbs g</span>
+                        <input
+                          className="edit-modal__cal-input"
+                          type="number"
+                          min="0"
+                          max="999.9"
+                          step="0.1"
+                          value={chip.nutrients?.carbs_g != null ? String(chip.nutrients.carbs_g) : ''}
+                          onChange={(e) => updateNutrient(i, 'carbs_g', e.target.value)}
+                          placeholder="—"
+                          aria-label={`Carbs for ${chip.description}`}
+                        />
+                      </label>
+                      <label className="edit-modal__nutrient">
+                        <span className="edit-modal__nutrient-label" aria-hidden="true">fat g</span>
+                        <input
+                          className="edit-modal__cal-input"
+                          type="number"
+                          min="0"
+                          max="999.9"
+                          step="0.1"
+                          value={chip.nutrients?.fat_g != null ? String(chip.nutrients.fat_g) : ''}
+                          onChange={(e) => updateNutrient(i, 'fat_g', e.target.value)}
+                          placeholder="—"
+                          aria-label={`Fat for ${chip.description}`}
                         />
                       </label>
                       <label className="edit-modal__nutrient">
