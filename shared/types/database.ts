@@ -1,3 +1,5 @@
+import type { ItemNutrients } from '../nutrients'
+
 /**
  * Hand-written Supabase schema types for the meals redesign.
  * Regenerate with:
@@ -64,6 +66,12 @@ export type Database = {
           protein_g: number | null
           /** Estimated dietary fiber in grams, 1 decimal. */
           fiber_g: number | null
+          /**
+           * Every other macro/micro for one serving (see shared/nutrients.ts).
+           * null = never estimated; a missing key = unknown. May be undefined
+           * at runtime on payloads from before migration 0020.
+           */
+          nutrients: ItemNutrients | null
         }
         Insert: {
           id?: string
@@ -76,6 +84,7 @@ export type Database = {
           qty?: string | null
           protein_g?: number | null
           fiber_g?: number | null
+          nutrients?: ItemNutrients | null
         }
         Update: {
           description?: string
@@ -85,6 +94,7 @@ export type Database = {
           qty?: string | null
           protein_g?: number | null
           fiber_g?: number | null
+          nutrients?: ItemNutrients | null
         }
         Relationships: [
           {
@@ -102,6 +112,7 @@ export type Database = {
           calories_per_100g: number | null
           protein_per_100g: number | null
           fiber_per_100g: number | null
+          nutrients_per_100g: ItemNutrients | null
           serving_g: number | null
           source: string
           usda_fdc_id: number | null
@@ -113,6 +124,7 @@ export type Database = {
           calories_per_100g?: number | null
           protein_per_100g?: number | null
           fiber_per_100g?: number | null
+          nutrients_per_100g?: ItemNutrients | null
           serving_g?: number | null
           source?: string
           usda_fdc_id?: number | null
@@ -123,6 +135,7 @@ export type Database = {
           calories_per_100g?: number | null
           protein_per_100g?: number | null
           fiber_per_100g?: number | null
+          nutrients_per_100g?: ItemNutrients | null
           serving_g?: number | null
           source?: string
           usda_fdc_id?: number | null

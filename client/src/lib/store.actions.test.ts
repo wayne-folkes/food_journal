@@ -58,6 +58,7 @@ function makeStoredMeal({
         calories: null,
         protein_g: null,
         fiber_g: null,
+        nutrients: null,
         qty: null,
       },
     ],
@@ -121,6 +122,7 @@ describe('useEntriesStore.addMeal', () => {
           calories: null,
           protein_g: null,
           fiber_g: null,
+          nutrients: null,
           qty: null,
         },
       ],
@@ -149,6 +151,7 @@ describe('useEntriesStore.addMeal', () => {
           calories: null,
           protein_g: null,
           fiber_g: null,
+          nutrients: null,
         },
       ],
     })
@@ -193,6 +196,7 @@ describe('useEntriesStore.addMeal', () => {
           calories: null,
           protein_g: null,
           fiber_g: null,
+          nutrients: null,
           qty: null,
         },
       ],
@@ -214,6 +218,7 @@ describe('useEntriesStore.addMeal', () => {
           calories: 5,
           protein_g: null,
           fiber_g: null,
+          nutrients: null,
           qty: null,
         },
       ],
@@ -269,6 +274,7 @@ describe('useEntriesStore.addMeal', () => {
           calories: 95,
           protein_g: 0.5,
           fiber_g: 4.4,
+          nutrients: null,
           qty: null,
         },
       ],
@@ -294,6 +300,7 @@ describe('useEntriesStore.addMeal', () => {
           calories: 300,
           protein_g: null,
           fiber_g: null,
+          nutrients: null,
           qty: null,
         },
       ],
@@ -319,6 +326,7 @@ describe('useEntriesStore.addMeal', () => {
           calories: 95,
           protein_g: null,
           fiber_g: null,
+          nutrients: null,
           qty: null,
         },
       ],
@@ -358,6 +366,7 @@ describe('useEntriesStore.addMeal', () => {
               calories: 95,
               protein_g: 0.5,
               fiber_g: 4.4,
+              nutrients: null,
             },
           ],
         },
@@ -374,6 +383,7 @@ describe('useEntriesStore.addMeal', () => {
               calories: 300,
               protein_g: null,
               fiber_g: null,
+              nutrients: null,
             },
           ],
         },
@@ -454,6 +464,7 @@ describe('useEntriesStore.addMeal', () => {
               calories: null,
               protein_g: null,
               fiber_g: null,
+              nutrients: null,
             },
           ],
         },
@@ -470,6 +481,7 @@ describe('useEntriesStore.addMeal', () => {
               calories: null,
               protein_g: null,
               fiber_g: null,
+              nutrients: null,
             },
           ],
         },
@@ -486,6 +498,7 @@ describe('useEntriesStore.addMeal', () => {
               calories: null,
               protein_g: null,
               fiber_g: null,
+              nutrients: null,
             },
           ],
         },
@@ -612,6 +625,7 @@ describe('useEntriesStore.addMeal', () => {
               calories: null,
               protein_g: null,
               fiber_g: null,
+              nutrients: null,
               qty: null,
             },
             {
@@ -624,6 +638,7 @@ describe('useEntriesStore.addMeal', () => {
               calories: 120,
               protein_g: null,
               fiber_g: null,
+              nutrients: null,
               qty: null,
             },
           ],
@@ -657,6 +672,7 @@ describe('useEntriesStore.addMeal', () => {
             calories: null,
             protein_g: null,
             fiber_g: null,
+            nutrients: null,
             qty: null,
           },
           {
@@ -669,6 +685,7 @@ describe('useEntriesStore.addMeal', () => {
             calories: 120,
             protein_g: null,
             fiber_g: null,
+            nutrients: null,
             qty: null,
           },
         ],
@@ -892,6 +909,27 @@ describe('useEntriesStore protein/fiber', () => {
     expect(items[1]).toMatchObject({ description: 'toast', protein_g: null, fiber_g: null })
   })
 
+  it('editMeal leaves out nutrients for chips that don\'t carry them, so the server keeps its value', async () => {
+    const meal = makeStoredMeal({ id: 'meal-1', description: 'apple', consumedAt: '2026-04-15T12:00:00.000Z', userId: 'u' })
+    useEntriesStore.setState({ meals: [meal], isAuthed: true })
+    mockSupabase.rpc.mockResolvedValue({ data: meal, error: null })
+
+    await useEntriesStore.getState().editMeal('meal-1', {
+      meal_type: 'snack',
+      consumed_at: '2026-04-15T12:00:00.000Z',
+      items: [
+        { description: 'apple', calories: 95 },
+        { description: 'pear', calories: 100, nutrients: { carbs_g: 27 } },
+        { description: 'plum', calories: 30, nutrients: null },
+      ],
+    })
+
+    const items = mockSupabase.rpc.mock.calls[0][1].p_items
+    expect(items[0]).not.toHaveProperty('nutrients')
+    expect(items[1].nutrients).toEqual({ carbs_g: 27 })
+    expect(items[2]).toHaveProperty('nutrients', null)
+  })
+
   it('editMeal sends null protein/fiber for chips that omit them', async () => {
     const meal = makeStoredMeal({ id: 'meal-1', description: 'apple', consumedAt: '2026-04-15T12:00:00.000Z', userId: 'u' })
     useEntriesStore.setState({ meals: [meal], isAuthed: true })
@@ -938,7 +976,7 @@ describe('useEntriesStore protein/fiber', () => {
         headline: null, note: null, created_at: '2026-04-15T10:00:00.000Z', updated_at: '2026-04-15T10:00:00.000Z',
         items: [{
           id: 'i', meal_id: 'meal-1', description: 'coffee', position: 0, consumed_at: 'x', created_at: 'x',
-          calories: null, protein_g: 'lots', fiber_g: null, qty: null,
+          calories: null, protein_g: 'lots', fiber_g: null, nutrients: null, qty: null,
         }],
       },
       error: null,
@@ -1030,8 +1068,8 @@ describe('useEntriesStore.addMeal nutrients', () => {
 
     expect(mockSupabase.rpc).toHaveBeenCalledTimes(1)
     expect(mockSupabase.rpc.mock.calls[0][1].p_items).toEqual([
-      { description: 'a', position: 0, calories: 95, protein_g: 0.5, fiber_g: null, consumed_at: '2026-04-15T09:00:00.000Z' },
-      { description: 'b', position: 1, calories: null, protein_g: null, fiber_g: 2, consumed_at: '2026-04-15T09:00:00.000Z' },
+      { description: 'a', position: 0, calories: 95, protein_g: 0.5, fiber_g: null, nutrients: null, consumed_at: '2026-04-15T09:00:00.000Z' },
+      { description: 'b', position: 1, calories: null, protein_g: null, fiber_g: 2, nutrients: null, consumed_at: '2026-04-15T09:00:00.000Z' },
     ])
   })
 })

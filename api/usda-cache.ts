@@ -1,4 +1,5 @@
 import type { LookupItem, LookupResult } from '../shared/usda-lookup'
+import type { ItemNutrients } from '../shared/nutrients'
 import type { Per100g } from './usda-serving'
 
 export interface LookupCacheRow {
@@ -7,6 +8,8 @@ export interface LookupCacheRow {
   calories_per_100g: number | null
   protein_per_100g: number | null
   fiber_per_100g: number | null
+  /** Every other nutrient USDA reported, per 100 g (see shared/nutrients.ts). */
+  nutrients_per_100g: ItemNutrients | null
   source: 'usda' | 'not_found'
   usda_fdc_id: number | null
   /** Typical serving weight in grams (null: USDA had no portions); the values above stay per 100 g. */
@@ -19,16 +22,22 @@ export interface LookupCacheRow {
 export const NOT_FOUND_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
- * Legacy USDA rows were cached before protein/fiber existed, so they have null
- * protein. Treat them as misses so the refetch upserts them with macros.
+ * Legacy USDA rows were cached before protein/fiber (migration 0018) or the
+ * other nutrients (0020) existed, so they have null protein or null
+ * nutrients_per_100g. Treat them as misses so the refetch upserts them in full.
  * not_found rows stay hits until they are older than NOT_FOUND_TTL_MS (a missing
  * or unparseable created_at counts as fresh).
  */
 export function isCacheHit(
-  row: { source: string; protein_per_100g: number | null; created_at?: string | null },
+  row: {
+    source: string
+    protein_per_100g: number | null
+    nutrients_per_100g?: ItemNutrients | null
+    created_at?: string | null
+  },
   now: number = Date.now()
 ): boolean {
-  if (row.source === 'usda') return row.protein_per_100g !== null
+  if (row.source === 'usda') return row.protein_per_100g !== null && row.nutrients_per_100g != null
   const createdAt = row.created_at ? Date.parse(row.created_at) : NaN
   return Number.isNaN(createdAt) || now - createdAt <= NOT_FOUND_TTL_MS
 }
@@ -86,6 +95,7 @@ export function buildLookupCacheRows(
       calories_per_100g: per100g.calories,
       protein_per_100g: per100g.protein_g,
       fiber_per_100g: per100g.fiber_g,
+      nutrients_per_100g: per100g.nutrients,
       source: result.source === 'usda' ? 'usda' : 'not_found',
       usda_fdc_id: fdcId,
       serving_g: servingG ?? null,
@@ -96,8 +106,8 @@ export function buildLookupCacheRows(
 
 /**
  * True when a Supabase/PostgREST error means a column does not exist (migration
- * 0019 not applied): PGRST204 (schema cache: column not found) or Postgres 42703
- * (undefined column). Any other error must not trigger the serving_g fallback.
+ * 0019 or 0020 not applied): PGRST204 (schema cache: column not found) or Postgres 42703
+ * (undefined column). Any other error must not trigger the legacy-columns fallback.
  */
 export function isUnknownColumnError(error: { code?: string | null } | null | undefined): boolean {
   return error?.code === 'PGRST204' || error?.code === '42703'

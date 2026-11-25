@@ -1,6 +1,7 @@
 import type { MealWithItems } from '@shared/types/database'
 import { MEAL_TYPE_LABELS } from '../lib/mealType'
-import { formatGrams, sumNutrients } from '../lib/nutrients'
+import { NUTRIENTS, type ItemNutrients, type NutrientGroup, type NutrientKey } from '@shared/nutrients'
+import { HEADLINE_MACROS, formatAmount, formatGrams, percentDailyValue, sumNutrients } from '../lib/nutrients'
 import { EITile } from './EITile'
 
 interface Props {
@@ -9,6 +10,54 @@ interface Props {
   onEdit: (meal: MealWithItems) => void
   onDelete: (id: string) => void
   onDuplicate: (meal: MealWithItems) => void
+}
+
+const MORE_GROUPS: Array<{ group: NutrientGroup; title: string }> = [
+  { group: 'macro', title: 'Macro details' },
+  { group: 'mineral', title: 'Minerals' },
+  { group: 'vitamin', title: 'Vitamins' },
+]
+
+/**
+ * Everything beyond the headline macros, collapsed by default so the sheet
+ * stays uncluttered. Renders nothing when no item has any of these values.
+ */
+function MoreNutrients({ totals, partial }: { totals: ItemNutrients; partial: NutrientKey[] }) {
+  const groups = MORE_GROUPS
+    .map(({ group, title }) => ({
+      title,
+      defs: NUTRIENTS.filter((d) => d.group === group && !HEADLINE_MACROS.includes(d.key) && totals[d.key] != null),
+    }))
+    .filter((g) => g.defs.length > 0)
+  if (groups.length === 0) return null
+
+  return (
+    <details className="ei-meal-detail__more">
+      <summary className="ei-meal-detail__more-toggle">More nutrients</summary>
+      {groups.map(({ title, defs }) => (
+        <section key={title} className="ei-meal-detail__more-group" aria-label={title}>
+          <h3 className="ei-meal-detail__more-title">{title}</h3>
+          <dl className="ei-meal-detail__more-list">
+            {defs.map((def) => {
+              const amount = totals[def.key]!
+              const dv = percentDailyValue(def, amount)
+              return (
+                <div key={def.key} className={`ei-meal-detail__more-row${def.indent ? ' ei-meal-detail__more-row--indent' : ''}`}>
+                  <dt>{def.label}</dt>
+                  <dd>
+                    {partial.includes(def.key) ? '~' : ''}{formatAmount(amount, def.unit)}
+                    {/* Always rendered (empty without a DV) so the amounts stay in one column */}
+                    <span className="ei-meal-detail__more-dv">{dv != null ? `${dv}%` : ''}</span>
+                  </dd>
+                </div>
+              )
+            })}
+          </dl>
+        </section>
+      ))}
+      <p className="ei-meal-detail__more-note">% Daily Value based on a 2,000 kcal diet. ~ means some items have no value.</p>
+    </details>
+  )
 }
 
 function formatTime(iso: string): string {
@@ -24,6 +73,8 @@ export function MealDetail({ meal, onClose, onEdit, onDelete, onDuplicate }: Pro
   const hasAnyCal = meal.items.some(i => i.calories != null)
   const hasAnyProtein = meal.items.some(i => i.protein_g != null)
   const hasAnyFiber = meal.items.some(i => i.fiber_g != null)
+  const carbs = totals.nutrients.carbs_g
+  const fat = totals.nutrients.fat_g
   // First tile gets double width, the rest share the remainder
   const stripColumns = meal.items.slice(0, 4).map((_, i) => (i === 0 ? '2fr' : '1fr')).join(' ')
 
@@ -70,6 +121,12 @@ export function MealDetail({ meal, onClose, onEdit, onDelete, onDuplicate }: Pro
                 {item.protein_g != null && (
                   <span className="ei-meal-detail__item-macro">{formatGrams(item.protein_g)} protein</span>
                 )}
+                {item.nutrients?.carbs_g != null && (
+                  <span className="ei-meal-detail__item-macro">{formatGrams(item.nutrients.carbs_g)} carbs</span>
+                )}
+                {item.nutrients?.fat_g != null && (
+                  <span className="ei-meal-detail__item-macro">{formatGrams(item.nutrients.fat_g)} fat</span>
+                )}
                 {item.fiber_g != null && (
                   <span className="ei-meal-detail__item-macro">{formatGrams(item.fiber_g)} fiber</span>
                 )}
@@ -79,7 +136,7 @@ export function MealDetail({ meal, onClose, onEdit, onDelete, onDuplicate }: Pro
         </ul>
 
         {/* Total */}
-        {(hasAnyCal || hasAnyProtein || hasAnyFiber) && (
+        {(hasAnyCal || hasAnyProtein || hasAnyFiber || carbs != null || fat != null) && (
           <div className="ei-meal-detail__totals">
             {hasAnyCal && (
               <div className="ei-meal-detail__total">
@@ -97,6 +154,22 @@ export function MealDetail({ meal, onClose, onEdit, onDelete, onDuplicate }: Pro
                 </span>
               </div>
             )}
+            {carbs != null && (
+              <div className="ei-meal-detail__total ei-meal-detail__total--macro">
+                <span className="ei-meal-detail__total-label">Carbs</span>
+                <span className="ei-meal-detail__total-value ei-meal-detail__total-value--macro">
+                  {totals.nutrientsPartial.includes('carbs_g') ? '~' : ''}{formatGrams(carbs)}
+                </span>
+              </div>
+            )}
+            {fat != null && (
+              <div className="ei-meal-detail__total ei-meal-detail__total--macro">
+                <span className="ei-meal-detail__total-label">Fat</span>
+                <span className="ei-meal-detail__total-value ei-meal-detail__total-value--macro">
+                  {totals.nutrientsPartial.includes('fat_g') ? '~' : ''}{formatGrams(fat)}
+                </span>
+              </div>
+            )}
             {hasAnyFiber && (
               <div className="ei-meal-detail__total ei-meal-detail__total--macro">
                 <span className="ei-meal-detail__total-label">Fiber</span>
@@ -107,6 +180,8 @@ export function MealDetail({ meal, onClose, onEdit, onDelete, onDuplicate }: Pro
             )}
           </div>
         )}
+
+        <MoreNutrients totals={totals.nutrients} partial={totals.nutrientsPartial} />
 
         {/* Actions */}
         <div className="ei-meal-detail__actions">

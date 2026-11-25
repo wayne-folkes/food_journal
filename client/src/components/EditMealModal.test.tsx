@@ -13,6 +13,7 @@ function item(id: string, description: string, overrides: Partial<MealItem> = {}
     calories: null,
     protein_g: null,
     fiber_g: null,
+    nutrients: null,
     qty: null,
     ...overrides,
   }
@@ -63,7 +64,7 @@ describe('EditMealModal nutrition', () => {
 
     expect(onSave).toHaveBeenCalledTimes(1)
     expect(onSave.mock.calls[0][1].items).toEqual([
-      { id: 'i1', description: 'Eggs', calories: 140, protein_g: 12.5, fiber_g: 0.4 },
+      { id: 'i1', description: 'Eggs', calories: 140, protein_g: 12.5, fiber_g: 0.4, nutrients: null },
     ])
   })
 
@@ -76,6 +77,16 @@ describe('EditMealModal nutrition', () => {
     save()
 
     expect(onSave.mock.calls[0][1].items[0]).toMatchObject({ protein_g: null, fiber_g: null })
+  })
+
+  it('keeps micronutrients when carbs and fat are edited, and drops a cleared key', () => {
+    const { onSave } = setup([item('i1', 'Eggs', { nutrients: { carbs_g: 1, fat_g: 10, sodium_mg: 140 } })])
+
+    fireEvent.change(screen.getByLabelText('Carbs for Eggs'), { target: { value: '2.25' } })
+    fireEvent.change(screen.getByLabelText('Fat for Eggs'), { target: { value: '' } })
+    save()
+
+    expect(onSave.mock.calls[0][1].items[0].nutrients).toEqual({ carbs_g: 2.3, sodium_mg: 140 })
   })
 
   it('saves edited protein and fiber, rounded to 1 decimal and clamped', () => {

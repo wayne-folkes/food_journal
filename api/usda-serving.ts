@@ -7,6 +7,8 @@
  * endpoint. Every field is treated as optional because the shape is unverified.
  */
 
+import { NUTRIENTS, roundNutrient, type ItemNutrients } from '../shared/nutrients'
+
 export interface UsdaFoodPortion {
   gramWeight?: number
   sequenceNumber?: number
@@ -16,6 +18,7 @@ export interface Per100g {
   calories: number | null
   protein_g: number | null
   fiber_g: number | null
+  nutrients: ItemNutrients | null
 }
 
 /** Weight used when USDA gave no usable portion: values stay per 100 g. */
@@ -44,7 +47,7 @@ export function pickServingGrams(foodPortions: UsdaFoodPortion[] | undefined | n
   return best?.gramWeight ?? null
 }
 
-/** Per-100g values -> one serving. Calories to an integer, protein/fiber to 0.1 g; nulls stay null. */
+/** Per-100g values -> one serving. Calories to an integer, protein/fiber to 0.1 g, other nutrients to 0.01; nulls stay null. */
 export function scaleToServing(per100g: Per100g, servingG: number | null | undefined): Per100g {
   const grams = typeof servingG === 'number' && Number.isFinite(servingG) && servingG > 0
     ? servingG
@@ -54,5 +57,15 @@ export function scaleToServing(per100g: Per100g, servingG: number | null | undef
     calories: per100g.calories === null ? null : Math.round(per100g.calories * factor),
     protein_g: per100g.protein_g === null ? null : Math.round(per100g.protein_g * factor * 10) / 10,
     fiber_g: per100g.fiber_g === null ? null : Math.round(per100g.fiber_g * factor * 10) / 10,
+    nutrients: per100g.nutrients == null ? null : scaleNutrients(per100g.nutrients, factor),
   }
+}
+
+function scaleNutrients(nutrients: ItemNutrients, factor: number): ItemNutrients {
+  const scaled: ItemNutrients = {}
+  for (const { key } of NUTRIENTS) {
+    const amount = nutrients[key]
+    if (typeof amount === 'number') scaled[key] = roundNutrient(amount * factor)
+  }
+  return scaled
 }

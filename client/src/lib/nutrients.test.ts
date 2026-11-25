@@ -1,14 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import type { LookupResult } from '@shared/usda-lookup'
-import { formatGrams, itemNeedsEstimate, nutrientPatch, sumNutrients } from './nutrients'
+import { formatAmount, formatGrams, itemNeedsEstimate, nutrientPatch, percentDailyValue, sumNutrients } from './nutrients'
+import { NUTRIENTS } from '@shared/nutrients'
 
 function result(partial: Partial<LookupResult> = {}): LookupResult {
-  return { id: 'x', description: 'x', calories: null, protein_g: null, fiber_g: null, source: 'usda', ...partial }
+  return { id: 'x', description: 'x', calories: null, protein_g: null, fiber_g: null, nutrients: null, source: 'usda', ...partial }
 }
 
 describe('itemNeedsEstimate', () => {
-  it('is false when all three values are present (including 0)', () => {
-    expect(itemNeedsEstimate({ calories: 0, protein_g: 0, fiber_g: 0 })).toBe(false)
+  it('is false when all three values are present (including 0) and nutrients were estimated', () => {
+    expect(itemNeedsEstimate({ calories: 0, protein_g: 0, fiber_g: 0, nutrients: {} })).toBe(false)
+  })
+  it('is true when the item was never estimated for the other nutrients', () => {
+    expect(itemNeedsEstimate({ calories: 1, protein_g: 1, fiber_g: 1, nutrients: null })).toBe(true)
+    expect(itemNeedsEstimate({ calories: 1, protein_g: 1, fiber_g: 1 })).toBe(true)
   })
   it('is true when any value is null', () => {
     expect(itemNeedsEstimate({ calories: null, protein_g: 1, fiber_g: 1 })).toBe(true)
@@ -38,6 +43,13 @@ describe('nutrientPatch', () => {
     expect(nutrientPatch({ calories: 1, protein_g: 1, fiber_g: 1 }, result({ calories: 5, protein_g: 5, fiber_g: 5 }))).toEqual({})
     expect(nutrientPatch({ calories: null }, result())).toEqual({})
   })
+  it('fills nutrients only when the item has none', () => {
+    const nutrients = { carbs_g: 20, sodium_mg: 300 }
+    expect(nutrientPatch({ calories: 1, protein_g: 1, fiber_g: 1, nutrients: null }, result({ nutrients })))
+      .toEqual({ nutrients })
+    expect(nutrientPatch({ calories: 1, protein_g: 1, fiber_g: 1, nutrients: { carbs_g: 5 } }, result({ nutrients })))
+      .toEqual({})
+  })
   it('fills undefined fields', () => {
     expect(nutrientPatch({ calories: 10 }, result({ protein_g: 1, fiber_g: 2 }))).toEqual({ protein_g: 1, fiber_g: 2 })
   })
@@ -52,6 +64,7 @@ describe('sumNutrients', () => {
     expect(t).toEqual({
       calories: 150, protein_g: 4, fiber_g: 3,
       caloriesPartial: false, proteinPartial: false, fiberPartial: false,
+      nutrients: {}, nutrientsPartial: [],
     })
   })
   it('flags partial only when some, not all, items have the value', () => {
@@ -72,6 +85,15 @@ describe('sumNutrients', () => {
     expect(t.proteinPartial).toBe(false)
     expect(sumNutrients([]).caloriesPartial).toBe(false)
   })
+  it('sums nutrient keys and flags the ones some items lack', () => {
+    const t = sumNutrients([
+      { calories: 1, protein_g: 1, fiber_g: 1, nutrients: { carbs_g: 10.1, sodium_mg: 200 } },
+      { calories: 1, protein_g: 1, fiber_g: 1, nutrients: { carbs_g: 0.2 } },
+      { calories: 1, protein_g: 1, fiber_g: 1, nutrients: null },
+    ])
+    expect(t.nutrients).toEqual({ carbs_g: 10.3, sodium_mg: 200 })
+    expect(t.nutrientsPartial).toEqual(['carbs_g', 'sodium_mg'])
+  })
   it('avoids floating point noise', () => {
     expect(sumNutrients([
       { calories: null, protein_g: 0.1, fiber_g: null },
@@ -90,5 +112,35 @@ describe('formatGrams', () => {
     expect(formatGrams(12.5)).toBe('12.5 g')
     expect(formatGrams(0.25)).toBe('0.3 g')
     expect(formatGrams(3.04)).toBe('3 g')
+  })
+})
+
+describe('formatAmount', () => {
+  it('uses whole numbers from 10 up and more decimals for small amounts', () => {
+    expect(formatAmount(410.4, 'mg')).toBe('410 mg')
+    expect(formatAmount(12.46, 'g')).toBe('12 g')
+    expect(formatAmount(2.44, 'µg')).toBe('2.4 µg')
+    expect(formatAmount(0.456, 'mg')).toBe('0.46 mg')
+    expect(formatAmount(0.5, 'mg')).toBe('0.5 mg')
+    expect(formatAmount(0, 'g')).toBe('0 g')
+  })
+})
+
+describe('percentDailyValue', () => {
+  const def = (key: string) => NUTRIENTS.find((n) => n.key === key)!
+  it('rounds to a whole percent', () => {
+    expect(percentDailyValue(def('sodium_mg'), 1150)).toBe(50)
+  })
+  it('is null when the FDA sets no Daily Value', () => {
+    expect(percentDailyValue(def('sugars_g'), 10)).toBeNull()
+  })
+})
+
+describe('NUTRIENTS table', () => {
+  it('has unique keys whose suffix matches the unit', () => {
+    const keys = NUTRIENTS.map((n) => n.key)
+    expect(new Set(keys).size).toBe(keys.length)
+    const suffix = { g: '_g', mg: '_mg', 'µg': '_ug' } as const
+    for (const n of NUTRIENTS) expect(n.key.endsWith(suffix[n.unit])).toBe(true)
   })
 })

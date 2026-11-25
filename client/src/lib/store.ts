@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Json, MealWithItems, MealInsert, MealType, MealItem } from '@shared/types/database'
 import { errorMessage } from '@shared/logger'
+import type { ItemNutrients } from '@shared/nutrients'
 import { supabase } from './supabase'
 import { log } from './logger'
 
@@ -45,6 +46,7 @@ export interface ChipItem {
   calories: number | null
   protein_g?: number | null
   fiber_g?: number | null
+  nutrients?: ItemNutrients | null
   id?: string
 }
 
@@ -53,6 +55,8 @@ interface RpcMealItem {
   calories: number | null
   protein_g: number | null
   fiber_g: number | null
+  /** undefined = this client doesn't know them; the key is left out so the server keeps its value. */
+  nutrients?: ItemNutrients | null
   consumed_at: string
 }
 
@@ -61,6 +65,7 @@ export interface ItemNutrientsUpdate {
   calories?: number | null
   protein_g?: number | null
   fiber_g?: number | null
+  nutrients?: ItemNutrients | null
 }
 
 interface MealsState {
@@ -239,6 +244,7 @@ function serializeRpcItems(items: RpcMealItem[]): Json {
     calories: item.calories,
     protein_g: item.protein_g,
     fiber_g: item.fiber_g,
+    ...(item.nutrients !== undefined && { nutrients: item.nutrients as Json }),
   }))
 }
 
@@ -266,6 +272,8 @@ function isMealItem(value: unknown): value is MealItem {
     // protein_g / fiber_g may be absent (undefined) on older payloads
     && isNullableNumber(value.protein_g)
     && isNullableNumber(value.fiber_g)
+    // nutrients may be absent on payloads from before migration 0020
+    && (value.nutrients == null || (isRecord(value.nutrients) && !Array.isArray(value.nutrients)))
 }
 
 function isMealWithItems(value: unknown): value is MealWithItems {
@@ -313,6 +321,7 @@ function serializeBatchSyncMeals(meals: MealWithItems[]): Json {
         calories: item.calories,
         protein_g: item.protein_g ?? null,
         fiber_g: item.fiber_g ?? null,
+        nutrients: item.nutrients,
         consumed_at: item.consumed_at,
       }))
     ),
@@ -409,6 +418,7 @@ function localMeal(
     calories: nutrients[i]?.calories ?? null,
     protein_g: nutrients[i]?.protein_g ?? null,
     fiber_g: nutrients[i]?.fiber_g ?? null,
+    nutrients: nutrients[i]?.nutrients ?? null,
     qty: null,
     created_at: now,
   }))
@@ -573,6 +583,7 @@ export const useEntriesStore = create<MealsState>()(
               calories: nutrients[i]?.calories ?? null,
               protein_g: nutrients[i]?.protein_g ?? null,
               fiber_g: nutrients[i]?.fiber_g ?? null,
+              nutrients: nutrients[i]?.nutrients ?? null,
               consumed_at: consumedAt,
             }))
           ),
@@ -611,6 +622,7 @@ export const useEntriesStore = create<MealsState>()(
                 calories: chip.calories ?? null,
                 protein_g: chip.protein_g ?? null,
                 fiber_g: chip.fiber_g ?? null,
+                nutrients: chip.nutrients ?? null,
                 qty: null,
                 created_at: m.items[i]?.created_at ?? now,
               }))
@@ -638,6 +650,7 @@ export const useEntriesStore = create<MealsState>()(
               calories: item.calories ?? null,
               protein_g: item.protein_g ?? null,
               fiber_g: item.fiber_g ?? null,
+              nutrients: item.nutrients,
               consumed_at: updates.consumed_at,
             }))
           ),

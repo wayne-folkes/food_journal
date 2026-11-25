@@ -13,10 +13,11 @@ describe('buildLookupCacheRows', () => {
           calories: null,
           protein_g: null,
           fiber_g: null,
+          nutrients: null,
           source: 'not_found',
         },
         fdcId: null,
-        per100g: { calories: null, protein_g: null, fiber_g: null },
+        per100g: { calories: null, protein_g: null, fiber_g: null, nutrients: null },
       }],
       NOW
     )
@@ -28,6 +29,7 @@ describe('buildLookupCacheRows', () => {
         calories_per_100g: null,
         protein_per_100g: null,
         fiber_per_100g: null,
+        nutrients_per_100g: null,
         source: 'not_found',
         usda_fdc_id: null,
         serving_g: null,
@@ -46,10 +48,11 @@ describe('buildLookupCacheRows', () => {
           calories: 364,
           protein_g: 19.3,
           fiber_g: 17.4,
+          nutrients: null,
           source: 'usda',
         },
         fdcId: 170392,
-        per100g: { calories: 364, protein_g: 19.3, fiber_g: 17.4 },
+        per100g: { calories: 364, protein_g: 19.3, fiber_g: 17.4, nutrients: null },
       }],
       NOW
     )
@@ -61,6 +64,7 @@ describe('buildLookupCacheRows', () => {
         calories_per_100g: 364,
         protein_per_100g: 19.3,
         fiber_per_100g: 17.4,
+        nutrients_per_100g: null,
         source: 'usda',
         usda_fdc_id: 170392,
         serving_g: null,
@@ -77,15 +81,18 @@ describe('legacy cache refresh safety', () => {
     calories_per_100g: source === 'usda' ? 89 : null,
     protein_per_100g: source === 'usda' ? 1.1 : null,
     fiber_per_100g: source === 'usda' ? 2.6 : null,
+    nutrients_per_100g: null,
     source,
     usda_fdc_id: null,
     serving_g: null,
     created_at: NOW.toISOString(),
   })
 
-  it('treats usda rows without protein as misses; not_found and complete rows stay hits', () => {
-    expect(isCacheHit({ source: 'usda', protein_per_100g: null })).toBe(false)
-    expect(isCacheHit({ source: 'usda', protein_per_100g: 0 })).toBe(true)
+  it('treats usda rows without protein or nutrients as misses; not_found and complete rows stay hits', () => {
+    expect(isCacheHit({ source: 'usda', protein_per_100g: null, nutrients_per_100g: {} })).toBe(false)
+    expect(isCacheHit({ source: 'usda', protein_per_100g: 0, nutrients_per_100g: null })).toBe(false)
+    expect(isCacheHit({ source: 'usda', protein_per_100g: 0 })).toBe(false)
+    expect(isCacheHit({ source: 'usda', protein_per_100g: 0, nutrients_per_100g: {} })).toBe(true)
     expect(isCacheHit({ source: 'not_found', protein_per_100g: null })).toBe(true)
   })
 
@@ -119,14 +126,14 @@ describe('not_found TTL and failed lookups', () => {
   })
 
   it('never expires complete usda rows by age', () => {
-    expect(isCacheHit({ source: 'usda', protein_per_100g: 1, created_at: ago(365 * day) }, now)).toBe(true)
+    expect(isCacheHit({ source: 'usda', protein_per_100g: 1, nutrients_per_100g: {}, created_at: ago(365 * day) }, now)).toBe(true)
     expect(isCacheHit({ source: 'usda', protein_per_100g: null, created_at: ago(day) }, now)).toBe(false)
   })
 
   it('drops rows for failed lookups but keeps genuine not_found and usda rows', () => {
     const mk = (key: string, source: 'usda' | 'not_found'): LookupCacheRow => ({
       description_key: key, description: key,
-      calories_per_100g: null, protein_per_100g: null, fiber_per_100g: null,
+      calories_per_100g: null, protein_per_100g: null, fiber_per_100g: null, nutrients_per_100g: null,
       source, usda_fdc_id: null, serving_g: null, created_at: NOW.toISOString(),
     })
     const rows = [mk('flaky', 'not_found'), mk('mystery', 'not_found'), mk('apple', 'usda')]
@@ -137,9 +144,9 @@ describe('not_found TTL and failed lookups', () => {
     const rows = buildLookupCacheRows(
       [{ id: 'item-1', description: 'almonds' }],
       [{
-        result: { id: 'item-1', description: 'almonds', calories: 162, protein_g: 5.9, fiber_g: 3.5, source: 'usda' },
+        result: { id: 'item-1', description: 'almonds', calories: 162, protein_g: 5.9, fiber_g: 3.5, nutrients: null, source: 'usda' },
         fdcId: 1,
-        per100g: { calories: 579, protein_g: 21.2, fiber_g: 12.5 },
+        per100g: { calories: 579, protein_g: 21.2, fiber_g: 12.5, nutrients: null },
         servingG: 28,
       }],
       NOW

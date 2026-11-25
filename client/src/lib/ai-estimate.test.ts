@@ -23,17 +23,17 @@ describe('parseAiEstimates', () => {
       '[{"id":"a","calories":143,"protein_g":12.34,"fiber_g":0.56}]',
       items
     )
-    expect(out.get('a')).toEqual({ calories: 143, protein_g: 12.3, fiber_g: 0.6 })
+    expect(out.get('a')).toEqual({ calories: 143, protein_g: 12.3, fiber_g: 0.6, nutrients: null })
   })
 
   it('treats 0 as a valid macro value', () => {
     const out = parseAiEstimates('[{"id":"a","calories":90,"protein_g":0,"fiber_g":0}]', items)
-    expect(out.get('a')).toEqual({ calories: 90, protein_g: 0, fiber_g: 0 })
+    expect(out.get('a')).toEqual({ calories: 90, protein_g: 0, fiber_g: 0, nutrients: null })
   })
 
   it('nulls missing macros but keeps the entry', () => {
     const out = parseAiEstimates('[{"id":"a","calories":140}]', items)
-    expect(out.get('a')).toEqual({ calories: 140, protein_g: null, fiber_g: null })
+    expect(out.get('a')).toEqual({ calories: 140, protein_g: null, fiber_g: null, nutrients: null })
   })
 
   it('nulls only the implausible macro and keeps the rest', () => {
@@ -41,7 +41,7 @@ describe('parseAiEstimates', () => {
       '[{"id":"a","calories":500,"protein_g":301,"fiber_g":4}]',
       items
     )
-    expect(out.get('a')).toEqual({ calories: 500, protein_g: null, fiber_g: 4 })
+    expect(out.get('a')).toEqual({ calories: 500, protein_g: null, fiber_g: 4, nutrients: null })
   })
 
   it('nulls negative and non-numeric macros', () => {
@@ -49,8 +49,21 @@ describe('parseAiEstimates', () => {
       '[{"id":"a","calories":200,"protein_g":-1,"fiber_g":101},{"id":"b","calories":300,"protein_g":"lots","fiber_g":null}]',
       items
     )
-    expect(out.get('a')).toEqual({ calories: 200, protein_g: null, fiber_g: null })
-    expect(out.get('b')).toEqual({ calories: 300, protein_g: null, fiber_g: null })
+    expect(out.get('a')).toEqual({ calories: 200, protein_g: null, fiber_g: null, nutrients: null })
+    expect(out.get('b')).toEqual({ calories: 300, protein_g: null, fiber_g: null, nutrients: null })
+  })
+
+  it('keeps plausible nutrients, drops unknown, negative and implausible keys', () => {
+    const out = parseAiEstimates(
+      '[{"id":"a","calories":300,"protein_g":10,"fiber_g":2,"nutrients":{"carbs_g":40.123,"sodium_mg":-5,"iron_mg":9999,"bogus_g":3,"vitamin_c_mg":"lots","fat_g":0}}]',
+      items
+    )
+    expect(out.get('a')?.nutrients).toEqual({ carbs_g: 40.12, fat_g: 0 })
+  })
+
+  it('nulls nutrients when the model sends something other than an object', () => {
+    const out = parseAiEstimates('[{"id":"a","calories":300,"nutrients":[1,2]}]', items)
+    expect(out.get('a')?.nutrients).toBeNull()
   })
 
   it('tolerates code fences and surrounding prose', () => {
@@ -58,7 +71,7 @@ describe('parseAiEstimates', () => {
       'Sure!\n```json\n[{"id":"a","calories":140,"protein_g":5,"fiber_g":2}]\n```',
       items
     )
-    expect([...out]).toEqual([['a', { calories: 140, protein_g: 5, fiber_g: 2 }]])
+    expect([...out]).toEqual([['a', { calories: 140, protein_g: 5, fiber_g: 2, nutrients: null }]])
   })
 
   it('drops unknown ids, non-numbers and implausible calories', () => {
@@ -85,7 +98,7 @@ describe('parseAiEstimates', () => {
 
 describe('calorieSourceLabel', () => {
   const r = (source: LookupResult['source'], calories: number | null = 100): LookupResult =>
-    ({ id: 'x', description: 'x', calories, protein_g: null, fiber_g: null, source })
+    ({ id: 'x', description: 'x', calories, protein_g: null, fiber_g: null, nutrients: null, source })
 
   it('labels by source', () => {
     expect(calorieSourceLabel([r('usda')])).toBe('USDA')

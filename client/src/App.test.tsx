@@ -303,7 +303,7 @@ describe('App nutrition estimate', () => {
   })
 
   it('does not look anything up when every item is complete', async () => {
-    Object.assign(meal().items[0], { calories: 95, protein_g: 0.5, fiber_g: 4.4 })
+    Object.assign(meal().items[0], { calories: 95, protein_g: 0.5, fiber_g: 4.4, nutrients: {} })
 
     await estimate()
 
@@ -335,7 +335,7 @@ describe('App undo delete', () => {
     id: 'm-del', user_id: 'u', meal_type: 'snack' as const, consumed_at: '2026-04-17T09:00:00.000Z',
     raw_input: 'apple, toast', created_at: '', updated_at: '',
     items: [
-      { id: 'a', meal_id: 'm-del', description: 'apple', position: 0, consumed_at: '', created_at: '', calories: 95, protein_g: 0.5, fiber_g: 4.4 },
+      { id: 'a', meal_id: 'm-del', description: 'apple', position: 0, consumed_at: '', created_at: '', calories: 95, protein_g: 0.5, fiber_g: 4.4, nutrients: { carbs_g: 25 } },
       { id: 'b', meal_id: 'm-del', description: 'toast', position: 1, consumed_at: '', created_at: '', calories: null, protein_g: null, fiber_g: null },
       { id: 'c', meal_id: 'm-del', description: 'jam', position: 2, consumed_at: '', created_at: '', calories: 50, protein_g: null, fiber_g: null },
     ],
@@ -364,9 +364,9 @@ describe('App undo delete', () => {
       expect(mocks.mockAddMeal).toHaveBeenCalledWith(
         { meal_type: 'snack', consumed_at: original.consumed_at, raw_input: 'apple, toast', items: ['apple', 'toast', 'jam'] },
         [
-          { calories: 95, protein_g: 0.5, fiber_g: 4.4 },
-          { calories: null, protein_g: null, fiber_g: null },
-          { calories: 50, protein_g: null, fiber_g: null },
+          { calories: 95, protein_g: 0.5, fiber_g: 4.4, nutrients: { carbs_g: 25 } },
+          { calories: null, protein_g: null, fiber_g: null, nutrients: null },
+          { calories: 50, protein_g: null, fiber_g: null, nutrients: null },
         ]
       )
       expect(mocks.mockUpdateItemNutrients).not.toHaveBeenCalled()
